@@ -1,0 +1,56 @@
+{
+  "agents": {
+    "defaultBehavior": "collaborative",
+    "maxIterations": 3,
+    "requireExplicitApproval": [
+      "databaseChanges",
+      "pricingLogicChanges",
+      "breakingChanges",
+      "newDependencies"
+    ]
+  },
+  "commands": {
+    "autoTriggerTests": true,
+    "autoRunTypeCheck": true,
+    "requirePricingValidation": true,
+    "e2eTestingThreshold": "critical-flows"
+  },
+  "context": {
+    "autoIncludeCLAUDEmd": true,
+    "maxTokensPerTask": 50000,
+    "warnAtTokens": 75000,
+    "pauseAtTokens": 100000
+  },
+  "validation": {
+    "requirePricingVerification": true,
+    "requireSecurityAudit": [
+      "authChanges",
+      "pricingDataChanges",
+      "fileUploadChanges",
+      "apiChanges"
+    ],
+    "requireE2E": [
+      "quoteProcessing",
+      "bomEditing",
+      "pdfGeneration",
+      "authentication"
+    ]
+  },
+  "reporting": {
+    "defaultFormat": "plainEnglish",
+    "includePricingMetrics": true,
+    "includeTestCoverage": true,
+    "includeSecurityStatus": true
+  },
+  "cpq": {
+    "pricingAccuracy": "critical",
+    "dataIntegrity": "critical",
+    "supplierCostConfidentiality": "critical",
+    "traceabilityRequirement": "always"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)"
+    ]
+  }
+}

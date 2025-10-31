@@ -1,0 +1,48 @@
+{
+    "mcpServers": {
+        "context7": {
+            "type": "stdio",
+            "command": "cmd",
+            "args": [
+                "/c",
+                "npx",
+                "-y",
+                "@upstash/context7-mcp"
+            ],
+            "env": {}
+        },
+        "supabase": {
+            "type": "stdio",
+            "command": "cmd",
+            "args": [
+                "/c",
+                "npx",
+                "-y",
+                "@supabase/mcp-server-postgrest@latest",
+                "--apiUrl",
+                "https://your-project-id.supabase.co/rest/v1",
+                "--apiKey",
+                "your-supabase-service-role-key",
+                "--schema",
+                "public"
+            ]
+        },
+        "playwright": {
+            "type": "stdio",
+            "command": "cmd",
+            "args": [
+                "/c",
+                "npx",
+                "-y",
+                "@playwright/mcp@latest"
+            ]
+        },
+        "shadcn": {
+            "command": "npx",
+            "args": [
+                "shadcn@latest",
+                "mcp"
+            ]
+        }
+    }
+}

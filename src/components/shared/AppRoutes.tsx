@@ -1,5 +1,5 @@
 import React from 'react'
-import { useCPQ } from '@/contexts/CPQContext'
+import { useCPQ } from '../../contexts/CPQContext'
 import { Dashboard } from '../dashboard/Dashboard'
 import { QuoteIngestion } from '../ingestion/QuoteIngestion'
 import { ComponentLibrary } from '../library/ComponentLibrary'
@@ -21,7 +21,7 @@ export function AppRoutes() {
       return <Dashboard />
     case 'quotes':
       return <QuoteIngestion />
-    case 'library':
+    case 'components':
       return <ComponentLibrary />
     case 'projects':
       return <ProjectList />

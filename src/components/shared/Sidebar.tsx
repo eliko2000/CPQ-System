@@ -1,5 +1,5 @@
 import React from 'react'
-import { useCPQ } from '@/contexts/CPQContext'
+import { useCPQ } from '../../contexts/CPQContext'
 import {
   LayoutDashboard,
   FileText,
@@ -10,7 +10,7 @@ import {
   Menu,
   X
 } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn } from '../../lib/utils'
 
 export function Sidebar() {
   const { uiState, setActiveView, toggleSidebar } = useCPQ()
@@ -29,7 +29,7 @@ export function Sidebar() {
     {
       name: 'Library',
       icon: Package,
-      view: 'library' as const,
+      view: 'components' as const,
     },
     {
       name: 'Projects',

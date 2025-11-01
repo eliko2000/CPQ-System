@@ -1,4 +1,17 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "WebSearch"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "context7",
+    "supabase",
+    "playwright",
+    "shadcn"
+  ],
   "agents": {
     "defaultBehavior": "collaborative",
     "maxIterations": 3,
@@ -47,10 +60,5 @@
     "dataIntegrity": "critical",
     "supplierCostConfidentiality": "critical",
     "traceabilityRequirement": "always"
-  },
-  "permissions": {
-    "allow": [
-      "Bash(npm install:*)"
-    ]
   }
 }

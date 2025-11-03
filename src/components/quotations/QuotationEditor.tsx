@@ -4,10 +4,12 @@ import { ColDef, ICellRendererParams, ValueGetterParams, ICellEditorParams } fro
 import { useCPQ } from '../../contexts/CPQContext'
 import { QuotationProject, QuotationItem, QuotationSystem, Component } from '../../types'
 import { QuotationParameters } from './QuotationParameters'
-import { calculateQuotationTotals } from '../../utils/quotationCalculations'
+import { calculateQuotationTotals, renumberItems } from '../../utils/quotationCalculations'
 import { Button } from '../ui/button'
 import { Trash2, Plus, Settings, ChevronDown, X, Save, LogOut, Edit } from 'lucide-react'
 import { useClickOutside } from '../../hooks/useClickOutside'
+import { useTableConfig } from '../../hooks/useTableConfig'
+import { useQuotations } from '../../hooks/useQuotations'
 import { CustomHeader } from '../grid/CustomHeader'
 import { ComponentForm } from '../library/ComponentForm'
 import 'ag-grid-community/styles/ag-grid.css'
@@ -64,12 +66,12 @@ class SystemNameEditor {
   private boundBlur!: () => void
   private boundInput!: () => void
 
-  // gets called once before the renderer is used
+  // gets called once before renderer is used
   init(params: ICellEditorParams): void {
     this.params = params
     this.value = params.value || ''
     
-    // create the cell editor
+    // create cell editor
     this.eInput = document.createElement('input')
     this.eInput.type = 'text'
     this.eInput.value = this.value
@@ -141,7 +143,7 @@ class SystemNameEditor {
     this.eInput.removeEventListener('input', this.boundInput)
   }
 
-  // returns false if we don't want popup
+  // returns false if we don't want a popup
   isPopup(): boolean {
     return false
   }
@@ -167,15 +169,23 @@ export function QuotationEditor() {
     closeModal
   } = useCPQ()
 
+  // Use quotations hook for Supabase persistence
+  const quotationsHook = useQuotations()
+
+  // Use table configuration hook
+  const { config, saveConfig, loading } = useTableConfig('quotation_editor', {
+    columnOrder: ['customerPriceILS', 'totalPriceILS', 'totalPriceUSD', 'unitPriceILS', 'quantity', 'componentName', 'displayNumber', 'actions'],
+    columnWidths: {},
+    visibleColumns: ['customerPriceILS', 'totalPriceILS', 'totalPriceUSD', 'unitPriceILS', 'quantity', 'componentName', 'displayNumber', 'actions'],
+    filterState: {}
+  })
+
   // Make components available globally for the LibrarySearchEditor
   useEffect(() => {
     (window as any).__cpq_components = components
   }, [components])
 
   const [selectedItems, setSelectedItems] = useState<string[]>([])
-  const [visibleColumns, setVisibleColumns] = useState<Set<string>>(new Set([
-    'displayNumber', 'componentName', 'quantity', 'unitPriceILS', 'totalPriceUSD', 'totalPriceILS', 'customerPriceILS', 'actions'
-  ]))
   const [showColumnManager, setShowColumnManager] = useState(false)
   const [showComponentSelector, setShowComponentSelector] = useState(false)
   const [selectedSystemId, setSelectedSystemId] = useState<string>('')
@@ -203,71 +213,53 @@ export function QuotationEditor() {
     )
   }, [components, componentSearchText])
 
-  // Initialize a new quotation if none exists
-  const initializeQuotation = useCallback(() => {
-    const newQuotation: QuotationProject = {
-      id: `quote_${Date.now()}`,
-      name: 'הצעת מחיר חדשה',
-      customerName: 'לקוח לדוגמה',
-      status: 'draft',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      systems: [],
-      parameters: {
-        usdToIlsRate: 3.7,
-        eurToIlsRate: 4.0,
-        markupPercent: 25,
-        dayWorkCost: 1200,
-        profitPercent: 20,
-        riskPercent: 10,
-        includeVAT: true,
-        vatRate: 18
-      },
-      items: [],
-      calculations: {
-        totalHardwareUSD: 0,
-        totalHardwareILS: 0,
-        totalLaborUSD: 0,
-        totalLaborILS: 0,
-        subtotalUSD: 0,
-        subtotalILS: 0,
-        totalCustomerPriceILS: 0,
-        riskAdditionILS: 0,
-        totalQuoteILS: 0,
-        totalVATILS: 0,
-        finalTotalILS: 0,
-        totalCostILS: 0,
-        totalProfitILS: 0,
-        profitMarginPercent: 0
-      }
-    }
-    
-    setCurrentQuotation(newQuotation)
-    addQuotation(newQuotation)
-  }, [setCurrentQuotation, addQuotation])
-
   // Add a new system
-  const addSystem = useCallback(() => {
+  const addSystem = useCallback(async () => {
     if (!currentQuotation) return
 
-    const newSystem: QuotationSystem = {
-      id: `system_${Date.now()}`,
-      name: `מערכת ${currentQuotation.systems.length + 1}`,
-      description: '',
-      order: currentQuotation.systems.length + 1,
-      quantity: 1,
-      createdAt: new Date().toISOString()
-    }
+    const systemOrder = currentQuotation.systems.length + 1
 
-    const updatedQuotation = {
-      ...currentQuotation,
-      systems: [...currentQuotation.systems, newSystem]
-    }
+    // Persist system to Supabase FIRST to get real ID
+    try {
+      const dbSystem = await quotationsHook.addQuotationSystem({
+        quotation_id: currentQuotation.id,
+        system_name: `מערכת ${systemOrder}`,
+        system_description: '',
+        quantity: 1,
+        sort_order: systemOrder,
+        unit_cost: 0,
+        total_cost: 0,
+        unit_price: 0,
+        total_price: 0
+      })
 
-    setCurrentQuotation(updatedQuotation)
-    updateQuotation(currentQuotation.id, { systems: updatedQuotation.systems })
-    setIsDirty(true)
-  }, [currentQuotation, setCurrentQuotation, updateQuotation])
+      if (!dbSystem) {
+        throw new Error('Failed to create system')
+      }
+
+      // Create local system with DB ID
+      const newSystem: QuotationSystem = {
+        id: dbSystem.id,
+        name: dbSystem.system_name,
+        description: dbSystem.system_description || '',
+        order: dbSystem.sort_order,
+        quantity: dbSystem.quantity,
+        createdAt: dbSystem.created_at
+      }
+
+      const updatedQuotation = {
+        ...currentQuotation,
+        systems: [...currentQuotation.systems, newSystem]
+      }
+
+      setCurrentQuotation(updatedQuotation)
+      updateQuotation(currentQuotation.id, { systems: updatedQuotation.systems })
+      setIsDirty(true)
+    } catch (error) {
+      console.error('Failed to save system:', error)
+      alert('שגיאה בהוספת מערכת. נסה שוב.')
+    }
+  }, [currentQuotation, setCurrentQuotation, updateQuotation, quotationsHook])
 
   // Open component selector popup
   const openComponentSelector = useCallback((systemId: string) => {
@@ -277,63 +269,120 @@ export function QuotationEditor() {
   }, [])
 
   // Add selected component to system
-  const addComponentToSystem = useCallback((component: Component) => {
+  const addComponentToSystem = useCallback(async (component: Component) => {
     if (!currentQuotation || !selectedSystemId) return
 
     const system = currentQuotation.systems.find(s => s.id === selectedSystemId)
     if (!system) return
 
-    const newItem: QuotationItem = {
-      id: `item_${Date.now()}`,
-      systemId: selectedSystemId,
-      systemOrder: system.order,
-      itemOrder: (currentQuotation.items.filter(item => item.systemId === selectedSystemId).length + 1),
-      displayNumber: `${system.order}.${(currentQuotation.items.filter(item => item.systemId === selectedSystemId).length + 1)}`,
-      componentName: component.name,
-      componentCategory: component.category,
-      isLabor: false,
-      quantity: 1,
-      unitPriceUSD: component.unitCostUSD || 0,
-      unitPriceILS: component.unitCostNIS || 0,
-      totalPriceUSD: (component.unitCostUSD || 0) * 1,
-      totalPriceILS: (component.unitCostNIS || 0) * 1,
-      itemMarkupPercent: currentQuotation.parameters.markupPercent || 25,
-      customerPriceILS: (component.unitCostNIS || 0) * 1,
-      notes: '',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    }
+    const itemOrder = currentQuotation.items.filter(item => item.systemId === selectedSystemId).length + 1
 
-    const updatedQuotation = {
-      ...currentQuotation,
-      items: [...currentQuotation.items, newItem]
-    }
+    // Persist item to Supabase FIRST to get real ID
+    try {
+      const dbItem = await quotationsHook.addQuotationItem({
+        quotation_system_id: selectedSystemId,
+        component_id: component.id,
+        item_name: component.name,
+        manufacturer: component.manufacturer,
+        manufacturer_part_number: component.manufacturerPN,
+        quantity: 1,
+        unit_cost: component.unitCostNIS || 0,
+        total_cost: component.unitCostNIS || 0,
+        unit_price: component.unitCostNIS || 0,
+        total_price: component.unitCostNIS || 0,
+        margin_percentage: currentQuotation.parameters.markupPercent || 25,
+        sort_order: itemOrder
+      })
 
-    setCurrentQuotation(updatedQuotation)
-    updateQuotation(currentQuotation.id, { items: updatedQuotation.items })
-    setShowComponentSelector(false)
-    setIsDirty(true)
-  }, [currentQuotation, selectedSystemId, setCurrentQuotation, updateQuotation])
+      if (!dbItem) {
+        throw new Error('Failed to create item')
+      }
+
+      // Create local item with DB ID
+      const newItem: QuotationItem = {
+        id: dbItem.id,
+        systemId: selectedSystemId,
+        systemOrder: system.order,
+        itemOrder: itemOrder,
+        displayNumber: `${system.order}.${itemOrder}`,
+        componentId: component.id,
+        componentName: component.name,
+        componentCategory: component.category,
+        isLabor: false,
+        quantity: dbItem.quantity,
+        unitPriceUSD: component.unitCostUSD || 0,
+        unitPriceILS: dbItem.unit_cost || 0,
+        totalPriceUSD: (component.unitCostUSD || 0) * dbItem.quantity,
+        totalPriceILS: dbItem.total_cost || 0,
+        itemMarkupPercent: dbItem.margin_percentage || 25,
+        customerPriceILS: dbItem.total_price || 0,
+        notes: dbItem.notes || '',
+        createdAt: dbItem.created_at,
+        updatedAt: dbItem.updated_at
+      }
+
+      const updatedQuotation = {
+        ...currentQuotation,
+        items: [...currentQuotation.items, newItem]
+      }
+
+      setCurrentQuotation(updatedQuotation)
+      updateQuotation(currentQuotation.id, { items: updatedQuotation.items })
+      setShowComponentSelector(false)
+      setIsDirty(true)
+    } catch (error) {
+      console.error('Failed to save item:', error)
+      alert('שגיאה בהוספת פריט. נסה שוב.')
+    }
+  }, [currentQuotation, selectedSystemId, setCurrentQuotation, updateQuotation, quotationsHook])
 
   // Delete item
-  const deleteItem = useCallback((itemId: string) => {
+  const deleteItem = useCallback(async (itemId: string) => {
     if (!currentQuotation) return
 
+    // Delete from Supabase first
+    try {
+      await quotationsHook.deleteQuotationItem(itemId)
+    } catch (error) {
+      console.error('Failed to delete item:', error)
+    }
+
+    // Remove from local state
     const updatedItems = currentQuotation.items.filter(item => item.id !== itemId)
+
+    // Renumber items
+    const renumberedItems = renumberItems(updatedItems)
+
     const updatedQuotation = {
       ...currentQuotation,
-      items: updatedItems
+      items: renumberedItems
     }
 
     setCurrentQuotation(updatedQuotation)
-    updateQuotation(currentQuotation.id, { items: updatedItems })
+    updateQuotation(currentQuotation.id, { items: renumberedItems })
     setIsDirty(true)
-  }, [currentQuotation, setCurrentQuotation, updateQuotation])
+  }, [currentQuotation, quotationsHook, setCurrentQuotation, updateQuotation])
 
   // Update item
-  const updateItem = useCallback((itemId: string, updates: Partial<QuotationItem>) => {
+  const updateItem = useCallback(async (itemId: string, updates: Partial<QuotationItem>) => {
     if (!currentQuotation) return
 
+    // Update in Supabase first
+    try {
+      await quotationsHook.updateQuotationItem(itemId, {
+        quantity: updates.quantity,
+        unit_cost: updates.unitPriceILS,
+        total_cost: updates.totalPriceILS,
+        unit_price: updates.unitPriceILS,
+        total_price: updates.totalPriceILS,
+        margin_percentage: updates.itemMarkupPercent,
+        notes: updates.notes
+      })
+    } catch (error) {
+      console.error('Failed to update item:', error)
+    }
+
+    // Update local state
     const updatedItems = currentQuotation.items.map(item =>
       item.id === itemId
         ? { ...item, ...updates, updatedAt: new Date().toISOString() }
@@ -348,7 +397,7 @@ export function QuotationEditor() {
     setCurrentQuotation(updatedQuotation)
     updateQuotation(currentQuotation.id, { items: updatedItems })
     setIsDirty(true)
-  }, [currentQuotation, setCurrentQuotation, updateQuotation])
+  }, [currentQuotation, quotationsHook, setCurrentQuotation, updateQuotation])
 
   // Update parameters
   const updateParameters = useCallback((parameters: any) => {
@@ -424,7 +473,7 @@ export function QuotationEditor() {
       const systemItems = currentQuotation.items.filter(item => item.systemId === system.id)
       
       // Calculate system totals with current profit coefficient
-      const systemTotalCost = systemItems.reduce((sum, item) => sum + ((item.unitPriceILS || 0) * (item.quantity || 1)), 0)
+      const systemTotalCost = systemItems.reduce((sum, item) => sum + ((item.unitPriceILS || 0) * (item.quantity ||1)), 0)
       const profitCoefficient = 1 / (1 + markupPercent / 100)
       const systemCustomerPrice = systemTotalCost / profitCoefficient
       
@@ -478,7 +527,7 @@ export function QuotationEditor() {
       valueGetter: (params: ValueGetterParams) => {
         if (params.data.isSystemGroup) {
           const system = currentQuotation?.systems.find(s => s.id === params.data.systemId)
-          const systemQuantity = system?.quantity || 1
+          const systemQuantity = system?.quantity ||1
           const systemItems = gridData.filter(item => 
             item.systemId === params.data.systemId && !item.isSystemGroup
           )
@@ -527,7 +576,7 @@ export function QuotationEditor() {
             item.systemId === params.data.systemId && !item.isSystemGroup
           )
           const itemsTotal = systemItems.reduce((sum: number, item: any) => {
-            const unitPrice = item.unitPriceILS || 0
+            const unitPrice = item.unitPriceILS ||0
             const quantity = item.quantity || 1
             return sum + (unitPrice * quantity)
           }, 0)
@@ -741,18 +790,49 @@ export function QuotationEditor() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => {
+                onClick={async () => {
                   // Delete system and all its items
-                  if (currentQuotation) {
-                    const updatedSystems = currentQuotation.systems.filter(s => s.id !== params.data.systemId)
-                    const updatedItems = currentQuotation.items.filter(item => item.systemId !== params.data.systemId)
+                  if (!currentQuotation) return
+
+                  const systemId = params.data.systemId
+
+                  // Delete from Supabase first
+                  try {
+                    // Delete all items in this system
+                    const itemsToDelete = currentQuotation.items.filter(item => item.systemId === systemId)
+                    for (const item of itemsToDelete) {
+                      await quotationsHook.deleteQuotationItem(item.id)
+                    }
+
+                    // Delete the system itself
+                    await quotationsHook.deleteQuotationSystem(systemId)
+
+                    // Remove from local state
+                    const updatedSystems = currentQuotation.systems
+                      .filter(s => s.id !== systemId)
+                      .map((s, index) => ({
+                        ...s,
+                        order: index + 1
+                      }))
+
+                    const updatedItems = currentQuotation.items
+                      .filter(item => item.systemId !== systemId)
+
+                    // Renumber all items with new system orders
+                    const renumberedItems = renumberItems(updatedItems, updatedSystems)
+
                     const updatedQuotation = {
                       ...currentQuotation,
                       systems: updatedSystems,
-                      items: updatedItems
+                      items: renumberedItems
                     }
+
                     setCurrentQuotation(updatedQuotation)
-                    updateQuotation(currentQuotation.id, { systems: updatedSystems, items: updatedItems })
+                    updateQuotation(currentQuotation.id, { systems: updatedSystems, items: renumberedItems })
+                    setIsDirty(true)
+                  } catch (error) {
+                    console.error('Failed to delete system:', error)
+                    alert('שגיאה במחיקת מערכת. נסה שוב.')
                   }
                 }}
                 className="h-8 w-8 p-0 text-red-600 hover:text-red-800"
@@ -806,10 +886,18 @@ export function QuotationEditor() {
     }
   ], [gridData, getUniqueValues, openComponentSelector, deleteItem, components, setModal])
 
-  // Filter columns based on visibility
+  // Filter and reorder columns based on config
   const visibleColumnDefs = useMemo(() => {
-    return columnDefs.filter(col => visibleColumns.has(col.field!))
-  }, [columnDefs, visibleColumns])
+    // First filter by visibility, then reorder
+    const visible = columnDefs.filter(col => config.visibleColumns.includes(col.field!))
+    
+    // Reorder according to config.columnOrder
+    const ordered = config.columnOrder
+      .filter(fieldId => visible.some(col => col.field === fieldId))
+      .map(fieldId => visible.find(col => col.field === fieldId)!)
+    
+    return ordered
+  }, [columnDefs, config.visibleColumns, config.columnOrder])
 
   // Auto-group column definition
   const autoGroupColumnDef = useMemo(() => ({
@@ -843,9 +931,6 @@ export function QuotationEditor() {
       resizable: true,
       sortable: false,
       filter: true
-    },
-    onGridReady: (params: any) => {
-      params.api.sizeColumnsToFit()
     }
   }), [])
 
@@ -901,25 +986,67 @@ export function QuotationEditor() {
 
   // Toggle column visibility
   const toggleColumn = useCallback((field: string) => {
-    setVisibleColumns(prev => {
-      const newSet = new Set(prev)
-      if (newSet.has(field)) {
-        newSet.delete(field)
-      } else {
-        newSet.add(field)
-      }
-      return newSet
-    })
-  }, [])
+    const newVisibleColumns = config.visibleColumns.includes(field)
+      ? config.visibleColumns.filter(col => col !== field)
+      : [...config.visibleColumns, field]
+    
+    saveConfig({ visibleColumns: newVisibleColumns })
+  }, [config.visibleColumns, saveConfig])
 
   // Get all available columns for management
   const allColumns = useMemo(() => {
     return columnDefs.map(col => ({
       field: col.field!,
       headerName: col.headerName!,
-      isVisible: visibleColumns.has(col.field!)
+      isVisible: config.visibleColumns.includes(col.field!)
     }))
-  }, [columnDefs, visibleColumns])
+  }, [columnDefs, config.visibleColumns])
+
+  // Handle grid ready with config restoration
+  const onGridReady = useCallback((params: any) => {
+    if (!params.api) return
+
+    // Apply saved column widths
+    if (Object.keys(config.columnWidths).length > 0) {
+      params.api.getAllDisplayedColumns()?.forEach((col: any) => {
+        const fieldId = col.getColId()
+        if (config.columnWidths[fieldId]) {
+          params.api.setColumnWidth(col.getColId(), config.columnWidths[fieldId])
+        }
+      })
+    }
+
+    // Apply saved filter state
+    if (Object.keys(config.filterState).length > 0) {
+      params.api.setFilterModel(config.filterState)
+    }
+
+    params.api.sizeColumnsToFit()
+  }, [config.columnWidths, config.filterState])
+
+  // Handle column resize
+  const onColumnResized = useCallback((params: any) => {
+    if (params.finished && params.api) {
+      const widths: Record<string, number> = {}
+      params.api.getAllDisplayedColumns()?.forEach((col: any) => {
+        widths[col.getColId()] = col.getActualWidth()
+      })
+      saveConfig({ columnWidths: widths })
+    }
+  }, [saveConfig])
+
+  // Handle column move
+  const onColumnMoved = useCallback((params: any) => {
+    if (params.finished && params.api) {
+      const order = params.api.getAllDisplayedColumns()?.map((col: any) => col.getColId()) || []
+      saveConfig({ columnOrder: order })
+    }
+  }, [saveConfig])
+
+  // Handle filter change
+  const onFilterChanged = useCallback((params: any) => {
+    saveConfig({ filterState: params.api.getFilterModel() })
+  }, [saveConfig])
 
   // Calculate totals
   const calculations = useMemo(() => {
@@ -927,21 +1054,12 @@ export function QuotationEditor() {
     return calculateQuotationTotals(currentQuotation)
   }, [currentQuotation])
 
+  if (loading) {
+    return <div className="flex items-center justify-center h-64">Loading table configuration...</div>
+  }
+
   if (!currentQuotation) {
-    return (
-      <div className="p-6">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">עורך הצעות מחיר</h2>
-          <p className="text-gray-600 mb-6">צור הצעת מחיר חדשה כדי להתחיל</p>
-          <button
-            onClick={initializeQuotation}
-            className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            צור הצעת מחיר חדשה
-          </button>
-        </div>
-      </div>
-    )
+    return <div className="flex items-center justify-center h-64">No quotation selected</div>
   }
 
   return (
@@ -1019,14 +1137,14 @@ export function QuotationEditor() {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => setVisibleColumns(new Set(allColumns.map(col => col.field)))}
+                      onClick={() => saveConfig({ visibleColumns: allColumns.map(col => col.field) })}
                     >
                       הצג הכל
                     </Button>
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => setVisibleColumns(new Set(['displayNumber', 'componentName', 'actions']))}
+                      onClick={() => saveConfig({ visibleColumns: ['displayNumber', 'componentName', 'actions'] })}
                     >
                       מינימלי
                     </Button>
@@ -1051,6 +1169,10 @@ export function QuotationEditor() {
             columnDefs={visibleColumnDefs}
             autoGroupColumnDef={autoGroupColumnDef}
             gridOptions={gridOptions}
+            onGridReady={onGridReady}
+            onColumnResized={onColumnResized}
+            onColumnMoved={onColumnMoved}
+            onFilterChanged={onFilterChanged}
             onCellValueChanged={onCellValueChanged}
             onCellDoubleClicked={onCellDoubleClicked}
             onSelectionChanged={(e) => setSelectedItems(e.api.getSelectedRows().map((row: any) => row.id))}

@@ -177,7 +177,15 @@ export function calculateQuotationTotals(project: QuotationProject): QuotationCa
 }
 
 // ============ Item Renumbering ============
-export function renumberItems(items: QuotationItem[]): QuotationItem[] {
+export function renumberItems(items: QuotationItem[], systems?: { id: string; order: number }[]): QuotationItem[] {
+  // Create systemId to order mapping if systems provided
+  const systemOrderMap: Record<string, number> = {};
+  if (systems) {
+    systems.forEach(system => {
+      systemOrderMap[system.id] = system.order;
+    });
+  }
+
   // Group items by system
   const itemsBySystem = items.reduce((acc, item) => {
     if (!acc[item.systemId]) {
@@ -186,22 +194,26 @@ export function renumberItems(items: QuotationItem[]): QuotationItem[] {
     acc[item.systemId].push(item);
     return acc;
   }, {} as Record<string, QuotationItem[]>);
-  
+
   // Sort items within each system and renumber
   const renumberedItems: QuotationItem[] = [];
-  
+
   Object.keys(itemsBySystem).forEach(systemId => {
+    // Get the correct system order (either from map or from first item)
+    const systemOrder = systems ? systemOrderMap[systemId] : itemsBySystem[systemId][0]?.systemOrder || 1;
+
     const systemItems = itemsBySystem[systemId]
       .sort((a, b) => a.itemOrder - b.itemOrder)
       .map((item, index) => ({
         ...item,
+        systemOrder: systemOrder, // Update system order
         itemOrder: index + 1,
-        displayNumber: generateDisplayNumber(item.systemOrder, index + 1)
+        displayNumber: generateDisplayNumber(systemOrder, index + 1)
       }));
-    
+
     renumberedItems.push(...systemItems);
   });
-  
+
   return renumberedItems;
 }
 

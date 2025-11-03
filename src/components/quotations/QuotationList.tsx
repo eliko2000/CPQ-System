@@ -1,14 +1,17 @@
 import { useState } from 'react'
 import { useCPQ } from '../../contexts/CPQContext'
 import { QuotationProject } from '../../types'
+import { useQuotations } from '../../hooks/useQuotations'
 import { Button } from '../ui/button'
 import { Card } from '../ui/card'
 
 export function QuotationList() {
-  const { quotations, setCurrentQuotation, setActiveView } = useCPQ()
+  const { quotations, setCurrentQuotation, addQuotation } = useCPQ()
+  const quotationsHook = useQuotations()
   const [filterStatus, setFilterStatus] = useState<string>('all')
+  const [creating, setCreating] = useState(false)
 
-  const filteredQuotations = quotations.filter(quotation => 
+  const filteredQuotations = quotations.filter(quotation =>
     filterStatus === 'all' || quotation.status === filterStatus
   )
 
@@ -16,9 +19,81 @@ export function QuotationList() {
     setCurrentQuotation(quotation)
   }
 
-  const handleCreateNew = () => {
-    setCurrentQuotation(null)
-    setActiveView('quotations')
+  const handleCreateNew = async () => {
+    if (creating) return
+
+    console.log('[QuotationList] Creating new quotation...')
+    setCreating(true)
+
+    try {
+      // Create quotation in Supabase first
+      const dbQuotation = await quotationsHook.addQuotation({
+        quotation_number: `Q-${Date.now()}`,
+        customer_name: 'לקוח לדוגמה',
+        project_name: 'הצעת מחיר חדשה',
+        currency: 'ILS',
+        exchange_rate: 3.7,
+        margin_percentage: 25,
+        status: 'draft',
+        total_cost: 0,
+        total_price: 0
+      })
+
+      if (!dbQuotation) {
+        throw new Error('Failed to create quotation')
+      }
+
+      console.log('[QuotationList] DB Quotation created:', dbQuotation)
+
+      // Create local quotation object
+      const newQuotation: QuotationProject = {
+        id: dbQuotation.id,
+        name: dbQuotation.project_name || 'הצעת מחיר חדשה',
+        customerName: dbQuotation.customer_name,
+        status: 'draft',
+        createdAt: dbQuotation.created_at,
+        updatedAt: dbQuotation.updated_at,
+        systems: [],
+        parameters: {
+          usdToIlsRate: dbQuotation.exchange_rate || 3.7,
+          eurToIlsRate: 4.0,
+          markupPercent: dbQuotation.margin_percentage || 25,
+          dayWorkCost: 1200,
+          profitPercent: 20,
+          riskPercent: 10,
+          includeVAT: true,
+          vatRate: 18
+        },
+        items: [],
+        calculations: {
+          totalHardwareUSD: 0,
+          totalHardwareILS: 0,
+          totalLaborUSD: 0,
+          totalLaborILS: 0,
+          subtotalUSD: 0,
+          subtotalILS: 0,
+          totalCustomerPriceILS: 0,
+          riskAdditionILS: 0,
+          totalQuoteILS: 0,
+          totalVATILS: 0,
+          finalTotalILS: 0,
+          totalCostILS: 0,
+          totalProfitILS: 0,
+          profitMarginPercent: 0
+        }
+      }
+
+      // Add to context and set as current
+      addQuotation(newQuotation)
+      setCurrentQuotation(newQuotation)
+
+      console.log('[QuotationList] Success! Opening editor...')
+    } catch (error) {
+      console.error('[QuotationList] ERROR:', error)
+      alert(`שגיאה ביצירת הצעת מחיר: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    } finally {
+      setCreating(false)
+    }
   }
 
   const formatDate = (dateString: string) => {
@@ -53,8 +128,12 @@ export function QuotationList() {
           <h1 className="text-2xl font-bold text-gray-900">הצעות מחיר</h1>
           <p className="text-gray-600">ניהול ויצירה של הצעות מחיר ללקוחות</p>
         </div>
-        <Button onClick={handleCreateNew} className="bg-blue-600 hover:bg-blue-700">
-          הצעת מחיר חדשה
+        <Button
+          onClick={handleCreateNew}
+          disabled={creating}
+          className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400"
+        >
+          {creating ? 'יוצר...' : 'הצעת מחיר חדשה'}
         </Button>
       </div>
 
@@ -153,8 +232,12 @@ export function QuotationList() {
               : `אין הצעות מחיר עם סטטוס "${getStatusText(filterStatus)}"`
             }
           </div>
-          <Button onClick={handleCreateNew} className="bg-blue-600 hover:bg-blue-700">
-            צור הצעת מחיר ראשונה
+          <Button
+            onClick={handleCreateNew}
+            disabled={creating}
+            className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400"
+          >
+            {creating ? 'יוצר...' : 'צור הצעת מחיר ראשונה'}
           </Button>
         </div>
       )}

@@ -887,12 +887,12 @@ const demoComponents: Component[] = [
 
 // ============ Reducer ============
 const initialState: CPQState = {
-  components: demoComponents,
+  components: [], // Will be loaded from Supabase
   assemblies: [],
   projects: [],
   supplierQuotes: [],
   pricingRules: [],
-  quotations: demoQuotations,
+  quotations: [], // Will be loaded from Supabase
   currentQuotation: null,
   currentProjectBOM: [],
   currentProject: null,
@@ -1217,6 +1217,7 @@ export function CPQProvider({ children }: { children: React.ReactNode }) {
       supplier: comp.supplier || '',
       unitCostNIS: comp.unit_cost_ils || 0,
       unitCostUSD: comp.unit_cost_usd || 0,
+      unitCostEUR: comp.unit_cost_eur || 0,
       currency: 'NIS' as const,
       originalCost: comp.unit_cost_ils || 0,
       quoteDate: comp.created_at?.split('T')[0] || '',
@@ -1258,28 +1259,30 @@ export function CPQProvider({ children }: { children: React.ReactNode }) {
         includeVAT: true,
         vatRate: 18
       },
-      items: quote.quotation_systems?.flatMap(system => 
-        system.quotation_items?.map(item => ({
-          id: item.id,
-          systemId: system.id,
-          systemOrder: system.sort_order,
-          itemOrder: item.sort_order,
-          displayNumber: `${system.sort_order}.${item.sort_order}`,
-          componentId: item.component_id,
-          componentName: item.item_name,
-          componentCategory: item.component?.category || 'Other',
-          isLabor: false,
-          quantity: item.quantity,
-          unitPriceUSD: item.unit_price ? item.unit_price / (quote.exchange_rate || 3.7) : 0,
-          unitPriceILS: item.unit_price || 0,
-          totalPriceUSD: item.total_price ? item.total_price / (quote.exchange_rate || 3.7) : 0,
-          totalPriceILS: item.total_price || 0,
-          itemMarkupPercent: item.margin_percentage || 0,
-          customerPriceILS: item.total_price || 0,
-          notes: item.notes,
-          createdAt: item.created_at,
-          updatedAt: item.updated_at
-        })) || []
+      items: quote.quotation_systems?.flatMap(system =>
+        system.quotation_items
+          ?.sort((a, b) => a.sort_order - b.sort_order)
+          ?.map((item, index) => ({
+            id: item.id,
+            systemId: system.id,
+            systemOrder: system.sort_order,
+            itemOrder: index + 1,
+            displayNumber: `${system.sort_order}.${index + 1}`,
+            componentId: item.component_id,
+            componentName: item.item_name,
+            componentCategory: item.component?.category || 'Other',
+            isLabor: false,
+            quantity: item.quantity,
+            unitPriceUSD: item.unit_price ? item.unit_price / (quote.exchange_rate || 3.7) : 0,
+            unitPriceILS: item.unit_price || 0,
+            totalPriceUSD: item.total_price ? item.total_price / (quote.exchange_rate || 3.7) : 0,
+            totalPriceILS: item.total_price || 0,
+            itemMarkupPercent: item.margin_percentage || 0,
+            customerPriceILS: item.total_price || 0,
+            notes: item.notes,
+            createdAt: item.created_at,
+            updatedAt: item.updated_at
+          })) || []
       ) || [],
       calculations: {
         totalHardwareUSD: 0,

@@ -6,9 +6,10 @@ import { QuotationProject, QuotationItem, QuotationSystem, Component } from '../
 import { QuotationParameters } from './QuotationParameters'
 import { calculateQuotationTotals } from '../../utils/quotationCalculations'
 import { Button } from '../ui/button'
-import { Trash2, Plus, Settings, ChevronDown, X, Save, LogOut } from 'lucide-react'
+import { Trash2, Plus, Settings, ChevronDown, X, Save, LogOut, Edit } from 'lucide-react'
 import { useClickOutside } from '../../hooks/useClickOutside'
 import { CustomHeader } from '../grid/CustomHeader'
+import { ComponentForm } from '../library/ComponentForm'
 import 'ag-grid-community/styles/ag-grid.css'
 import 'ag-grid-community/styles/ag-theme-alpine.css'
 
@@ -59,6 +60,9 @@ class SystemNameEditor {
   private eInput!: HTMLInputElement
   private params!: ICellEditorParams
   private value!: string
+  private boundKeyDown!: (event: KeyboardEvent) => void
+  private boundBlur!: () => void
+  private boundInput!: () => void
 
   // gets called once before the renderer is used
   init(params: ICellEditorParams): void {
@@ -72,10 +76,15 @@ class SystemNameEditor {
     this.eInput.placeholder = 'שם מערכת...'
     this.eInput.className = 'w-full px-2 py-1 border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500'
     
-    // add event listeners
-    this.eInput.addEventListener('keydown', this.onKeyDown.bind(this))
-    this.eInput.addEventListener('blur', this.onBlur.bind(this))
-    this.eInput.addEventListener('input', this.onInput.bind(this))
+    // Create bound references once to avoid memory leaks
+    this.boundKeyDown = this.onKeyDown.bind(this)
+    this.boundBlur = this.onBlur.bind(this)
+    this.boundInput = this.onInput.bind(this)
+    
+    // add event listeners using bound references
+    this.eInput.addEventListener('keydown', this.boundKeyDown)
+    this.eInput.addEventListener('blur', this.boundBlur)
+    this.eInput.addEventListener('input', this.boundInput)
   }
 
   // gets called once when grid is ready to insert the element
@@ -83,10 +92,21 @@ class SystemNameEditor {
     return this.eInput
   }
 
+  // Called by AG Grid after editor is attached to DOM
+  // This ensures focus happens after render is complete
+  afterGuiAttached(): void {
+    if (this.eInput) {
+      this.eInput.focus()
+      this.eInput.select()
+    }
+  }
+
   // focus and select the text
   focusIn(): void {
-    this.eInput.focus()
-    this.eInput.select()
+    if (this.eInput) {
+      this.eInput.focus()
+      this.eInput.select()
+    }
   }
 
   // returns the new value after editing
@@ -115,9 +135,10 @@ class SystemNameEditor {
 
   // destroy the editor
   destroy(): void {
-    this.eInput.removeEventListener('keydown', this.onKeyDown.bind(this))
-    this.eInput.removeEventListener('blur', this.onBlur.bind(this))
-    this.eInput.removeEventListener('input', this.onInput.bind(this))
+    // Remove using same references to properly clean up
+    this.eInput.removeEventListener('keydown', this.boundKeyDown)
+    this.eInput.removeEventListener('blur', this.boundBlur)
+    this.eInput.removeEventListener('input', this.boundInput)
   }
 
   // returns false if we don't want popup
@@ -133,182 +154,6 @@ class SystemNameEditor {
   }
 }
 
-// Custom cell editor for library search
-class LibrarySearchEditor {
-  private eContainer!: HTMLElement
-  private eInput!: HTMLInputElement
-  private eDropdown!: HTMLElement
-  private params!: ICellEditorParams
-  private value!: string
-  private filteredComponents: Component[] = []
-  private components: Component[] = []
-
-  // gets called once before the renderer is used
-  init(params: ICellEditorParams): void {
-    this.params = params
-    this.value = params.value || ''
-    
-    // Get components from context (we'll need to pass this differently)
-    // For now, we'll use a simpler approach
-    this.components = (window as any).__cpq_components || []
-    
-    // create the container
-    this.eContainer = document.createElement('div')
-    this.eContainer.className = 'relative w-full'
-    
-    // create the input
-    this.eInput = document.createElement('input')
-    this.eInput.type = 'text'
-    this.eInput.value = this.value
-    this.eInput.placeholder = 'הקלד שם רכיב...'
-    this.eInput.className = 'w-full px-2 py-1 border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500'
-    
-    // create dropdown container
-    this.eDropdown = document.createElement('div')
-    this.eDropdown.className = 'absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto hidden'
-    
-    // add elements to container
-    this.eContainer.appendChild(this.eInput)
-    this.eContainer.appendChild(this.eDropdown)
-    
-    // add event listeners
-    this.eInput.addEventListener('keydown', this.onKeyDown.bind(this))
-    this.eInput.addEventListener('blur', this.onBlur.bind(this))
-    this.eInput.addEventListener('input', this.onInput.bind(this))
-    this.eInput.addEventListener('focus', this.onFocus.bind(this))
-    
-    // initial filter
-    this.filterComponents(this.value)
-  }
-
-  // gets called once when grid is ready to insert the element
-  getGui(): HTMLElement {
-    return this.eContainer
-  }
-
-  // focus and select the text
-  focusIn(): void {
-    this.eInput.focus()
-    this.eInput.select()
-  }
-
-  // returns the new value after editing
-  getValue(): string {
-    return this.eInput.value
-  }
-
-  // when user presses Enter or Escape
-  private onKeyDown(event: KeyboardEvent): void {
-    if (event.key === 'Enter') {
-      this.params.api.stopEditing()
-    } else if (event.key === 'Escape') {
-      this.params.api.stopEditing(true)
-    }
-  }
-
-  // when user clicks outside
-  private onBlur(): void {
-    // Small delay to allow dropdown clicks to register
-    setTimeout(() => {
-      this.params.api.stopEditing()
-    }, 200)
-  }
-
-  // when user focuses the input
-  private onFocus(): void {
-    this.filterComponents(this.eInput.value)
-  }
-
-  // update value on input
-  private onInput(): void {
-    this.value = this.eInput.value
-    this.filterComponents(this.value)
-  }
-
-  // filter components based on search text
-  private filterComponents(text: string): void {
-    if (!text) {
-      this.filteredComponents = []
-      this.eDropdown.classList.add('hidden')
-      return
-    }
-
-    this.filteredComponents = this.components.filter(comp =>
-      comp.name.toLowerCase().includes(text.toLowerCase()) ||
-      comp.manufacturer?.toLowerCase().includes(text.toLowerCase())
-    )
-
-    if (this.filteredComponents.length > 0) {
-      this.eDropdown.classList.remove('hidden')
-      this.renderDropdown()
-    } else {
-      this.eDropdown.classList.add('hidden')
-    }
-  }
-
-  // render dropdown items
-  private renderDropdown(): void {
-    this.eDropdown.innerHTML = ''
-    
-    this.filteredComponents.forEach((component) => {
-      const item = document.createElement('div')
-      item.className = 'px-3 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0'
-      
-      const nameDiv = document.createElement('div')
-      nameDiv.className = 'font-medium'
-      nameDiv.textContent = component.name
-      
-      const manufacturerDiv = document.createElement('div')
-      manufacturerDiv.className = 'text-sm text-gray-600'
-      manufacturerDiv.textContent = component.manufacturer || ''
-      
-      item.appendChild(nameDiv)
-      item.appendChild(manufacturerDiv)
-      
-      item.addEventListener('click', () => this.selectComponent(component))
-      this.eDropdown.appendChild(item)
-    })
-  }
-
-  // when user selects a component
-  private selectComponent(component: Component): void {
-    this.eInput.value = component.name
-    this.value = component.name
-    
-    // Update the row data with component details
-    this.params.node.setDataValue('componentName', component.name)
-    this.params.node.setDataValue('componentCategory', component.category || '')
-    this.params.node.setDataValue('unitPriceUSD', component.unitCostUSD || 0)
-    this.params.node.setDataValue('unitPriceILS', component.unitCostNIS || 0)
-    this.params.node.setDataValue('quantity', 1)
-    this.params.node.setDataValue('isLabor', false)
-
-    this.eDropdown.classList.add('hidden')
-
-    this.params.api.stopEditing()
-  }
-
-  // destroy the editor
-  destroy(): void {
-    this.eInput.removeEventListener('keydown', this.onKeyDown.bind(this))
-    this.eInput.removeEventListener('blur', this.onBlur.bind(this))
-    this.eInput.removeEventListener('input', this.onInput.bind(this))
-    this.eInput.removeEventListener('focus', this.onFocus.bind(this))
-  }
-
-  // returns false if we don't want popup
-  isPopup(): boolean {
-    return false
-  }
-
-  // if refresh, update the value
-  refresh(params: ICellEditorParams): boolean {
-    this.value = params.value || ''
-    this.eInput.value = this.value
-    this.filterComponents(this.value)
-    return true
-  }
-}
 
 export function QuotationEditor() {
   const {
@@ -317,7 +162,9 @@ export function QuotationEditor() {
     setCurrentQuotation,
     updateQuotation,
     addQuotation,
-    setModal
+    setModal,
+    modalState,
+    closeModal
   } = useCPQ()
 
   // Make components available globally for the LibrarySearchEditor
@@ -803,9 +650,35 @@ export function QuotationEditor() {
       field: 'componentName',
       width: 200,
       pinned: 'right',
-      editable: true,
-      cellEditor: (params: any) => params.data?.isSystemGroup ? SystemNameEditor : LibrarySearchEditor,
+      editable: (params: any) => params.data?.isSystemGroup, // ✅ Only systems editable
+      cellEditor: SystemNameEditor, // ✅ Direct class assignment
       cellClass: params => params.data?.isSystemGroup ? 'ag-cell-bold' : 'ag-cell-right',
+      cellRenderer: (params: ICellRendererParams) => {
+        if (params.data?.isSystemGroup) {
+          return (
+            <span className="font-bold">
+              {params.value}
+            </span>
+          )
+        }
+
+        // For component items: double-click opens component card
+        return (
+          <div
+            onDoubleClick={(e) => {
+              e.stopPropagation()
+              const component = components.find(comp => comp.name === params.data.componentName)
+              if (component) {
+                setModal({ type: 'edit-component', data: component })
+              }
+            }}
+            className="cursor-pointer hover:text-blue-600"
+            title="לחץ פעמיים לפתיחת כרטיס רכיב"
+          >
+            {params.value}
+          </div>
+        )
+      },
       valueGetter: (params: ValueGetterParams<any>) => {
         if (params.data.isSystemGroup) return params.data?.componentName || ''
         return params.data.componentName || ''
@@ -856,7 +729,7 @@ export function QuotationEditor() {
     {
       headerName: 'פעולות',
       field: 'actions',
-      width: 120,
+      width: 150, // Increased width to accommodate edit button
       pinned: 'right',
       sortable: false,
       filter: false,
@@ -905,6 +778,22 @@ export function QuotationEditor() {
             <Button
               variant="outline"
               size="sm"
+              onClick={() => {
+                // Find the component in the library
+                const component = components.find(comp => comp.name === params.data.componentName)
+                if (component) {
+                  // Open component form modal for editing/viewing
+                  setModal({ type: 'edit-component', data: component })
+                }
+              }}
+              className="h-8 w-8 p-0"
+              title="ערוך פריט"
+            >
+              <Edit className="h-3 w-3" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => deleteItem(params.data.id)}
               className="h-8 w-8 p-0 text-red-600 hover:text-red-800"
               title="מחק"
@@ -915,7 +804,7 @@ export function QuotationEditor() {
         )
       }
     }
-  ], [gridData, getUniqueValues, openComponentSelector, deleteItem])
+  ], [gridData, getUniqueValues, openComponentSelector, deleteItem, components, setModal])
 
   // Filter columns based on visibility
   const visibleColumnDefs = useMemo(() => {
@@ -997,7 +886,7 @@ export function QuotationEditor() {
     })
   }, [updateItem, currentQuotation, setCurrentQuotation, updateQuotation])
 
-  // Handle double-click to open component card
+  // Handle double-click to open component card (now redundant since we handle it in cell renderer)
   const onCellDoubleClicked = useCallback((params: any) => {
     // Only open component cards for non-system rows
     if (!params.data.isSystemGroup && params.data.componentName) {
@@ -1357,6 +1246,13 @@ export function QuotationEditor() {
           </div>
         </div>
       )}
+
+      {/* Component Card Modal */}
+      <ComponentForm
+        component={modalState?.type === 'edit-component' ? modalState.data : null}
+        isOpen={modalState?.type === 'edit-component'}
+        onClose={closeModal}
+      />
     </div>
   )
 }

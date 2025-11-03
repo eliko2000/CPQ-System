@@ -391,6 +391,92 @@ export interface PricingCondition {
   value: any;
 }
 
+// ============ Database Schema Types ============
+// These types match Supabase database schema
+
+export interface DbQuotation {
+  id: string;
+  quotation_number: string;
+  customer_name: string;
+  customer_email?: string;
+  project_name?: string;
+  project_description?: string;
+  currency: string;
+  exchange_rate: number;
+  margin_percentage: number;
+  status: 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired';
+  valid_until_date?: string;
+  terms?: string;
+  notes?: string;
+  total_cost?: number;
+  total_price?: number;
+  created_at: string;
+  updated_at: string;
+  
+  // Related data from joins
+  quotation_systems?: DbQuotationSystem[];
+}
+
+export interface DbQuotationSystem {
+  id: string;
+  quotation_id: string;
+  system_name: string;
+  system_description?: string;
+  quantity: number;
+  unit_cost?: number;
+  total_cost?: number;
+  margin_percentage?: number;
+  unit_price?: number;
+  total_price?: number;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+  
+  // Related data from joins
+  quotation_items?: DbQuotationItem[];
+}
+
+export interface DbQuotationItem {
+  id: string;
+  quotation_system_id: string;
+  component_id?: string;
+  item_name: string;
+  manufacturer?: string;
+  manufacturer_part_number?: string;
+  quantity: number;
+  unit_cost?: number;
+  total_cost?: number;
+  margin_percentage?: number;
+  unit_price?: number;
+  total_price?: number;
+  notes?: string;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+  
+  // Related data from joins
+  component?: DbComponent;
+}
+
+export interface DbComponent {
+  id: string;
+  name: string;
+  manufacturer?: string;
+  manufacturer_part_number?: string;
+  category?: string;
+  description?: string;
+  unit_cost_usd?: number;
+  unit_cost_ils?: number;
+  supplier?: string;
+  supplier_part_number?: string;
+  lead_time_days?: number;
+  min_order_quantity?: number;
+  notes?: string;
+  is_active?: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 // ============ Legacy Types for compatibility ============
 export interface SupplierQuote {
   id: string;

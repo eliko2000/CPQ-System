@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, useCallback } from 'react'
+import React, { createContext, useContext, useReducer, useCallback, useEffect } from 'react'
 import {
   Component,
   Assembly,
@@ -10,6 +10,8 @@ import {
   ModalState,
   QuotationProject
 } from '../types'
+import { useComponents } from '../hooks/useComponents'
+import { useQuotations } from '../hooks/useQuotations'
 
 // ============ State Shape ============
 interface CPQState {
@@ -1195,7 +1197,129 @@ const CPQContext = createContext<CPQContextType | undefined>(undefined)
 
 // ============ Provider ============
 export function CPQProvider({ children }: { children: React.ReactNode }) {
+  // Use the new hooks for data management
+  const componentsHook = useComponents()
+  const quotationsHook = useQuotations()
+  
   const [state, dispatch] = useReducer(cpqReducer, initialState)
+
+  // Sync hooks data with reducer state
+  useEffect(() => {
+    // Map DbComponent to Component
+    const mappedComponents = componentsHook.components.map(comp => ({
+      id: comp.id,
+      name: comp.name,
+      description: comp.description || '',
+      category: comp.category || 'Other',
+      productType: comp.category || 'Other',
+      manufacturer: comp.manufacturer || '',
+      manufacturerPN: comp.manufacturer_part_number || '',
+      supplier: comp.supplier || '',
+      unitCostNIS: comp.unit_cost_ils || 0,
+      unitCostUSD: comp.unit_cost_usd || 0,
+      currency: 'NIS' as const,
+      originalCost: comp.unit_cost_ils || 0,
+      quoteDate: comp.created_at?.split('T')[0] || '',
+      quoteFileUrl: '',
+      notes: comp.notes,
+      createdAt: comp.created_at,
+      updatedAt: comp.updated_at
+    }))
+    dispatch({ type: 'SET_COMPONENTS', payload: mappedComponents })
+  }, [componentsHook.components])
+
+  useEffect(() => {
+    // Map DbQuotation to QuotationProject
+    const mappedQuotations = quotationsHook.quotations.map(quote => ({
+      id: quote.id,
+      name: quote.project_name || quote.quotation_number,
+      customerName: quote.customer_name,
+      status: quote.status === 'accepted' ? 'won' : 
+              quote.status === 'rejected' ? 'lost' : 
+              quote.status as 'draft' | 'sent' | 'won' | 'lost',
+      createdAt: quote.created_at,
+      updatedAt: quote.updated_at,
+      systems: quote.quotation_systems?.map(system => ({
+        id: system.id,
+        name: system.system_name,
+        description: system.system_description,
+        order: system.sort_order,
+        quantity: system.quantity,
+        createdAt: system.created_at
+      })) || [],
+      parameters: {
+        usdToIlsRate: quote.exchange_rate || 3.7,
+        eurToIlsRate: 4.0,
+        markupPercent: quote.margin_percentage || 25,
+        dayWorkCost: 1200,
+        profitPercent: 20,
+        riskPercent: 5,
+        deliveryTime: '4-6 שבועות',
+        includeVAT: true,
+        vatRate: 18
+      },
+      items: quote.quotation_systems?.flatMap(system => 
+        system.quotation_items?.map(item => ({
+          id: item.id,
+          systemId: system.id,
+          systemOrder: system.sort_order,
+          itemOrder: item.sort_order,
+          displayNumber: `${system.sort_order}.${item.sort_order}`,
+          componentId: item.component_id,
+          componentName: item.item_name,
+          componentCategory: item.component?.category || 'Other',
+          isLabor: false,
+          quantity: item.quantity,
+          unitPriceUSD: item.unit_price ? item.unit_price / (quote.exchange_rate || 3.7) : 0,
+          unitPriceILS: item.unit_price || 0,
+          totalPriceUSD: item.total_price ? item.total_price / (quote.exchange_rate || 3.7) : 0,
+          totalPriceILS: item.total_price || 0,
+          itemMarkupPercent: item.margin_percentage || 0,
+          customerPriceILS: item.total_price || 0,
+          notes: item.notes,
+          createdAt: item.created_at,
+          updatedAt: item.updated_at
+        })) || []
+      ) || [],
+      calculations: {
+        totalHardwareUSD: 0,
+        totalHardwareILS: 0,
+        totalLaborUSD: 0,
+        totalLaborILS: 0,
+        subtotalUSD: 0,
+        subtotalILS: 0,
+        totalCustomerPriceILS: quote.total_price || 0,
+        riskAdditionILS: 0,
+        totalQuoteILS: quote.total_price || 0,
+        totalVATILS: 0,
+        finalTotalILS: quote.total_price || 0,
+        totalCostILS: quote.total_cost || 0,
+        totalProfitILS: (quote.total_price || 0) - (quote.total_cost || 0),
+        profitMarginPercent: 0
+      }
+    }))
+    dispatch({ type: 'SET_QUOTATIONS', payload: mappedQuotations })
+  }, [quotationsHook.quotations])
+
+  useEffect(() => {
+    dispatch({ type: 'SET_LOADING', payload: { key: 'components', value: componentsHook.loading } })
+  }, [componentsHook.loading])
+
+  useEffect(() => {
+    dispatch({ type: 'SET_LOADING', payload: { key: 'quotations', value: quotationsHook.loading } })
+  }, [quotationsHook.loading])
+
+  useEffect(() => {
+    if (componentsHook.error) {
+      dispatch({ type: 'SET_ERROR', payload: componentsHook.error })
+    }
+  }, [componentsHook.error])
+
+  useEffect(() => {
+    if (quotationsHook.error) {
+      dispatch({ type: 'SET_ERROR', payload: quotationsHook.error })
+    }
+  }, [quotationsHook.error])
 
   // ============ Basic Actions ============
   const setLoading = useCallback((key: keyof CPQState['loading'], value: boolean) => {
@@ -1213,46 +1337,30 @@ export function CPQProvider({ children }: { children: React.ReactNode }) {
   // ============ Component Actions ============
   const addComponent = useCallback(async (component: Omit<Component, 'id' | 'createdAt' | 'updatedAt'>) => {
     try {
-      setLoading('components', true)
-      // TODO: Implement actual API call
-      const now = new Date().toISOString()
-      const newComponent: Component = {
-        ...component,
-        id: `comp_${Date.now()}`,
-        createdAt: now,
-        updatedAt: now,
-      }
-      dispatch({ type: 'ADD_COMPONENT', payload: newComponent })
+      await componentsHook.addComponent(component)
+      // Data will be updated automatically by the hook
     } catch (error) {
       setError(`Failed to add component: ${error}`)
-    } finally {
-      setLoading('components', false)
     }
-  }, [setLoading, setError])
+  }, [componentsHook, setError])
 
   const updateComponent = useCallback(async (id: string, updates: Partial<Component>) => {
     try {
-      setLoading('components', true)
-      // TODO: Implement actual API call
-      dispatch({ type: 'UPDATE_COMPONENT', payload: { id, updates } })
+      await componentsHook.updateComponent(id, updates)
+      // Data will be updated automatically by the hook
     } catch (error) {
       setError(`Failed to update component: ${error}`)
-    } finally {
-      setLoading('components', false)
     }
-  }, [setLoading, setError])
+  }, [componentsHook, setError])
 
   const deleteComponent = useCallback(async (id: string) => {
     try {
-      setLoading('components', true)
-      // TODO: Implement actual API call
-      dispatch({ type: 'DELETE_COMPONENT', payload: id })
+      await componentsHook.deleteComponent(id)
+      // Data will be updated automatically by the hook
     } catch (error) {
       setError(`Failed to delete component: ${error}`)
-    } finally {
-      setLoading('components', false)
     }
-  }, [setLoading, setError])
+  }, [componentsHook, setError])
 
   // ============ Assembly Actions ============
   const addAssembly = useCallback(async (assembly: Omit<Assembly, 'id' | 'createdAt' | 'updatedAt'>) => {

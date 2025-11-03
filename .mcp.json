@@ -20,9 +20,9 @@
         "-y",
         "@supabase/mcp-server-postgrest@latest",
         "--apiUrl",
-        "https://your-project-id.supabase.co/rest/v1",
+        "https://uxkvfghfcwnynshmzeck.supabase.co/rest/v1",
         "--apiKey",
-        "your-supabase-service-role-key",
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV4a3ZmZ2hmY3dueW5zaG16ZWNrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MjE2MzcyMywiZXhwIjoyMDc3NzM5NzIzfQ.gLkmwqm2ybOAj_LcEPzjZWEQYyOpWM8ExiUUpA9NlSM",
         "--schema",
         "public"
       ]

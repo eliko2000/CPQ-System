@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, useCallback, useEffect } from 'react'
+import React, { createContext, useContext, useReducer, useCallback } from 'react'
 import {
   Component,
   Assembly,
@@ -8,7 +8,7 @@ import {
   PricingRule,
   UIState,
   ModalState,
-  ComponentFormData
+  QuotationProject
 } from '../types'
 
 // ============ State Shape ============
@@ -19,6 +19,10 @@ interface CPQState {
   projects: Project[]
   supplierQuotes: SupplierQuote[]
   pricingRules: PricingRule[]
+
+  // Quotation data
+  quotations: QuotationProject[]
+  currentQuotation: QuotationProject | null
 
   // Current project BOM being edited
   currentProjectBOM: BOMLine[]
@@ -34,6 +38,7 @@ interface CPQState {
     assemblies: boolean
     projects: boolean
     quotes: boolean
+    quotations: boolean
   }
 
   // Errors
@@ -72,6 +77,13 @@ type CPQAction =
   | { type: 'UPDATE_SUPPLIER_QUOTE'; payload: { id: string; updates: Partial<SupplierQuote> } }
   | { type: 'DELETE_SUPPLIER_QUOTE'; payload: string }
 
+  // Quotations
+  | { type: 'SET_QUOTATIONS'; payload: QuotationProject[] }
+  | { type: 'ADD_QUOTATION'; payload: QuotationProject }
+  | { type: 'UPDATE_QUOTATION'; payload: { id: string; updates: Partial<QuotationProject> } }
+  | { type: 'DELETE_QUOTATION'; payload: string }
+  | { type: 'SET_CURRENT_QUOTATION'; payload: QuotationProject | null }
+
   // BOM Management
   | { type: 'SET_CURRENT_BOM'; payload: BOMLine[] }
   | { type: 'ADD_BOM_ITEM'; payload: { item: BOMLine; parentId?: string } }
@@ -92,6 +104,212 @@ type CPQAction =
   | { type: 'CLOSE_MODAL' }
 
 // ============ Demo Data ============
+const demoQuotations: QuotationProject[] = [
+  {
+    id: 'quote_demo_1',
+    name: 'הצעת מחיר - מערכת בקרה תעשייתית',
+    customerName: 'תעשיות מתקדמות בע"מ',
+    status: 'draft',
+    createdAt: '2024-03-15T10:00:00Z',
+    updatedAt: '2024-03-15T10:00:00Z',
+        systems: [
+          {
+            id: 'system_1',
+            name: 'מערכת בקרה ראשית',
+            description: 'מערכת בקרה מרכזית עם PLC ופאנל אופרטור',
+            order: 1,
+            quantity: 1,
+            createdAt: '2024-01-15T10:00:00Z'
+          },
+          {
+            id: 'system_2',
+            name: 'מערכת כוח',
+            description: 'ספקי כוח וממירים למערכת',
+            order: 2,
+            quantity: 1,
+            createdAt: '2024-01-15T10:00:00Z'
+          },
+          {
+            id: 'system_3',
+            name: 'מערכת בטיחות',
+            description: 'חיישנים ומגננים לבטיחות המערכת',
+            order: 3,
+            quantity: 1,
+            createdAt: '2024-01-15T10:00:00Z'
+          }
+        ],
+    parameters: {
+      usdToIlsRate: 3.7,
+      eurToIlsRate: 4.0,
+      markupPercent: 25,
+      dayWorkCost: 1200,
+      profitPercent: 20,
+      riskPercent: 5,
+      deliveryTime: '4-6 שבועות',
+      includeVAT: true,
+      vatRate: 18
+    },
+    items: [
+      {
+        id: 'item_1',
+        systemId: 'system_1',
+        systemOrder: 1,
+        itemOrder: 1,
+        displayNumber: '1.1',
+        componentName: 'בקר PLC S7-1200',
+        componentCategory: 'בקרים (PLCs)',
+        isLabor: false,
+        quantity: 1,
+        unitPriceUSD: 1610,
+        unitPriceILS: 5957,
+        totalPriceUSD: 1610,
+        totalPriceILS: 5957,
+        itemMarkupPercent: 25,
+        customerPriceILS: 7446,
+        notes: 'כולל תקשורת PROFINET',
+        createdAt: '2024-03-15T10:00:00Z',
+        updatedAt: '2024-03-15T10:00:00Z'
+      },
+      {
+        id: 'item_2',
+        systemId: 'system_1',
+        systemOrder: 1,
+        itemOrder: 2,
+        displayNumber: '1.2',
+        componentName: 'מסוף HMI טאצ\' 7 אינץ\'',
+        componentCategory: 'בקרים',
+        isLabor: false,
+        quantity: 1,
+        unitPriceUSD: 890,
+        unitPriceILS: 3293,
+        totalPriceUSD: 890,
+        totalPriceILS: 3293,
+        itemMarkupPercent: 25,
+        customerPriceILS: 4116,
+        notes: 'תצוגה צבעונית עם מגע',
+        createdAt: '2024-03-15T10:00:00Z',
+        updatedAt: '2024-03-15T10:00:00Z'
+      },
+      {
+        id: 'item_3',
+        systemId: 'system_2',
+        systemOrder: 2,
+        itemOrder: 1,
+        displayNumber: '2.1',
+        componentName: 'חיישן טמפרטורה PT100',
+        componentCategory: 'חיישנים',
+        isLabor: false,
+        quantity: 4,
+        unitPriceUSD: 125,
+        unitPriceILS: 463,
+        totalPriceUSD: 500,
+        totalPriceILS: 1852,
+        itemMarkupPercent: 25,
+        customerPriceILS: 2315,
+        notes: 'טווח מדידה: -50°C עד 500°C',
+        createdAt: '2024-03-15T10:00:00Z',
+        updatedAt: '2024-03-15T10:00:00Z'
+      },
+      {
+        id: 'item_4',
+        systemId: 'system_2',
+        systemOrder: 2,
+        itemOrder: 2,
+        displayNumber: '2.2',
+        componentName: 'חיישן לחץ דיפרנציאלי',
+        componentCategory: 'חיישנים',
+        isLabor: false,
+        quantity: 2,
+        unitPriceUSD: 89,
+        unitPriceILS: 329,
+        totalPriceUSD: 178,
+        totalPriceILS: 658,
+        itemMarkupPercent: 25,
+        customerPriceILS: 823,
+        notes: 'טווח: 0-10 בר, פלט: 4-20mA',
+        createdAt: '2024-03-15T10:00:00Z',
+        updatedAt: '2024-03-15T10:00:00Z'
+      },
+      {
+        id: 'item_5',
+        systemId: 'system_3',
+        systemOrder: 3,
+        itemOrder: 1,
+        displayNumber: '3.1',
+        componentName: 'ספק כוח 24VDC 10A',
+        componentCategory: 'ספקי כוח',
+        isLabor: false,
+        quantity: 2,
+        unitPriceUSD: 189,
+        unitPriceILS: 699,
+        totalPriceUSD: 378,
+        totalPriceILS: 1398,
+        itemMarkupPercent: 25,
+        customerPriceILS: 1748,
+        notes: 'מתג הפרעות, הספק: 240W',
+        createdAt: '2024-03-15T10:00:00Z',
+        updatedAt: '2024-03-15T10:00:00Z'
+      },
+      {
+        id: 'item_6',
+        systemId: 'system_3',
+        systemOrder: 3,
+        itemOrder: 2,
+        displayNumber: '3.2',
+        componentName: 'מפסק חשמלי מוגן',
+        componentCategory: 'בטיחות',
+        isLabor: false,
+        quantity: 3,
+        unitPriceUSD: 78,
+        unitPriceILS: 289,
+        totalPriceUSD: 234,
+        totalPriceILS: 867,
+        itemMarkupPercent: 25,
+        customerPriceILS: 1084,
+        notes: 'דירוג: 14A, הגנה תרמית ומגנטית',
+        createdAt: '2024-03-15T10:00:00Z',
+        updatedAt: '2024-03-15T10:00:00Z'
+      },
+      {
+        id: 'item_7',
+        systemId: 'system_1',
+        systemOrder: 1,
+        itemOrder: 3,
+        displayNumber: '1.3',
+        componentName: 'עבודת התקנה - בקר ו-HMI',
+        componentCategory: 'עבודה',
+        isLabor: true,
+        quantity: 2,
+        unitPriceUSD: 324,
+        unitPriceILS: 1200,
+        totalPriceUSD: 648,
+        totalPriceILS: 2400,
+        itemMarkupPercent: 25,
+        customerPriceILS: 3000,
+        notes: 'התקנה וחיווט בסיסי של בקר ופאנל',
+        createdAt: '2024-03-15T10:00:00Z',
+        updatedAt: '2024-03-15T10:00:00Z'
+      }
+    ],
+        calculations: {
+          totalHardwareUSD: 0,
+          totalHardwareILS: 0,
+          totalLaborUSD: 0,
+          totalLaborILS: 0,
+          subtotalUSD: 0,
+          subtotalILS: 0,
+          totalCustomerPriceILS: 0,
+          riskAdditionILS: 0,
+          totalQuoteILS: 0,
+          totalVATILS: 0,
+          finalTotalILS: 0,
+          totalCostILS: 0,
+          totalProfitILS: 0,
+          profitMarginPercent: 0
+        }
+  }
+]
+
 const demoComponents: Component[] = [
   {
     id: 'comp_1',
@@ -187,6 +405,481 @@ const demoComponents: Component[] = [
     notes: 'יציאה: 24V DC, הספק: 240W',
     createdAt: '2024-01-18T16:20:00Z',
     updatedAt: '2024-01-18T16:20:00Z'
+  },
+  {
+    id: 'comp_6',
+    name: 'מפסק חשמלי מוגן',
+    description: 'מפסק חשמלי תעשייתי עם הגנת עומס יתר',
+    category: 'בטיחות',
+    productType: 'בטיחות',
+    manufacturer: 'Schneider Electric',
+    manufacturerPN: 'GV2ME14',
+    supplier: 'חשמל תעשייתי',
+    unitCostNIS: 280.00,
+    unitCostUSD: 78.00,
+    currency: 'NIS',
+    originalCost: 265.00,
+    quoteDate: '2024-02-01',
+    quoteFileUrl: '',
+    notes: 'דירוג: 14A, הגנה תרמית ומגנטית',
+    createdAt: '2024-02-01T09:30:00Z',
+    updatedAt: '2024-02-01T09:30:00Z'
+  },
+  {
+    id: 'comp_7',
+    name: 'כבל תקשורת PROFINET',
+    description: 'כבל תקשורת תעשייתי עם מגן',
+    category: 'כבלים ומחברים',
+    productType: 'כבלים ומחברים',
+    manufacturer: 'Hirschmann',
+    manufacturerPN: '1944030001',
+    supplier: 'תקשורת תעשייתית',
+    unitCostNIS: 45.00,
+    unitCostUSD: 12.50,
+    currency: 'NIS',
+    originalCost: 42.00,
+    quoteDate: '2024-02-05',
+    quoteFileUrl: '',
+    notes: 'אורך: 2 מטר, CAT6A, IP67',
+    createdAt: '2024-02-05T13:15:00Z',
+    updatedAt: '2024-02-05T13:15:00Z'
+  },
+  {
+    id: 'comp_8',
+    name: 'אקטואטור ליניארי חשמלי',
+    description: 'אקטואטור ליניארי עם מנוע סטפר',
+    category: 'אקטואטורים',
+    productType: 'אקטואטורים',
+    manufacturer: 'Parker',
+    manufacturerPN: 'ETB08-050',
+    supplier: 'מוטור טכנולוגיות',
+    unitCostNIS: 2100.00,
+    unitCostUSD: 585.00,
+    currency: 'NIS',
+    originalCost: 2050.00,
+    quoteDate: '2024-02-10',
+    quoteFileUrl: '',
+    notes: 'טווח תנועה: 50 מ"מ, כוח: 500N',
+    createdAt: '2024-02-10T11:20:00Z',
+    updatedAt: '2024-02-10T11:20:00Z'
+  },
+  {
+    id: 'comp_9',
+    name: 'ממיר תדירות VFD',
+    description: 'ממיר תדירות לשליטה במהירות מנועים',
+    category: 'בקרים',
+    productType: 'בקרים',
+    manufacturer: 'Danfoss',
+    manufacturerPN: 'FC-051',
+    supplier: 'דנפוס ישראל',
+    unitCostNIS: 1850.00,
+    unitCostUSD: 515.00,
+    currency: 'NIS',
+    originalCost: 1780.00,
+    quoteDate: '2024-02-12',
+    quoteFileUrl: '',
+    notes: 'הספק: 0.75 קו"ט, 380-480V',
+    createdAt: '2024-02-12T15:45:00Z',
+    updatedAt: '2024-02-12T15:45:00Z'
+  },
+  {
+    id: 'comp_10',
+    name: 'חיישן לחץ דיפרנציאלי',
+    description: 'חיישן לחץ דיפרנציאלי תעשייתי',
+    category: 'חיישנים',
+    productType: 'חיישנים',
+    manufacturer: 'WIKA',
+    manufacturerPN: 'A-10',
+    supplier: 'מדידות תעשייתיות',
+    unitCostNIS: 320.00,
+    unitCostUSD: 89.00,
+    currency: 'NIS',
+    originalCost: 305.00,
+    quoteDate: '2024-02-15',
+    quoteFileUrl: '',
+    notes: 'טווח: 0-10 בר, פלט: 4-20mA',
+    createdAt: '2024-02-15T10:30:00Z',
+    updatedAt: '2024-02-15T10:30:00Z'
+  },
+  {
+    id: 'comp_11',
+    name: 'ממסר חשמלי SSR',
+    description: 'ממסר מצב מוצק למערכות בקרה',
+    category: 'בקרים',
+    productType: 'בקרים',
+    manufacturer: 'Omron',
+    manufacturerPN: 'G3NA-210B',
+    supplier: 'אומרון ישראל',
+    unitCostNIS: 180.00,
+    unitCostUSD: 50.00,
+    currency: 'NIS',
+    originalCost: 170.00,
+    quoteDate: '2024-02-18',
+    quoteFileUrl: '',
+    notes: 'זרם: 10A, מתח: 24-280V AC',
+    createdAt: '2024-02-18T14:20:00Z',
+    updatedAt: '2024-02-18T14:20:00Z'
+  },
+  {
+    id: 'comp_12',
+    name: 'מסוף HMI טאצ\' 7 אינץ\'',
+    description: 'מסוף אנושי עם מסך מגע צבעוני',
+    category: 'בקרים',
+    productType: 'בקרים',
+    manufacturer: 'Siemens',
+    manufacturerPN: '6AV2124-0GC01-0AX0',
+    supplier: 'סימנס ישראל',
+    unitCostNIS: 3200.00,
+    unitCostUSD: 890.00,
+    currency: 'NIS',
+    originalCost: 3100.00,
+    quoteDate: '2024-02-20',
+    quoteFileUrl: '',
+    notes: 'תצוגה: 800x480, תקשורת: PROFINET',
+    createdAt: '2024-02-20T12:10:00Z',
+    updatedAt: '2024-02-20T12:10:00Z'
+  },
+  {
+    id: 'comp_13',
+    name: 'מגבר אות אנלוגי',
+    description: 'מגבר אות לחיישנים אנלוגיים',
+    category: 'בקרים',
+    productType: 'בקרים',
+    manufacturer: 'Turck',
+    manufacturerPN: 'NI8-U-EX',
+    supplier: 'טורק ישראל',
+    unitCostNIS: 420.00,
+    unitCostUSD: 117.00,
+    currency: 'NIS',
+    originalCost: 400.00,
+    quoteDate: '2024-02-22',
+    quoteFileUrl: '',
+    notes: 'כניסה: 0-10V, יציאה: 4-20mA',
+    createdAt: '2024-02-22T16:30:00Z',
+    updatedAt: '2024-02-22T16:30:00Z'
+  },
+  {
+    id: 'comp_14',
+    name: 'מנוע סטפר NEMA 23',
+    description: 'מנוע סטפר תעשייתי באיכות גבוהה',
+    category: 'מנועים',
+    productType: 'מנועים',
+    manufacturer: 'Oriental Motor',
+    manufacturerPN: 'PK268-02A',
+    supplier: 'מוטור אוריינטל',
+    unitCostNIS: 580.00,
+    unitCostUSD: 161.00,
+    currency: 'NIS',
+    originalCost: 560.00,
+    quoteDate: '2024-02-25',
+    quoteFileUrl: '',
+    notes: 'זוגיות: 200, זרם: 2A/פאזה',
+    createdAt: '2024-02-25T09:45:00Z',
+    updatedAt: '2024-02-25T09:45:00Z'
+  },
+  {
+    id: 'comp_15',
+    name: 'ספק כוח רגולטורי',
+    description: 'ספק כוח רגולטורי עם פלט יציב',
+    category: 'ספקי כוח',
+    productType: 'ספקי כוח',
+    manufacturer: 'Mean Well',
+    manufacturerPN: 'LRS-75-24',
+    supplier: 'מין וול ישראל',
+    unitCostNIS: 95.00,
+    unitCostUSD: 26.50,
+    currency: 'NIS',
+    originalCost: 90.00,
+    quoteDate: '2024-02-28',
+    quoteFileUrl: '',
+    notes: 'יציאה: 24V DC, 3.1A, 75W',
+    createdAt: '2024-02-28T13:20:00Z',
+    updatedAt: '2024-02-28T13:20:00Z'
+  },
+  {
+    id: 'comp_16',
+    name: 'מחבר חשמלי M12',
+    description: 'מחבר חשמלי תעשייתי עם הגנה',
+    category: 'כבלים ומחברים',
+    productType: 'כבלים ומחברים',
+    manufacturer: 'Lapp',
+    manufacturerPN: '1570124',
+    supplier: 'לאפ ישראל',
+    unitCostNIS: 28.00,
+    unitCostUSD: 7.80,
+    currency: 'NIS',
+    originalCost: 26.00,
+    quoteDate: '2024-03-01',
+    quoteFileUrl: '',
+    notes: '4 פינים, IP67, זהב',
+    createdAt: '2024-03-01T11:15:00Z',
+    updatedAt: '2024-03-01T11:15:00Z'
+  },
+  {
+    id: 'comp_17',
+    name: 'חיישן קרבה אינדוקטיבי',
+    description: 'חיישן קרבה לזיהוי מתכות',
+    category: 'חיישנים',
+    productType: 'חיישנים',
+    manufacturer: 'Pepperl+Fuchs',
+    manufacturerPN: 'NBB4-12GM50-E2',
+    supplier: 'פפרל אנד פוקס',
+    unitCostNIS: 150.00,
+    unitCostUSD: 42.00,
+    currency: 'NIS',
+    originalCost: 145.00,
+    quoteDate: '2024-03-03',
+    quoteFileUrl: '',
+    notes: 'טווח: 4 מ"מ, M12, PNP',
+    createdAt: '2024-03-03T14:40:00Z',
+    updatedAt: '2024-03-03T14:40:00Z'
+  },
+  {
+    id: 'comp_18',
+    name: 'ברז אוויר דיגיטלי',
+    description: 'ברז אוויר עם שליטה דיגיטלית',
+    category: 'אקטואטורים',
+    productType: 'אקטואטורים',
+    manufacturer: 'SMC',
+    manufacturerPN: 'SY3000',
+    supplier: 'SMC ישראל',
+    unitCostNIS: 380.00,
+    unitCostUSD: 106.00,
+    currency: 'NIS',
+    originalCost: 365.00,
+    quoteDate: '2024-03-05',
+    quoteFileUrl: '',
+    notes: '5/2 דרכי, 24V DC, ידית ידנית',
+    createdAt: '2024-03-05T10:25:00Z',
+    updatedAt: '2024-03-05T10:25:00Z'
+  },
+  {
+    id: 'comp_19',
+    name: 'ממיר USB ל-RS485',
+    description: 'ממיר תקשורת לחיבור ציוד תעשייתי',
+    category: 'תקשורת',
+    productType: 'תקשורת',
+    manufacturer: 'Advantech',
+    manufacturerPN: 'ADAM-4561',
+    supplier: 'אדוונטק ישראל',
+    unitCostNIS: 220.00,
+    unitCostUSD: 61.00,
+    currency: 'NIS',
+    originalCost: 210.00,
+    quoteDate: '2024-03-07',
+    quoteFileUrl: '',
+    notes: 'בידוד: 2000VDC, תקשורת: Modbus RTU',
+    createdAt: '2024-03-07T15:50:00Z',
+    updatedAt: '2024-03-07T15:50:00Z'
+  },
+  {
+    id: 'comp_20',
+    name: 'מנוע DC עם גיר הילוכים',
+    description: 'מנוע DC עם גיר הילוכים משולב',
+    category: 'מנועים',
+    productType: 'מנועים',
+    manufacturer: 'Maxon',
+    manufacturerPN: 'GP 32 C',
+    supplier: 'מקסון ישראל',
+    unitCostNIS: 850.00,
+    unitCostUSD: 236.00,
+    currency: 'NIS',
+    originalCost: 820.00,
+    quoteDate: '2024-03-10',
+    quoteFileUrl: '',
+    notes: 'יחס הילוכים: 1:51, מתח: 24V',
+    createdAt: '2024-03-10T12:35:00Z',
+    updatedAt: '2024-03-10T12:35:00Z'
+  },
+  {
+    id: 'comp_21',
+    name: 'מתג גבול מכני',
+    description: 'מתג גבול תעשייתי עמיד',
+    category: 'בטיחות',
+    productType: 'בטיחות',
+    manufacturer: 'Honeywell',
+    manufacturerPN: 'BZ-2RW71-A2',
+    supplier: 'הוניוול ישראל',
+    unitCostNIS: 65.00,
+    unitCostUSD: 18.00,
+    currency: 'NIS',
+    originalCost: 62.00,
+    quoteDate: '2024-03-12',
+    quoteFileUrl: '',
+    notes: 'מגע: SPDT, דירוג IP67',
+    createdAt: '2024-03-12T09:20:00Z',
+    updatedAt: '2024-03-12T09:20:00Z'
+  },
+  {
+    id: 'comp_22',
+    name: 'כרטיס כניסות אנלוגיות',
+    description: 'כרטיס הרחבה לכניסות אנלוגיות',
+    category: 'בקרים',
+    productType: 'בקרים',
+    manufacturer: 'Wago',
+    manufacturerPN: '750-459',
+    supplier: 'ואגו ישראל',
+    unitCostNIS: 450.00,
+    unitCostUSD: 125.00,
+    currency: 'NIS',
+    originalCost: 430.00,
+    quoteDate: '2024-03-14',
+    quoteFileUrl: '',
+    notes: '8 כניסות, 0-10V, 16 ביט',
+    createdAt: '2024-03-14T14:10:00Z',
+    updatedAt: '2024-03-14T14:10:00Z'
+  },
+  {
+    id: 'comp_23',
+    name: 'צינור פנאומטי PU',
+    description: 'צינור פנאומטי גמיש עמיד',
+    category: 'כבלים ומחברים',
+    productType: 'כבלים ומחברים',
+    manufacturer: 'Festo',
+    manufacturerPN: 'PU-4',
+    supplier: 'פסטו ישראל',
+    unitCostNIS: 12.00,
+    unitCostUSD: 3.35,
+    currency: 'NIS',
+    originalCost: 11.00,
+    quoteDate: '2024-03-16',
+    quoteFileUrl: '',
+    notes: 'קוטר: 4 מ"מ, אורך: מטר',
+    createdAt: '2024-03-16T11:45:00Z',
+    updatedAt: '2024-03-16T11:45:00Z'
+  },
+  {
+    id: 'comp_24',
+    name: 'חיישן זרימה אולטראסוני',
+    description: 'חיישן זרימה לנוזלים לא מוליכים',
+    category: 'חיישנים',
+    productType: 'חיישנים',
+    manufacturer: 'Krohne',
+    manufacturerPN: 'OPTIFLUX 2000',
+    supplier: 'קרונה ישראל',
+    unitCostNIS: 2800.00,
+    unitCostUSD: 778.00,
+    currency: 'NIS',
+    originalCost: 2700.00,
+    quoteDate: '2024-03-18',
+    quoteFileUrl: '',
+    notes: 'קוטר: DN50, דיוק: ±0.5%',
+    createdAt: '2024-03-18T16:25:00Z',
+    updatedAt: '2024-03-18T16:25:00Z'
+  },
+  {
+    id: 'comp_25',
+    name: 'מנעול אלקטרומכני',
+    description: 'מנעול אלקטרומכני לשערים',
+    category: 'בטיחות',
+    productType: 'בטיחות',
+    manufacturer: 'ABB',
+    manufacturerPN: 'GSR140',
+    supplier: 'ABB ישראל',
+    unitCostNIS: 420.00,
+    unitCostUSD: 117.00,
+    currency: 'NIS',
+    originalCost: 400.00,
+    quoteDate: '2024-03-20',
+    quoteFileUrl: '',
+    notes: 'מתח: 24V DC, 2 נתיבים',
+    createdAt: '2024-03-20T13:15:00Z',
+    updatedAt: '2024-03-20T13:15:00Z'
+  },
+  {
+    id: 'comp_26',
+    name: 'מודול תקשורת Ethernet',
+    description: 'מודול תקשורת לרשת Ethernet',
+    category: 'תקשורת',
+    productType: 'תקשורת',
+    manufacturer: 'Cisco',
+    manufacturerPN: 'IE-2000-4T',
+    supplier: 'סיסקו ישראל',
+    unitCostNIS: 1200.00,
+    unitCostUSD: 334.00,
+    currency: 'NIS',
+    originalCost: 1150.00,
+    quoteDate: '2024-03-22',
+    quoteFileUrl: '',
+    notes: '4 פורטים, Industrial Ethernet, IP30',
+    createdAt: '2024-03-22T10:40:00Z',
+    updatedAt: '2024-03-22T10:40:00Z'
+  },
+  {
+    id: 'comp_27',
+    name: 'מאוורר תעשייתי 120 מ"מ',
+    description: 'מאוורר קירור תעשייתי איכותי',
+    category: 'מכני',
+    productType: 'מכני',
+    manufacturer: 'Papst',
+    manufacturerPN: '4412F/2HHP',
+    supplier: 'פפסט ישראל',
+    unitCostNIS: 85.00,
+    unitCostUSD: 23.60,
+    currency: 'NIS',
+    originalCost: 80.00,
+    quoteDate: '2024-03-24',
+    quoteFileUrl: '',
+    notes: 'מתח: 230V AC, זרימת אוויר: 85 CFM',
+    createdAt: '2024-03-24T15:30:00Z',
+    updatedAt: '2024-03-24T15:30:00Z'
+  },
+  {
+    id: 'comp_28',
+    name: 'מתג רגל מצוף',
+    description: 'מתג רגל מצוף למערכות בקרה',
+    category: 'בטיחות',
+    productType: 'בטיחות',
+    manufacturer: 'Schmersal',
+    manufacturerPN: 'AZM300',
+    supplier: 'שמרזל ישראל',
+    unitCostNIS: 650.00,
+    unitCostUSD: 181.00,
+    currency: 'NIS',
+    originalCost: 620.00,
+    quoteDate: '2024-03-26',
+    quoteFileUrl: '',
+    notes: 'קטגוריה: 4, נעילה מכנית',
+    createdAt: '2024-03-26T12:05:00Z',
+    updatedAt: '2024-03-26T12:05:00Z'
+  },
+  {
+    id: 'comp_29',
+    name: 'כרטיס זיכרון SD תעשייתי',
+    description: 'כרטיס זיכרון לאחסון נתונים',
+    category: 'תקשורת',
+    productType: 'תקשורת',
+    manufacturer: 'Swissbit',
+    manufacturerPN: 'S-280',
+    supplier: 'סוויסביט ישראל',
+    unitCostNIS: 180.00,
+    unitCostUSD: 50.00,
+    currency: 'NIS',
+    originalCost: 170.00,
+    quoteDate: '2024-03-28',
+    quoteFileUrl: '',
+    notes: 'נפח: 8GB, טמפרטורה: -40°C עד 85°C',
+    createdAt: '2024-03-28T14:50:00Z',
+    updatedAt: '2024-03-28T14:50:00Z'
+  },
+  {
+    id: 'comp_30',
+    name: 'מפצל אות חשמלי',
+    description: 'מפצל אות למערכות בקרה',
+    category: 'כבלים ומחברים',
+    productType: 'כבלים ומחברים',
+    manufacturer: 'Phoenix Contact',
+    manufacturerPN: '2857197',
+    supplier: 'פיניקס קונטקט',
+    unitCostNIS: 35.00,
+    unitCostUSD: 9.75,
+    currency: 'NIS',
+    originalCost: 33.00,
+    quoteDate: '2024-03-30',
+    quoteFileUrl: '',
+    notes: '4 יציאות, 0-10V, DIN רכב',
+    createdAt: '2024-03-30T11:20:00Z',
+    updatedAt: '2024-03-30T11:20:00Z'
   }
 ]
 
@@ -197,13 +890,19 @@ const initialState: CPQState = {
   projects: [],
   supplierQuotes: [],
   pricingRules: [],
+  quotations: demoQuotations,
+  currentQuotation: null,
   currentProjectBOM: [],
   currentProject: null,
   uiState: {
     activeView: 'dashboard',
     sidebarCollapsed: false,
     theme: 'system',
-    loading: false,
+    loading: {
+      components: false,
+      quotes: false,
+      projects: false,
+    },
     errors: [],
   },
   modalState: {
@@ -215,6 +914,7 @@ const initialState: CPQState = {
     assemblies: false,
     projects: false,
     quotes: false,
+    quotations: false,
   },
   errors: [],
 }
@@ -333,6 +1033,40 @@ function cpqReducer(state: CPQState, action: CPQAction): CPQState {
         currentProjectBOM: action.payload ? [] : [],
       }
 
+    case 'SET_CURRENT_QUOTATION':
+      return {
+        ...state,
+        currentQuotation: action.payload,
+      }
+
+    case 'SET_QUOTATIONS':
+      return {
+        ...state,
+        quotations: action.payload,
+      }
+
+    case 'ADD_QUOTATION':
+      return {
+        ...state,
+        quotations: [...state.quotations, action.payload],
+      }
+
+    case 'UPDATE_QUOTATION':
+      return {
+        ...state,
+        quotations: state.quotations.map(quotation =>
+          quotation.id === action.payload.id
+            ? { ...quotation, ...action.payload.updates, updatedAt: new Date().toISOString() }
+            : quotation
+        ),
+      }
+
+    case 'DELETE_QUOTATION':
+      return {
+        ...state,
+        quotations: state.quotations.filter(quotation => quotation.id !== action.payload),
+      }
+
     case 'SET_SUPPLIER_QUOTES':
       return {
         ...state,
@@ -441,6 +1175,11 @@ interface CPQContextType extends CPQState {
 
   // Quote actions
   addSupplierQuote: (quote: Omit<SupplierQuote, 'id'>) => Promise<void>
+
+  // Quotation actions
+  setCurrentQuotation: (quotation: QuotationProject | null) => void
+  addQuotation: (quotation: QuotationProject) => void
+  updateQuotation: (id: string, updates: Partial<QuotationProject>) => void
 
   // UI actions
   setActiveView: (view: UIState['activeView']) => void
@@ -620,24 +1359,37 @@ export function CPQProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   // Placeholder implementations for missing functions
-  const updateAssembly = useCallback(async (id: string, updates: Partial<Assembly>) => {
+  const updateAssembly = useCallback(async (_id: string, _updates: Partial<Assembly>) => {
     // TODO: Implement
     console.log('updateAssembly not implemented yet')
   }, [])
 
-  const deleteAssembly = useCallback(async (id: string) => {
+  const deleteAssembly = useCallback(async (_id: string) => {
     // TODO: Implement
     console.log('deleteAssembly not implemented yet')
   }, [])
 
-  const updateProject = useCallback(async (id: string, updates: Partial<Project>) => {
+  const updateProject = useCallback(async (_id: string, _updates: Partial<Project>) => {
     // TODO: Implement
     console.log('updateProject not implemented yet')
   }, [])
 
-  const deleteProject = useCallback(async (id: string) => {
+  const deleteProject = useCallback(async (_id: string) => {
     // TODO: Implement
     console.log('deleteProject not implemented yet')
+  }, [])
+
+  // ============ Quotation Actions ============
+  const setCurrentQuotation = useCallback((quotation: QuotationProject | null) => {
+    dispatch({ type: 'SET_CURRENT_QUOTATION', payload: quotation })
+  }, [])
+
+  const addQuotation = useCallback((quotation: QuotationProject) => {
+    dispatch({ type: 'ADD_QUOTATION', payload: quotation })
+  }, [])
+
+  const updateQuotation = useCallback((id: string, updates: Partial<QuotationProject>) => {
+    dispatch({ type: 'UPDATE_QUOTATION', payload: { id, updates } })
   }, [])
 
   const value: CPQContextType = {
@@ -659,6 +1411,9 @@ export function CPQProvider({ children }: { children: React.ReactNode }) {
     updateBOMItem,
     deleteBOMItem,
     addSupplierQuote,
+    setCurrentQuotation,
+    addQuotation,
+    updateQuotation,
     setActiveView,
     toggleSidebar,
     setModal,

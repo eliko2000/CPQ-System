@@ -1,79 +1,75 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { BOMGrid, BOMItem } from '../BOMGrid';
-import { createAGGridTestUtils, AGGridTestScenarios, mockBOMData } from '@/src/test/ag-grid-utils';
+import { mockBOMData } from '@/test/ag-grid-utils';
 
 // Mock AG Grid modules
 vi.mock('ag-grid-react', () => ({
-  AgGridReact: {
-    // Mock AG Grid component
-    __esModule: true,
-    default: vi.fn(({ rowData, onCellValueChanged, onRowDragEnd, columnDefs, ...props }) => {
-      return (
-        <div className="ag-theme-alpine" data-testid="ag-grid">
-          <div className="grid-header">
-            {columnDefs?.map((col: any, index: number) => (
-              <div key={index} className="grid-header-cell" data-col-id={col.field}>
-                {col.headerName}
-              </div>
-            ))}
-          </div>
-          <div className="grid-body">
-            {rowData?.map((row: any, rowIndex: number) => (
-              <div key={row.id} className="grid-row" data-row-id={row.id} data-row-index={rowIndex}>
-                {columnDefs?.map((col: any, colIndex: number) => (
-                  <div
-                    key={colIndex}
-                    className="grid-cell"
-                    data-col-id={col.field}
-                    contentEditable={col.editable}
-                    onDoubleClick={(e) => {
-                      if (col.editable) {
-                        e.currentTarget.focus();
-                      }
-                    }}
-                    onBlur={(e) => {
-                      if (col.editable && onCellValueChanged) {
-                        const newValue = col.field === 'quantity' ? parseInt(e.currentTarget.textContent) :
-                                       col.field === 'unitCost' || col.field === 'customerPrice' ?
-                                       parseFloat(e.currentTarget.textContent) : e.currentTarget.textContent;
-                        onCellValueChanged({
-                          data: { ...row, [col.field]: newValue },
-                          newValue,
-                          oldValue: row[col.field],
-                          colDef: col
-                        });
-                      }
-                    }}
-                  >
-                    {col.field === 'totalCost' ? (row.quantity * row.unitCost).toFixed(2) :
-                     col.field === 'totalPrice' ? (row.quantity * row.customerPrice).toFixed(2) :
-                     col.field === 'margin' ? `${row.margin}%` :
-                     row[col.field]}
-                  </div>
-                ))}
-                <div className="grid-cell">
-                  <button
-                    onClick={() => {
-                      // Mock delete functionality
-                      const deleteHandler = props.onBOMChange;
-                      if (deleteHandler) {
-                        const newItems = rowData.filter((item: BOMItem) => item.id !== row.id);
-                        deleteHandler(newItems);
-                      }
-                    }}
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
+  AgGridReact: vi.fn(({ rowData, onCellValueChanged, onRowDragEnd, columnDefs, ...props }) => {
+    return (
+      <div className="ag-theme-alpine" data-testid="ag-grid">
+        <div className="grid-header">
+          {columnDefs?.map((col: any, index: number) => (
+            <div key={index} className="grid-header-cell" data-col-id={col.field}>
+              {col.headerName}
+            </div>
+          ))}
         </div>
-      );
-    }
-  },
+        <div className="grid-body">
+          {rowData?.map((row: any, rowIndex: number) => (
+            <div key={row.id} className="grid-row" data-row-id={row.id} data-row-index={rowIndex}>
+              {columnDefs?.map((col: any, colIndex: number) => (
+                <div
+                  key={colIndex}
+                  className="grid-cell"
+                  data-col-id={col.field}
+                  contentEditable={col.editable}
+                  onDoubleClick={(e) => {
+                    if (col.editable) {
+                      e.currentTarget.focus();
+                    }
+                  }}
+                  onBlur={(e) => {
+                    if (col.editable && onCellValueChanged) {
+                      const newValue = col.field === 'quantity' ? parseInt(e.currentTarget.textContent || '0') :
+                                     col.field === 'unitCost' || col.field === 'customerPrice' ?
+                                     parseFloat(e.currentTarget.textContent || '0') : e.currentTarget.textContent;
+                      onCellValueChanged({
+                        data: { ...row, [col.field]: newValue },
+                        newValue,
+                        oldValue: row[col.field],
+                        colDef: col
+                      });
+                    }
+                  }}
+                >
+                  {col.field === 'totalCost' ? (row.quantity * row.unitCost).toFixed(2) :
+                   col.field === 'totalPrice' ? (row.quantity * row.customerPrice).toFixed(2) :
+                   col.field === 'margin' ? `${row.margin}%` :
+                   row[col.field]}
+                </div>
+              ))}
+              <div className="grid-cell">
+                <button
+                  onClick={() => {
+                    // Mock delete functionality
+                    const deleteHandler = props.onBOMChange;
+                    if (deleteHandler) {
+                      const newItems = rowData.filter((item: BOMItem) => item.id !== row.id);
+                      deleteHandler(newItems);
+                    }
+                  }}
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }),
   ColDef: vi.fn(),
   GridApi: vi.fn(),
   GridReadyEvent: vi.fn(),
@@ -235,7 +231,7 @@ describe('BOMGrid', () => {
         ...mockBOMData,
         {
           id: 'item-4',
-          itemType: 'component',
+          itemType: 'component' as const,
           description: 'Zero Cost Item',
           quantity: 1,
           unitCost: 0,
@@ -254,7 +250,7 @@ describe('BOMGrid', () => {
         ...mockBOMData,
         {
           id: 'item-4',
-          itemType: 'component',
+          itemType: 'component' as const,
           description: 'Low Margin Item',
           quantity: 1,
           unitCost: 1000,
@@ -364,7 +360,7 @@ describe('BOMGrid', () => {
     it('handles large BOM lists efficiently', () => {
       const largeBOM = Array.from({ length: 100 }, (_, index) => ({
         id: `item-${index}`,
-        itemType: 'component',
+        itemType: 'component' as const,
         description: `Component ${index + 1}`,
         quantity: 1,
         unitCost: 100 + index,
@@ -390,7 +386,7 @@ describe('BOMGrid', () => {
     });
 
     it('supports keyboard navigation', async () => {
-      const user = userEvent.setup();
+      userEvent.setup();
       render(<BOMGrid {...defaultProps} />);
 
       const firstCell = screen.getByText('Siemens S7-1500 PLC');

@@ -54,13 +54,39 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-hebrew;
+    direction: rtl;
+    text-align: right;
+  }
+  
+  /* RTL support for flex layouts */
+  .flex {
+    direction: rtl;
+  }
+  
+  /* RTL support for AG Grid */
+  .ag-theme-alpine {
+    direction: rtl; /* Make AG Grid RTL for proper Hebrew display */
+  }
+  
+  /* RTL spacing utilities */
+  .space-x-reverse > :not([hidden]) ~ :not([hidden]) {
+    --tw-space-x-reverse: 1;
+  }
+  
+  .space-x-reverse > :not([hidden]) ~ :not([hidden]) {
+    margin-right: calc(0.5rem * var(--tw-space-x-reverse));
+    margin-left: 0;
   }
 }
 
 /* AG Grid Custom Styles */
 .ag-theme-alpine {
   @apply border border-border rounded-lg;
+  --ag-row-height: 32px; /* Smaller row height */
+  --ag-header-height: 40px; /* Slightly smaller header */
+  --ag-cell-horizontal-padding: 8px;
+  --ag-grid-size: 4px;
 }
 
 .ag-theme-alpine .ag-header {
@@ -69,6 +95,7 @@
 
 .ag-theme-alpine .ag-row {
   @apply border-b border-border/50;
+  min-height: 32px !important; /* Force smaller row height */
 }
 
 .ag-theme-alpine .ag-row-selected {
@@ -76,15 +103,32 @@
 }
 
 .ag-theme-alpine .ag-cell {
-  @apply px-3 py-2;
+  @apply px-2 py-1; /* Reduced padding for smaller rows */
+  line-height: 1.2;
+  font-size: 0.875rem; /* Slightly smaller text */
+  display: flex;
+  align-items: center; /* Vertical center alignment */
+  white-space: nowrap; /* Prevent text wrapping */
+  overflow: hidden; /* Hide overflow */
+  text-overflow: ellipsis; /* Show ellipsis for truncated text */
 }
 
 .ag-theme-alpine .ag-cell-edit-input {
   @apply border border-input bg-background px-2 py-1 rounded;
+  height: 28px; /* Smaller edit input */
 }
 
 .ag-theme-alpine .ag-cell-focus {
   @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+}
+
+/* Ensure all rows have consistent height */
+.ag-theme-alpine .ag-row-no-focus {
+  min-height: 32px !important;
+}
+
+.ag-theme-alpine .ag-center-cols-viewport {
+  min-height: 32px !important;
 }
 
 /* Custom scrollbar */
@@ -103,4 +147,40 @@
 
 ::-webkit-scrollbar-thumb:hover {
   @apply bg-muted-foreground/50;
+}
+
+/* Custom AG Grid cell classes for RTL alignment */
+.ag-cell-right {
+  text-align: right !important;
+  justify-content: flex-end !important;
+}
+
+.ag-cell-center {
+  text-align: center !important;
+  justify-content: center !important;
+}
+
+.ag-cell-bold {
+  font-weight: bold !important;
+  text-align: right !important;
+  justify-content: flex-end !important;
+}
+
+/* RTL Support for AG Grid */
+[dir="rtl"] .ag-theme-alpine {
+  direction: rtl;
+}
+
+[dir="rtl"] .ag-header-cell-label {
+  text-align: right;
+}
+
+[dir="rtl"] .ag-pinned-right-cols-container {
+  left: 0;
+  right: auto;
+}
+
+[dir="rtl"] .ag-pinned-left-cols-container {
+  right: 0;
+  left: auto;
 }

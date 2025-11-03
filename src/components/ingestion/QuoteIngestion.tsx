@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
@@ -7,9 +7,24 @@ import { QuoteUpload } from './QuoteUpload'
 import { QuoteValidation } from './QuoteValidation'
 import { ValidatedComponent } from '@/types'
 
+interface ExtractedData {
+  supplier: string;
+  quoteDate: string;
+  items: Array<{
+    name: string;
+    description?: string;
+    manufacturer?: string;
+    manufacturerPN?: string;
+    quantity?: number;
+    unitPrice?: number;
+    confidence: number;
+  }>;
+  confidence: number;
+}
+
 export function QuoteIngestion() {
   const [currentStep, setCurrentStep] = useState<'upload' | 'validation' | 'completed'>('upload')
-  const [extractedData, setExtractedData] = useState(null)
+  const [extractedData, setExtractedData] = useState<ExtractedData | null>(null)
   const [quotes, setQuotes] = useState<Array<{
     id: string;
     fileName: string;
@@ -20,8 +35,8 @@ export function QuoteIngestion() {
     errors?: string[];
   }>>([])
 
-  const handleQuoteProcessed = (data: any) => {
-    setExtractedData({
+  const handleQuoteProcessed = () => {
+    const newExtractedData: ExtractedData = {
       supplier: 'ABC Robotics',
       quoteDate: '2024-01-15',
       items: [
@@ -54,24 +69,26 @@ export function QuoteIngestion() {
         }
       ],
       confidence: 0.88
-    })
+    }
+    setExtractedData(newExtractedData)
     setCurrentStep('validation')
   }
 
   const handleValidationComplete = (validatedComponents: ValidatedComponent[]) => {
     setCurrentStep('completed')
 
-    const newQuote = {
-      id: `quote_${Date.now()}`,
-      fileName: 'demo_quote.pdf',
-      fileUrl: '/quotes/demo_quote.pdf',
-      status: 'completed' as const,
-      uploadDate: new Date().toISOString(),
-      extractedData,
-      validatedComponents
-    }
+    if (extractedData) {
+      const newQuote = {
+        id: `quote_${Date.now()}`,
+        fileName: 'demo_quote.pdf',
+        fileUrl: '/quotes/demo_quote.pdf',
+        status: 'completed' as const,
+        uploadDate: new Date().toISOString(),
+        validatedComponents
+      }
 
-    setQuotes(prev => [...prev, newQuote])
+      setQuotes(prev => [...prev, newQuote])
+    }
   }
 
   const startNewQuote = () => {
@@ -148,7 +165,7 @@ export function QuoteIngestion() {
               <div className="text-center py-8">
                 <CheckCircle className="h-16 w-16 text-green-600 mx-auto mb-4" />
                 <h3 className="text-xl font-semibold text-green-600 mb-2">
-                  {extractedData.items.length} רכיבים נשמרו בהצלחה
+                  {extractedData?.items.length || 0} רכיבים נשמרו בהצלחה
                 </h3>
                 <p className="text-muted-foreground">
                   הרכיבים נוספו לספרייה ומוכנים לשימוש בפרויקטים
@@ -172,7 +189,7 @@ export function QuoteIngestion() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {quotes.map((quote, index) => (
+                  {quotes.map((quote) => (
                     <div
                       key={quote.id}
                       className="flex items-center justify-between p-4 border rounded-lg"

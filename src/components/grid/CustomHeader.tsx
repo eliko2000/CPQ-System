@@ -1,6 +1,6 @@
-import React, { useRef, useState, useEffect } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { IHeaderParams, Column } from 'ag-grid-community'
+import { Column } from 'ag-grid-community'
 import { MoreVertical, Filter } from 'lucide-react'
 import { SmartFilter } from './SmartFilter'
 import { DateFilter } from './DateFilter'
@@ -205,8 +205,8 @@ export function CustomHeader(props: CustomHeaderProps) {
         {props.displayName}
       </div>
 
-      {/* Action Icons */}
-      <div className="flex items-center gap-1 mr-2 opacity-0 group-hover:opacity-100 transition-opacity">
+      {/* Action Icons - Always visible, right-aligned */}
+      <div className="flex items-center gap-1 mr-2 transition-opacity">
         {/* Filter Icon */}
         <button
           ref={filterRef}

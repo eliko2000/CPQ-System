@@ -8,10 +8,10 @@ interface MainLayoutProps {
 }
 
 export function MainLayout({ children }: MainLayoutProps) {
-  const { uiState } = useCPQ()
+  useCPQ()
 
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex h-screen bg-background" dir="rtl">
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header />

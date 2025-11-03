@@ -87,6 +87,7 @@ export default {
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
         mono: ['JetBrains Mono', 'monospace'],
+        hebrew: ['Assistant', 'Inter', 'system-ui', 'sans-serif'],
       },
     },
   },

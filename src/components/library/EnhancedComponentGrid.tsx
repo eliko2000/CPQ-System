@@ -1,12 +1,11 @@
-import React, { useMemo, useRef, useState, useCallback } from 'react'
+import { useMemo, useRef, useState, useCallback } from 'react'
 import { AgGridReact } from 'ag-grid-react'
-import { ColDef, ICellRendererParams, ValueGetterParams, ValueSetterParams, IFilterParams } from 'ag-grid-community'
+import { ColDef, ICellRendererParams, ValueSetterParams } from 'ag-grid-community'
 import 'ag-grid-community/styles/ag-grid.css'
 import 'ag-grid-community/styles/ag-theme-alpine.css'
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
-import { Input } from '../ui/input'
-import { Edit, Trash2, Eye, Settings, ChevronDown, Search, X } from 'lucide-react'
+import { Edit, Trash2, Eye, Settings, ChevronDown, Copy } from 'lucide-react'
 import { Component } from '../../types'
 import { useClickOutside } from '../../hooks/useClickOutside'
 import { CustomHeader } from '../grid/CustomHeader'
@@ -27,26 +26,13 @@ const UNIFIED_CATEGORIES = [
   'אחר'
 ]
 
-// Default product types for dropdown
-const DEFAULT_PRODUCT_TYPES = [
-  'שסתומים',
-  'חיישנים',
-  'מנועים',
-  'בקרים',
-  'כבלים ומחברים',
-  'ערכות הרכבה',
-  'רכיבים מכניים',
-  'מקורות כוח',
-  'תקשורת',
-  'בטיחות',
-  'אחר'
-]
 
 
 interface EnhancedComponentGridProps {
   components: Component[]
   onEdit: (component: Component) => void
   onDelete: (componentId: string, componentName: string) => void
+  onDuplicate?: (component: Component) => void
   onView?: (component: Component) => void
   onComponentUpdate?: (componentId: string, field: string, value: any) => void
 }
@@ -55,13 +41,14 @@ export function EnhancedComponentGrid({
   components, 
   onEdit, 
   onDelete, 
+  onDuplicate,
   onView, 
   onComponentUpdate 
 }: EnhancedComponentGridProps) {
   const gridRef = useRef<AgGridReact>(null)
   const [visibleColumns, setVisibleColumns] = useState<Set<string>>(new Set([
-    'name', 'manufacturer', 'manufacturerPN', 'category', 'productType', 
-    'supplier', 'unitCostNIS', 'currency', 'quoteDate', 'actions'
+    'name', 'manufacturer', 'manufacturerPN', 'category', 
+    'supplier', 'unitCostNIS', 'unitCostUSD', 'unitCostEUR', 'currency', 'quoteDate', 'actions'
   ]))
   const [showColumnManager, setShowColumnManager] = useState(false)
 
@@ -85,13 +72,13 @@ export function EnhancedComponentGrid({
   }, [onComponentUpdate])
 
   // Handle column menu click
-  const handleColumnMenuClick = useCallback((columnId: string, event: React.MouseEvent) => {
+  const handleColumnMenuClick = useCallback((columnId: string) => {
     console.log('Column menu clicked:', columnId)
     // Menu functionality will be implemented in Phase 2
   }, [])
 
   // Handle filter click
-  const handleFilterClick = useCallback((columnId: string, event: React.MouseEvent) => {
+  const handleFilterClick = useCallback((columnId: string) => {
     console.log('Filter clicked:', columnId)
     // Smart filter is now handled by the CustomHeader component
   }, [])
@@ -104,7 +91,7 @@ export function EnhancedComponentGrid({
       sortable: true,
       filter: CustomSetFilter, // Use custom filter component
       resizable: true,
-      minWidth: 200,
+      width: 180,
       editable: true,
       cellEditor: 'agTextCellEditor',
       onCellValueChanged: handleCellEdit,
@@ -121,11 +108,6 @@ export function EnhancedComponentGrid({
       cellRenderer: (params: ICellRendererParams) => (
         <div className="py-1">
           <div className="font-medium">{params.value}</div>
-          {params.data.description && (
-            <div className="text-sm text-muted-foreground">
-              {params.data.description}
-            </div>
-          )}
         </div>
       )
     },
@@ -135,7 +117,7 @@ export function EnhancedComponentGrid({
       sortable: true,
       filter: CustomSetFilter, // Use custom filter component
       resizable: true,
-      minWidth: 120,
+      width: 120,
       editable: true,
       cellEditor: 'agTextCellEditor',
       onCellValueChanged: handleCellEdit,
@@ -156,7 +138,7 @@ export function EnhancedComponentGrid({
       sortable: true,
       filter: CustomSetFilter, // Use custom filter component
       resizable: true,
-      minWidth: 140,
+      width: 140,
       editable: true,
       cellEditor: 'agTextCellEditor',
       onCellValueChanged: handleCellEdit,
@@ -178,7 +160,7 @@ export function EnhancedComponentGrid({
       sortable: true,
       filter: CustomSetFilter, // Use custom filter component
       resizable: true,
-      minWidth: 120,
+      width: 120,
       editable: true,
       cellEditor: 'agSelectCellEditor',
       cellEditorParams: {
@@ -202,42 +184,12 @@ export function EnhancedComponentGrid({
       )
     },
     {
-      headerName: 'סוג מוצר',
-      field: 'productType',
-      sortable: true,
-      filter: CustomSetFilter, // Use custom filter component
-      resizable: true,
-      minWidth: 120,
-      editable: true,
-      cellEditor: 'agSelectCellEditor',
-      cellEditorParams: {
-        values: DEFAULT_PRODUCT_TYPES
-      },
-      onCellValueChanged: handleCellEdit,
-      headerComponent: CustomHeader,
-      headerComponentParams: (params: any) => ({
-        displayName: 'סוג מוצר',
-        onMenuClick: handleColumnMenuClick,
-        onFilterClick: handleFilterClick,
-        api: params.api,
-        columnApi: params.columnApi,
-        column: params.column,
-        uniqueValues: getUniqueValues('productType')
-      }),
-      valueGetter: (params: ValueGetterParams) => params.data.productType || '-',
-      cellRenderer: (params: ICellRendererParams) => (
-        <Badge variant="outline" className="text-xs">
-          {params.value || '-'}
-        </Badge>
-      )
-    },
-    {
       headerName: 'ספק',
       field: 'supplier',
       sortable: true,
       filter: CustomSetFilter, // Use custom filter component
       resizable: true,
-      minWidth: 120,
+      width: 120,
       editable: true,
       cellEditor: 'agTextCellEditor',
       onCellValueChanged: handleCellEdit,
@@ -258,7 +210,7 @@ export function EnhancedComponentGrid({
       sortable: true,
       filter: 'agNumberColumnFilter',
       resizable: true,
-      minWidth: 120,
+      width: 120,
       type: 'numericColumn',
       editable: true,
       cellEditor: 'agNumberCellEditor',
@@ -291,7 +243,7 @@ export function EnhancedComponentGrid({
       sortable: true,
       filter: 'agNumberColumnFilter',
       resizable: true,
-      minWidth: 120,
+      width: 120,
       type: 'numericColumn',
       editable: true,
       cellEditor: 'agNumberCellEditor',
@@ -319,12 +271,45 @@ export function EnhancedComponentGrid({
       }
     },
     {
+      headerName: 'מחיר באירו',
+      field: 'unitCostEUR',
+      sortable: true,
+      filter: 'agNumberColumnFilter',
+      resizable: true,
+      width: 120,
+      type: 'numericColumn',
+      editable: true,
+      cellEditor: 'agNumberCellEditor',
+      onCellValueChanged: handleCellEdit,
+      headerComponent: CustomHeader,
+      headerComponentParams: (params: any) => ({
+        displayName: 'מחיר באירו',
+        onMenuClick: handleColumnMenuClick,
+        onFilterClick: handleFilterClick,
+        api: params.api,
+        columnApi: params.columnApi,
+        column: params.column,
+        filterType: 'number'
+      }),
+      valueFormatter: (params: any) => {
+        return new Intl.NumberFormat('de-DE', {
+          style: 'currency',
+          currency: 'EUR',
+          minimumFractionDigits: 2
+        }).format(params.value || 0)
+      },
+      cellClass: 'font-semibold text-purple-600',
+      filterParams: {
+        buttons: ['reset']
+      }
+    },
+    {
       headerName: 'מטבע',
       field: 'currency',
       sortable: true,
       filter: CustomSetFilter, // Use custom filter component
       resizable: true,
-      minWidth: 80,
+      width: 80,
       editable: true,
       cellEditor: 'agSelectCellEditor',
       cellEditorParams: {
@@ -353,7 +338,7 @@ export function EnhancedComponentGrid({
       sortable: true,
       filter: 'agDateColumnFilter',
       resizable: true,
-      minWidth: 120,
+      width: 120,
       editable: true,
       cellEditor: 'agDateStringCellEditor',
       onCellValueChanged: handleCellEdit,
@@ -381,7 +366,7 @@ export function EnhancedComponentGrid({
       sortable: true,
       filter: CustomSetFilter, // Use custom filter component
       resizable: true,
-      minWidth: 200,
+      width: 200,
       editable: true,
       cellEditor: 'agLargeTextCellEditor',
       cellEditorPopup: true,
@@ -403,7 +388,7 @@ export function EnhancedComponentGrid({
       sortable: true,
       filter: CustomSetFilter, // Use custom filter component
       resizable: true,
-      minWidth: 150,
+      width: 150,
       editable: true,
       cellEditor: 'agLargeTextCellEditor',
       cellEditorPopup: true,
@@ -425,10 +410,10 @@ export function EnhancedComponentGrid({
       sortable: false,
       filter: false,
       resizable: false,
-      minWidth: 150,
-      pinned: 'left',
+      width: 180,
+      pinned: 'right', // Pin to right side for RTL
       cellRenderer: (params: ICellRendererParams) => (
-        <div className="flex gap-1">
+        <div className="flex gap-1 items-center justify-center">
           {onView && (
             <Button
               variant="outline"
@@ -438,6 +423,17 @@ export function EnhancedComponentGrid({
               title="צפה"
             >
               <Eye className="h-3 w-3" />
+            </Button>
+          )}
+          {onDuplicate && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onDuplicate(params.data)}
+              className="h-8 w-8 p-0 text-blue-600 hover:text-blue-800"
+              title="שכפל"
+            >
+              <Copy className="h-3 w-3" />
             </Button>
           )}
           <Button
@@ -473,9 +469,11 @@ export function EnhancedComponentGrid({
     filter: true,
     resizable: true,
     wrapText: true,
-    autoHeight: true,
+    autoHeight: false, // Disable auto-height for smaller rows
     headerClass: 'ag-header-cell-label-right',
-    cellClass: 'ag-rtl'
+    cellClass: 'ag-rtl',
+    flex: 1, // Allow columns to flex and auto-size
+    minWidth: 100
   }), [])
 
   // Toggle column visibility
@@ -507,6 +505,13 @@ export function EnhancedComponentGrid({
   const onFirstDataRendered = (params: any) => {
     params.api.sizeColumnsToFit()
   }
+
+  // Handle double-click to open component card
+  const onCellDoubleClicked = useCallback((params: any) => {
+    if (params.data && onEdit) {
+      onEdit(params.data)
+    }
+  }, [onEdit])
 
   return (
     <div className="space-y-4">
@@ -570,6 +575,7 @@ export function EnhancedComponentGrid({
           defaultColDef={defaultColDef}
           onGridReady={onGridReady}
           onFirstDataRendered={onFirstDataRendered}
+          onCellDoubleClicked={onCellDoubleClicked}
           rowSelection="single"
           animateRows={true}
           pagination={true}
@@ -605,7 +611,7 @@ export function EnhancedComponentGrid({
             endsWith: 'מסתיים ב',
             andCondition: 'וגם',
             orCondition: 'או',
-            group: 'קבץ',
+            group: 'קבוצה',
             columns: 'עמודות',
             filters: 'סינונים',
             pivotMode: 'מצב פיבוט',

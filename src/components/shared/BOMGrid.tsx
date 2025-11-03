@@ -1,13 +1,11 @@
 import React, { useRef, useState, useCallback, useMemo } from 'react';
 import { AgGridReact } from 'ag-grid-react';
-import { ColDef, GridApi, GridReadyEvent,CellValueChangedEvent, RowDragEvent } from 'ag-grid-community';
+import { ColDef, GridReadyEvent, NewValueParams, ValueFormatterParams, ValueGetterParams } from 'ag-grid-community';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { formatCurrency, calculateMargin } from '@/src/lib/utils';
-import { Plus, Trash2, Calculator, Save } from 'lucide-react';
+import { formatCurrency, calculateMargin } from '@/lib/utils';
+import { Plus, Trash2, Calculator } from 'lucide-react';
 
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
@@ -54,7 +52,7 @@ export const BOMGrid: React.FC<BOMGridProps> = ({
   const columnDefs: ColDef<BOMItem>[] = useMemo(() => [
     {
       headerName: '',
-      field: 'id',
+      field: 'id' as keyof BOMItem,
       width: 50,
       rowDrag: allowEditing,
       cellRenderer: () => <div className="drag-handle">⋮⋮</div>,
@@ -63,9 +61,9 @@ export const BOMGrid: React.FC<BOMGridProps> = ({
     },
     {
       headerName: 'Type',
-      field: 'itemType',
+      field: 'itemType' as keyof BOMItem,
       width: 120,
-      cellRenderer: (params) => (
+      cellRenderer: (params: ValueFormatterParams) => (
         <Badge variant={
           params.value === 'component' ? 'default' :
           params.value === 'assembly' ? 'secondary' :
@@ -82,7 +80,7 @@ export const BOMGrid: React.FC<BOMGridProps> = ({
     },
     {
       headerName: 'Description',
-      field: 'description',
+      field: 'description' as keyof BOMItem,
       flex: 2,
       editable: allowEditing,
       cellEditorPopup: true,
@@ -90,25 +88,25 @@ export const BOMGrid: React.FC<BOMGridProps> = ({
     },
     {
       headerName: 'Manufacturer',
-      field: 'manufacturer',
+      field: 'manufacturer' as keyof BOMItem,
       width: 150,
       editable: allowEditing,
     },
     {
       headerName: 'MFR P/N',
-      field: 'manufacturerPn',
+      field: 'manufacturerPn' as keyof BOMItem,
       width: 140,
       editable: allowEditing,
     },
     {
       headerName: 'Supplier',
-      field: 'supplier',
+      field: 'supplier' as keyof BOMItem,
       width: 120,
       editable: allowEditing,
     },
     {
       headerName: 'Qty',
-      field: 'quantity',
+      field: 'quantity' as keyof BOMItem,
       width: 80,
       editable: allowEditing,
       cellEditor: 'agNumberCellEditor',
@@ -116,10 +114,10 @@ export const BOMGrid: React.FC<BOMGridProps> = ({
         min: 1,
         precision: 0,
       },
-      valueFormatter: (params) => params.value?.toLocaleString() || '0',
-      onCellValueChanged: (params: CellValueChangedEvent) => {
+      valueFormatter: (params: ValueFormatterParams) => params.value?.toLocaleString() || '0',
+      onCellValueChanged: (params: NewValueParams<BOMItem>) => {
         const newValue = params.newValue;
-        if (newValue < 1) {
+        if (newValue < 1 && params.node) {
           params.node.setDataValue('quantity', 1);
         }
         calculateTotals();
@@ -127,7 +125,7 @@ export const BOMGrid: React.FC<BOMGridProps> = ({
     },
     {
       headerName: 'Unit Cost',
-      field: 'unitCost',
+      field: 'unitCost' as keyof BOMItem,
       width: 120,
       editable: allowEditing && !readonly,
       cellEditor: 'agNumberCellEditor',
@@ -135,17 +133,19 @@ export const BOMGrid: React.FC<BOMGridProps> = ({
         min: 0,
         precision: 2,
       },
-      valueFormatter: (params) => formatCurrency(params.value || 0),
-      onCellValueChanged: (params: CellValueChangedEvent) => {
-        const item = params.data as BOMItem;
-        const newMargin = calculateMargin(item.unitCost, item.customerPrice);
-        params.node.setDataValue('margin', newMargin);
+      valueFormatter: (params: ValueFormatterParams) => formatCurrency(params.value || 0),
+      onCellValueChanged: (params: NewValueParams<BOMItem>) => {
+        const item = params.data;
+        if (item && params.node) {
+          const newMargin = calculateMargin(item.unitCost, item.customerPrice);
+          params.node.setDataValue('margin', newMargin);
+        }
         calculateTotals();
       }
     },
     ...(showCustomerPricing ? [{
       headerName: 'Customer Price',
-      field: 'customerPrice',
+      field: 'customerPrice' as keyof BOMItem,
       width: 140,
       editable: allowEditing && !readonly,
       cellEditor: 'agNumberCellEditor',
@@ -153,21 +153,23 @@ export const BOMGrid: React.FC<BOMGridProps> = ({
         min: 0,
         precision: 2,
       },
-      valueFormatter: (params) => formatCurrency(params.value || 0),
-      onCellValueChanged: (params: CellValueChangedEvent) => {
-        const item = params.data as BOMItem;
-        const newMargin = calculateMargin(item.unitCost, item.customerPrice);
-        params.node.setDataValue('margin', newMargin);
+      valueFormatter: (params: ValueFormatterParams) => formatCurrency(params.value || 0),
+      onCellValueChanged: (params: NewValueParams<BOMItem>) => {
+        const item = params.data;
+        if (item && params.node) {
+          const newMargin = calculateMargin(item.unitCost, item.customerPrice);
+          params.node.setDataValue('margin', newMargin);
+        }
         calculateTotals();
       }
     }] : []),
     {
       headerName: 'Margin %',
-      field: 'margin',
+      field: 'margin' as keyof BOMItem,
       width: 100,
       editable: false,
-      valueFormatter: (params) => `${params.value?.toFixed(1)}%`,
-      cellRenderer: (params) => {
+      valueFormatter: (params: ValueFormatterParams) => `${params.value?.toFixed(1)}%`,
+      cellRenderer: (params: ValueFormatterParams) => {
         const margin = params.value || 0;
         const color = margin >= 25 ? 'text-green-600' : margin >= 15 ? 'text-yellow-600' : 'text-red-600';
         return <span className={color}>{margin.toFixed(1)}%</span>;
@@ -175,23 +177,23 @@ export const BOMGrid: React.FC<BOMGridProps> = ({
     },
     {
       headerName: 'Total Cost',
-      field: 'totalCost',
+      field: 'totalCost' as keyof BOMItem,
       width: 120,
       editable: false,
-      valueGetter: (params) => (params.data.quantity || 0) * (params.data.unitCost || 0),
-      valueFormatter: (params) => formatCurrency(params.value || 0),
-      cellRenderer: (params) => (
+      valueGetter: (params: ValueGetterParams) => (params.data.quantity || 0) * (params.data.unitCost || 0),
+      valueFormatter: (params: ValueFormatterParams) => formatCurrency(params.value || 0),
+      cellRenderer: (params: ValueFormatterParams) => (
         <span className="font-medium">{formatCurrency(params.value || 0)}</span>
       )
     },
     ...(showCustomerPricing ? [{
       headerName: 'Total Price',
-      field: 'totalPrice',
+      field: 'totalPrice' as keyof BOMItem,
       width: 140,
       editable: false,
-      valueGetter: (params) => (params.data.quantity || 0) * (params.data.customerPrice || 0),
-      valueFormatter: (params) => formatCurrency(params.value || 0),
-      cellRenderer: (params) => (
+      valueGetter: (params: ValueGetterParams) => (params.data.quantity || 0) * (params.data.customerPrice || 0),
+      valueFormatter: (params: ValueFormatterParams) => formatCurrency(params.value || 0),
+      cellRenderer: (params: ValueFormatterParams) => (
         <span className="font-semibold text-blue-600">{formatCurrency(params.value || 0)}</span>
       )
     }] : []),
@@ -200,7 +202,7 @@ export const BOMGrid: React.FC<BOMGridProps> = ({
       width: 100,
       suppressMenu: true,
       sortable: false,
-      cellRenderer: (params) => (
+      cellRenderer: (params: ValueFormatterParams) => (
         <div className="flex gap-1">
           {allowEditing && (
             <Button
@@ -243,19 +245,23 @@ export const BOMGrid: React.FC<BOMGridProps> = ({
     calculateTotals();
   }, [calculateTotals]);
 
-  const onCellValueChanged = useCallback((params: CellValueChangedEvent) => {
-    const updatedItems = [];
+  const onCellValueChanged = useCallback(() => {
+    const updatedItems: BOMItem[] = [];
     gridRef.current?.api.forEachNode((node) => {
-      updatedItems.push(node.data);
+      if (node.data) {
+        updatedItems.push(node.data);
+      }
     });
     onBOMChange(updatedItems);
     calculateTotals();
   }, [onBOMChange, calculateTotals]);
 
-  const onRowDragEnd = useCallback((event: RowDragEvent) => {
-    const updatedItems = [];
+  const onRowDragEnd = useCallback(() => {
+    const updatedItems: BOMItem[] = [];
     gridRef.current?.api.forEachNode((node) => {
-      updatedItems.push(node.data);
+      if (node.data) {
+        updatedItems.push(node.data);
+      }
     });
     onBOMChange(updatedItems);
   }, [onBOMChange]);
@@ -355,23 +361,23 @@ export const BOMGrid: React.FC<BOMGridProps> = ({
           <div className="border-t pt-4">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
-                <Label className="text-sm font-medium text-gray-600">Total Cost</Label>
+                <div className="text-sm font-medium text-gray-600">Total Cost</div>
                 <div className="text-2xl font-bold">{formatCurrency(totalCost)}</div>
               </div>
               {showCustomerPricing && (
                 <>
                   <div>
-                    <Label className="text-sm font-medium text-gray-600">Total Price</Label>
+                    <div className="text-sm font-medium text-gray-600">Total Price</div>
                     <div className="text-2xl font-bold text-blue-600">{formatCurrency(totalPrice)}</div>
                   </div>
                   <div>
-                    <Label className="text-sm font-medium text-gray-600">Total Margin</Label>
+                    <div className="text-sm font-medium text-gray-600">Total Margin</div>
                     <div className="text-2xl font-bold text-green-600">
                       {formatCurrency(totalPrice - totalCost)}
                     </div>
                   </div>
                   <div>
-                    <Label className="text-sm font-medium text-gray-600">Average Margin</Label>
+                    <div className="text-sm font-medium text-gray-600">Average Margin</div>
                     <div className={`text-2xl font-bold ${
                       averageMargin >= 25 ? 'text-green-600' :
                       averageMargin >= 15 ? 'text-yellow-600' : 'text-red-600'

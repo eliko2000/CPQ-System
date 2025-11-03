@@ -1,21 +1,14 @@
 import React, { useState, useMemo, useCallback } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
+import { Card, CardContent } from '../ui/card'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
-import { Badge } from '../ui/badge'
-import { 
-  Package, 
-  Plus, 
-  Search, 
-  Filter, 
-  Edit, 
-  Trash2, 
-  Eye,
+import {
+  Package,
+  Plus,
+  Search,
   DollarSign,
   Building,
-  Calendar,
-  Settings,
-  ChevronDown
+  Calendar
 } from 'lucide-react'
 import { useCPQ } from '../../contexts/CPQContext'
 import { Component } from '../../types'
@@ -23,23 +16,8 @@ import { ComponentForm } from './ComponentForm'
 import { ConfirmDialog } from '../ui/ConfirmDialog'
 import { EnhancedComponentGrid } from './EnhancedComponentGrid'
 
-// Default categories for robotics components
-const DEFAULT_CATEGORIES = [
-  'PLCs',
-  'Sensors',
-  'Actuators',
-  'Motors',
-  'Controllers',
-  'Power Supplies',
-  'Communication',
-  'Safety',
-  'Mechanical',
-  'Cables & Connectors',
-  'Other'
-]
-
 export function ComponentLibrary() {
-  const { components, addComponent, updateComponent, deleteComponent, setModal, modalState, closeModal } = useCPQ()
+  const { components, updateComponent, deleteComponent, setModal, modalState, closeModal } = useCPQ()
   const [searchTerm, setSearchTerm] = useState('')
   const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; componentId: string | null; componentName: string }>({
     isOpen: false,
@@ -52,8 +30,7 @@ export function ComponentLibrary() {
     try {
       const component = components.find(c => c.id === componentId)
       if (component) {
-        const updatedComponent = { ...component, [field]: value, updatedAt: new Date().toISOString() }
-        await updateComponent(updatedComponent)
+        await updateComponent(componentId, { [field]: value })
       }
     } catch (error) {
       console.error('Failed to update component:', error)
@@ -82,6 +59,26 @@ export function ComponentLibrary() {
 
   const handleEditComponent = (component: Component) => {
     setModal({ type: 'edit-component', data: component })
+  }
+
+  const handleDuplicateComponent = (component: Component) => {
+    // Create a duplicate without an ID so the form treats it as new
+    const duplicatedComponent = {
+      name: `${component.name} (העתק)`,
+      description: component.description || '',
+      category: component.category,
+      productType: component.productType || '',
+      manufacturer: component.manufacturer,
+      manufacturerPN: component.manufacturerPN,
+      supplier: component.supplier,
+      unitCostNIS: component.unitCostNIS,
+      unitCostUSD: component.unitCostUSD || 0,
+      currency: component.currency || 'NIS',
+      originalCost: component.originalCost || component.unitCostNIS,
+      quoteDate: component.quoteDate || new Date().toISOString().split('T')[0],
+      notes: component.notes || ''
+    }
+    setModal({ type: 'add-component', data: duplicatedComponent })
   }
 
   const handleDeleteComponent = (componentId: string, componentName: string) => {
@@ -166,6 +163,7 @@ export function ComponentLibrary() {
           components={filteredComponents}
           onEdit={handleEditComponent}
           onDelete={handleDeleteComponent}
+          onDuplicate={handleDuplicateComponent}
           onComponentUpdate={handleComponentUpdate}
         />
       )}
@@ -227,7 +225,7 @@ export function ComponentLibrary() {
 
       {/* Component Form Modal */}
       <ComponentForm
-        component={modalState?.type === 'edit-component' ? modalState.data : null}
+        component={modalState?.type === 'edit-component' || modalState?.type === 'add-component' ? modalState.data : null}
         isOpen={modalState?.type === 'add-component' || modalState?.type === 'edit-component'}
         onClose={closeModal}
       />

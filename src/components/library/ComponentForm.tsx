@@ -6,6 +6,13 @@ import { useCPQ } from '../../contexts/CPQContext'
 import { Component, ComponentFormData } from '../../types'
 import { useClickOutside } from '../../hooks/useClickOutside'
 
+// Exchange rates (can be moved to a config file or fetched from API)
+const EXCHANGE_RATES = {
+  USD_TO_NIS: 3.7,
+  EUR_TO_NIS: 4.0,
+  USD_TO_EUR: 0.92
+}
+
 // Unified categories for both form and grid
 const UNIFIED_CATEGORIES = [
   'בקרים (PLCs)',
@@ -39,32 +46,42 @@ export function ComponentForm({ component, isOpen, onClose }: ComponentFormProps
     supplier: '',
     unitCostNIS: 0,
     unitCostUSD: 0,
+    unitCostEUR: 0,
     currency: 'NIS',
     originalCost: 0,
     quoteDate: new Date().toISOString().split('T')[0],
     notes: ''
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [priceInputField, setPriceInputField] = useState<'NIS' | 'USD' | 'EUR'>('NIS')
   const modalRef = useClickOutside<HTMLDivElement>(() => handleClose())
 
   // Initialize form data when component changes
   useEffect(() => {
     if (component) {
-      setFormData({
-        name: component.name,
-        description: component.description || '',
-        category: component.category,
-        productType: component.productType || '',
-        manufacturer: component.manufacturer,
-        manufacturerPN: component.manufacturerPN,
-        supplier: component.supplier,
-        unitCostNIS: component.unitCostNIS,
-        unitCostUSD: component.unitCostUSD || 0,
-        currency: component.currency || 'NIS',
-        originalCost: component.originalCost || component.unitCostNIS,
-        quoteDate: component.quoteDate || new Date().toISOString().split('T')[0],
-        notes: component.notes || ''
-      })
+      // Check if it's a full Component (has id) or ComponentFormData (no id)
+      if ('id' in component) {
+        // Full Component - editing existing
+        setFormData({
+          name: component.name,
+          description: component.description || '',
+          category: component.category,
+          productType: component.productType || '',
+          manufacturer: component.manufacturer,
+          manufacturerPN: component.manufacturerPN,
+          supplier: component.supplier,
+          unitCostNIS: component.unitCostNIS,
+          unitCostUSD: component.unitCostUSD || 0,
+          unitCostEUR: component.unitCostEUR || 0,
+          currency: component.currency || 'NIS',
+          originalCost: component.originalCost || component.unitCostNIS,
+          quoteDate: component.quoteDate || new Date().toISOString().split('T')[0],
+          notes: component.notes || ''
+        })
+      } else {
+        // ComponentFormData - duplicating or new with pre-filled data
+        setFormData(component as ComponentFormData)
+      }
     } else {
       setFormData({
         name: '',
@@ -76,6 +93,7 @@ export function ComponentForm({ component, isOpen, onClose }: ComponentFormProps
         supplier: '',
         unitCostNIS: 0,
         unitCostUSD: 0,
+        unitCostEUR: 0,
         currency: 'NIS',
         originalCost: 0,
         quoteDate: new Date().toISOString().split('T')[0],
@@ -88,6 +106,37 @@ export function ComponentForm({ component, isOpen, onClose }: ComponentFormProps
     setFormData(prev => ({
       ...prev,
       [field]: value
+    }))
+  }
+
+  const handlePriceChange = (currency: 'NIS' | 'USD' | 'EUR', value: number) => {
+    setPriceInputField(currency)
+    
+    let newNIS = formData.unitCostNIS
+    let newUSD = formData.unitCostUSD || 0
+    let newEUR = formData.unitCostEUR || 0
+
+    if (currency === 'NIS') {
+      newNIS = value
+      newUSD = Math.round((value / EXCHANGE_RATES.USD_TO_NIS) * 100) / 100
+      newEUR = Math.round((value / EXCHANGE_RATES.EUR_TO_NIS) * 100) / 100
+    } else if (currency === 'USD') {
+      newUSD = value
+      newNIS = Math.round((value * EXCHANGE_RATES.USD_TO_NIS) * 100) / 100
+      newEUR = Math.round((value * EXCHANGE_RATES.USD_TO_EUR) * 100) / 100
+    } else if (currency === 'EUR') {
+      newEUR = value
+      newNIS = Math.round((value * EXCHANGE_RATES.EUR_TO_NIS) * 100) / 100
+      newUSD = Math.round((value / EXCHANGE_RATES.USD_TO_EUR) * 100) / 100
+    }
+
+    setFormData(prev => ({
+      ...prev,
+      unitCostNIS: newNIS,
+      unitCostUSD: newUSD,
+      unitCostEUR: newEUR,
+      originalCost: value,
+      currency: currency
     }))
   }
 
@@ -114,9 +163,12 @@ export function ComponentForm({ component, isOpen, onClose }: ComponentFormProps
         quoteFileUrl: '', // Empty for manual entry
       }
       
-      if (component) {
+      // FIXED: Check if component has an 'id' property to distinguish between editing and adding
+      if (component && 'id' in component) {
+        // Editing existing component - has an id
         await updateComponent(component.id, componentData)
       } else {
+        // Adding new component (including duplicates) - no id
         await addComponent(componentData)
       }
       onClose()
@@ -140,18 +192,20 @@ export function ComponentForm({ component, isOpen, onClose }: ComponentFormProps
       <Card ref={modalRef} className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <CardHeader>
           <CardTitle>
-            {component ? 'עריכת רכיב' : 'הוספת רכיב חדש'}
+            {component && 'id' in component ? 'עריכת רכיב' : 'הוספת רכיב חדש'}
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-4">
             {/* Basic Information */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold">מידע בסיסי</h3>
+            <div className="space-y-3">
+              <div className="border-b pb-2">
+                <h3 className="text-lg font-semibold text-blue-600">מידע בסיסי</h3>
+              </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium mb-2">
+                  <label className="block text-sm font-medium mb-1">
                     שם רכיב *
                   </label>
                   <Input
@@ -163,8 +217,8 @@ export function ComponentForm({ component, isOpen, onClose }: ComponentFormProps
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium mb-2">
-                    קטגוריה
+                  <label className="block text-sm font-medium mb-1">
+                    סוג רכיב
                   </label>
                   <select
                     value={formData.category}
@@ -178,40 +232,29 @@ export function ComponentForm({ component, isOpen, onClose }: ComponentFormProps
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    סוג מוצר
-                  </label>
-                  <Input
-                    value={formData.productType}
-                    onChange={(e) => handleInputChange('productType', e.target.value)}
-                    placeholder="לדוגמה: שסתומים, חיישנים, מנועים"
-                  />
-                </div>
-              </div>
-
               <div>
-                <label className="block text-sm font-medium mb-2">
+                <label className="block text-sm font-medium mb-1">
                   תיאור
                 </label>
                 <textarea
                   value={formData.description}
                   onChange={(e) => handleInputChange('description', e.target.value)}
                   placeholder="תיאור מפורט של הרכיב..."
-                  rows={3}
+                  rows={2}
                   className="w-full px-3 py-2 border border-input bg-background rounded-md text-sm resize-vertical"
                 />
               </div>
             </div>
 
             {/* Manufacturer Information */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold">מידע יצרן</h3>
+            <div className="space-y-3">
+              <div className="border-b pb-2">
+                <h3 className="text-lg font-semibold text-blue-600">מידע יצרן</h3>
+              </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium mb-2">
+                  <label className="block text-sm font-medium mb-1">
                     יצרן *
                   </label>
                   <Input
@@ -223,7 +266,7 @@ export function ComponentForm({ component, isOpen, onClose }: ComponentFormProps
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium mb-2">
+                  <label className="block text-sm font-medium mb-1">
                     מק"ט יצרן
                   </label>
                   <Input
@@ -236,11 +279,13 @@ export function ComponentForm({ component, isOpen, onClose }: ComponentFormProps
             </div>
 
             {/* Supplier Information */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold">מידע ספק</h3>
+            <div className="space-y-3">
+              <div className="border-b pb-2">
+                <h3 className="text-lg font-semibold text-blue-600">מידע ספק</h3>
+              </div>
               
               <div>
-                <label className="block text-sm font-medium mb-2">
+                <label className="block text-sm font-medium mb-1">
                   ספק *
                 </label>
                 <Input
@@ -253,74 +298,61 @@ export function ComponentForm({ component, isOpen, onClose }: ComponentFormProps
             </div>
 
             {/* Pricing Information */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold">מחירון</h3>
+            <div className="space-y-3">
+              <div className="border-b pb-2">
+                <h3 className="text-lg font-semibold text-blue-600">מחירון</h3>
+              </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-sm font-medium mb-2">
-                    מטבע מקורי
-                  </label>
-                  <select
-                    value={formData.currency}
-                    onChange={(e) => handleInputChange('currency', e.target.value as 'NIS' | 'USD' | 'EUR')}
-                    className="w-full px-3 py-2 border border-input bg-background rounded-md text-sm"
-                  >
-                    <option value="NIS">ש"ח</option>
-                    <option value="USD">דולר</option>
-                    <option value="EUR">אירו</option>
-                  </select>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    מחיר מקורי *
-                  </label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={formData.originalCost}
-                    onChange={(e) => handleInputChange('originalCost', parseFloat(e.target.value) || 0)}
-                    placeholder="0.00"
-                    required
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    מחיר בש"ח (מחושב)
+                  <label className="block text-sm font-medium mb-1">
+                    מחיר בש"ח
                   </label>
                   <Input
                     type="number"
                     step="0.01"
                     min="0"
                     value={formData.unitCostNIS}
-                    onChange={(e) => handleInputChange('unitCostNIS', parseFloat(e.target.value) || 0)}
+                    onChange={(e) => handlePriceChange('NIS', parseFloat(e.target.value) || 0)}
                     placeholder="0.00"
-                    className="bg-blue-50"
+                    className={priceInputField === 'NIS' ? 'bg-green-100 border-green-400' : 'bg-orange-50 border-orange-300'}
                   />
                 </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                
                 <div>
-                  <label className="block text-sm font-medium mb-2">
-                    מחיר בדולר (מחושב)
+                  <label className="block text-sm font-medium mb-1">
+                    מחיר בדולר
                   </label>
                   <Input
                     type="number"
                     step="0.01"
                     min="0"
                     value={formData.unitCostUSD}
-                    onChange={(e) => handleInputChange('unitCostUSD', parseFloat(e.target.value) || 0)}
+                    onChange={(e) => handlePriceChange('USD', parseFloat(e.target.value) || 0)}
                     placeholder="0.00"
-                    className="bg-green-50"
+                    className={priceInputField === 'USD' ? 'bg-green-100 border-green-400' : 'bg-orange-50 border-orange-300'}
                   />
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium mb-2">
+                  <label className="block text-sm font-medium mb-1">
+                    מחיר באירו
+                  </label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.unitCostEUR}
+                    onChange={(e) => handlePriceChange('EUR', parseFloat(e.target.value) || 0)}
+                    placeholder="0.00"
+                    className={priceInputField === 'EUR' ? 'bg-green-100 border-green-400' : 'bg-orange-50 border-orange-300'}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium mb-1">
                     תאריך הצעת מחיר
                   </label>
                   <Input
@@ -330,29 +362,43 @@ export function ComponentForm({ component, isOpen, onClose }: ComponentFormProps
                     className="w-full px-3 py-2 border border-input bg-background rounded-md text-sm"
                   />
                 </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    תאריך יצירה
+                  </label>
+                  <Input
+                    type="date"
+                    value={component && 'createdAt' in component ? component.createdAt : new Date().toISOString().split('T')[0]}
+                    disabled
+                    className="w-full px-3 py-2 border border-input bg-gray-100 rounded-md text-sm"
+                  />
+                </div>
               </div>
             </div>
 
             {/* Additional Information */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold">מידע נוסף</h3>
+            <div className="space-y-3">
+              <div className="border-b pb-2">
+                <h3 className="text-lg font-semibold text-blue-600">מידע נוסף</h3>
+              </div>
               
               <div>
-                <label className="block text-sm font-medium mb-2">
+                <label className="block text-sm font-medium mb-1">
                   הערות
                 </label>
                 <textarea
                   value={formData.notes}
                   onChange={(e) => handleInputChange('notes', e.target.value)}
                   placeholder="הערות נוספות על הרכיב..."
-                  rows={3}
+                  rows={2}
                   className="w-full px-3 py-2 border border-input bg-background rounded-md text-sm resize-vertical"
                 />
               </div>
             </div>
 
             {/* Form Actions */}
-            <div className="flex justify-end gap-3 pt-4 border-t">
+            <div className="flex justify-end gap-3 pt-2 border-t">
               <Button
                 type="button"
                 variant="outline"
@@ -365,7 +411,7 @@ export function ComponentForm({ component, isOpen, onClose }: ComponentFormProps
                 type="submit"
                 disabled={isSubmitting}
               >
-                {isSubmitting ? 'שומר...' : (component ? 'עדכן רכיב' : 'הוסף רכיב')}
+                {isSubmitting ? 'שומר...' : (component && 'id' in component ? 'עדכן רכיב' : 'הוסף רכיב')}
               </Button>
             </div>
           </form>

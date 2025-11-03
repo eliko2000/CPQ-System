@@ -33,7 +33,15 @@ export class CustomSetFilter implements IFilterComp {
     // Try using valueGetter if available
     if (this.params.valueGetter) {
       try {
-        value = this.params.valueGetter(params.node)
+        value = this.params.valueGetter({
+          node: params.node,
+          data: params.node.data,
+          column: this.params.column,
+          colDef: this.params.colDef,
+          api: this.params.api,
+          context: this.params.context,
+          getValue: (field: string) => params.node.data?.[field]
+        } as any)
       } catch (e) {
         console.error('Error getting value:', e)
       }
@@ -62,7 +70,7 @@ export class CustomSetFilter implements IFilterComp {
     return { values: this.filterValues }
   }
 
-  setModel(model: any): void | Promise<void> {
+  setModel(model: any): void {
     if (model == null) {
       this.filterValues = []
     } else if (model.values && Array.isArray(model.values)) {

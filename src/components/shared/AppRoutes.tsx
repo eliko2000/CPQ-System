@@ -1,4 +1,3 @@
-import React from 'react'
 import { useCPQ } from '../../contexts/CPQContext'
 import { Dashboard } from '../dashboard/Dashboard'
 import { QuoteIngestion } from '../ingestion/QuoteIngestion'
@@ -6,9 +5,16 @@ import { ComponentLibrary } from '../library/ComponentLibrary'
 import { ProjectList } from '../projects/ProjectList'
 import { BOMEditor } from '../projects/BOMEditor'
 import { Analytics } from '../analytics/Analytics'
+import { QuotationEditor } from '../quotations/QuotationEditor'
+import { QuotationList } from '../quotations/QuotationList'
 
 export function AppRoutes() {
-  const { uiState, currentProject } = useCPQ()
+  const { uiState, currentProject, currentQuotation } = useCPQ()
+
+  // If we have a current quotation, show quotation editor
+  if (currentQuotation) {
+    return <QuotationEditor />
+  }
 
   // If we have a current project, show BOM editor
   if (currentProject) {
@@ -21,6 +27,8 @@ export function AppRoutes() {
       return <Dashboard />
     case 'quotes':
       return <QuoteIngestion />
+    case 'quotations':
+      return <QuotationList />
     case 'components':
       return <ComponentLibrary />
     case 'projects':

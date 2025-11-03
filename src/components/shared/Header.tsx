@@ -1,4 +1,3 @@
-import React from 'react'
 import { useCPQ } from '@/contexts/CPQContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useToastActions } from '@/contexts/ToastContext'
@@ -16,7 +15,7 @@ import { Input } from '@/components/ui/input'
 export function Header() {
   const { currentProject, setModal } = useCPQ()
   const { theme, setTheme } = useTheme()
-  const { info } = useToastActions()
+  useToastActions()
 
   const handleThemeToggle = () => {
     if (theme === 'light') {
@@ -40,7 +39,7 @@ export function Header() {
   }
 
   const handleNewProject = () => {
-    setModal({ type: 'create-project' })
+    setModal({ type: 'edit-project', data: null })
   }
 
   const handleUploadQuote = () => {
@@ -66,7 +65,7 @@ export function Header() {
           ) : (
             <div className="flex items-center space-x-3">
               <Input
-                placeholder="Search components, assemblies, projects..."
+                placeholder="חיפוש רכיבים, אסמבלים, פרויקטים..."
                 className="w-80"
                 startIcon={<Search className="h-4 w-4" />}
               />
@@ -86,7 +85,7 @@ export function Header() {
                 className="flex items-center space-x-2"
               >
                 <Plus className="h-4 w-4" />
-                <span>Upload Quote</span>
+                <span>העלאת הצעה</span>
               </Button>
               <Button
                 size="sm"
@@ -94,7 +93,7 @@ export function Header() {
                 className="flex items-center space-x-2"
               >
                 <Plus className="h-4 w-4" />
-                <span>New Project</span>
+                <span>פרויקט חדש</span>
               </Button>
             </>
           )}

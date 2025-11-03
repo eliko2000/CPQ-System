@@ -1,11 +1,11 @@
-import React, { useRef, useMemo, useCallback } from 'react'
+import { useRef, useMemo, useCallback } from 'react'
 import { AgGridReact } from 'ag-grid-react'
-import { ColDef, CellValueChangedEvent, RowDragItem, RowDragEndEvent } from 'ag-grid-community'
-import { useCPQ } from '@/contexts/CPQContext'
-import { BOMLine } from '@/types'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+import { ColDef, CellValueChangedEvent, RowDragEndEvent } from 'ag-grid-community'
+import { useCPQ } from '../../contexts/CPQContext'
+import { BOMLine } from '../../types'
+import { Button } from '../ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
+import { Badge } from '../ui/badge'
 import { Plus, Save, Calculator } from 'lucide-react'
 import 'ag-grid-community/styles/ag-grid.css'
 import 'ag-grid-community/styles/ag-theme-alpine.css'
@@ -49,7 +49,7 @@ export function BOMEditor() {
   const columnDefs: ColDef<BOMLine>[] = useMemo(() => [
     {
       headerName: '',
-      field: 'drag',
+      field: 'drag' as any,
       width: 50,
       rowDrag: true,
       suppressSizeToFit: true,
@@ -57,7 +57,7 @@ export function BOMEditor() {
       resizable: false,
     },
     {
-      headerName: 'Item Name',
+      headerName: 'שם פריט',
       field: 'name',
       editable: true,
       width: 200,
@@ -65,7 +65,7 @@ export function BOMEditor() {
       cellEditorPopup: false,
     },
     {
-      headerName: 'Type',
+      headerName: 'סוג',
       field: 'type',
       width: 120,
       cellRenderer: StatusRenderer,
@@ -76,7 +76,7 @@ export function BOMEditor() {
       },
     },
     {
-      headerName: 'Description',
+      headerName: 'תיאור',
       field: 'description',
       editable: true,
       width: 250,
@@ -84,7 +84,7 @@ export function BOMEditor() {
       flex: 1,
     },
     {
-      headerName: 'Quantity',
+      headerName: 'כמות',
       field: 'quantity',
       editable: true,
       width: 100,
@@ -99,7 +99,7 @@ export function BOMEditor() {
       },
     },
     {
-      headerName: 'Unit Cost',
+      headerName: 'מחיר יחידה',
       field: 'unitCost',
       editable: true,
       width: 120,
@@ -115,19 +115,19 @@ export function BOMEditor() {
       },
     },
     {
-      headerName: 'Total Cost',
+      headerName: 'עלות כוללת',
       field: 'totalPrice',
       width: 120,
       type: 'numericColumn',
       cellRenderer: CurrencyRenderer,
       valueGetter: (params) => {
-        return (params.data.quantity || 0) * (params.data.unitCost || 0)
+        return (params.data?.quantity || 0) * (params.data?.unitCost || 0)
       },
       editable: false,
     },
     {
-      headerName: 'Markup',
-      field: 'markupValue',
+      headerName: 'רווח',
+      field: 'markupValue' as any,
       editable: true,
       width: 100,
       type: 'numericColumn',
@@ -142,32 +142,33 @@ export function BOMEditor() {
       },
     },
     {
-      headerName: 'Customer Price',
-      field: 'customerPrice',
+      headerName: 'מחיר ללקוח',
+      field: 'customerPrice' as any,
       width: 140,
       type: 'numericColumn',
       cellRenderer: CurrencyRenderer,
       valueGetter: (params) => {
-        const totalPrice = (params.data.quantity || 0) * (params.data.unitCost || 0)
-        const markup = params.data.markupValue || 0
+        const totalPrice = (params.data?.quantity || 0) * (params.data?.unitCost || 0)
+        const markup = (params.data as any)?.markupValue || 0
         return totalPrice * (1 + markup / 100)
       },
       editable: false,
     },
     {
-      headerName: 'Margin',
+      headerName: 'שוליים',
       width: 100,
       type: 'numericColumn',
       cellRenderer: PercentageRenderer,
       valueGetter: (params) => {
-        const totalPrice = (params.data.quantity || 0) * (params.data.unitCost || 0)
-        const customerPrice = totalPrice * (1 + (params.data.markupValue || 0) / 100)
+        const totalPrice = (params.data?.quantity || 0) * (params.data?.unitCost || 0)
+        const markup = (params.data as any)?.markupValue || 0
+        const customerPrice = totalPrice * (1 + markup / 100)
         return totalPrice > 0 ? ((customerPrice - totalPrice) / customerPrice * 100) : 0
       },
       editable: false,
     },
     {
-      headerName: 'Actions',
+      headerName: 'פעולות',
       width: 100,
       suppressSizeToFit: true,
       cellRenderer: (params: any) => {
@@ -175,10 +176,10 @@ export function BOMEditor() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => deleteBOMItem(params.data.id)}
+            onClick={() => deleteBOMItem(params.data?.id)}
             className="text-red-600 hover:text-red-800"
           >
-            Delete
+            מחק
           </Button>
         )
       },
@@ -192,6 +193,8 @@ export function BOMEditor() {
     resizable: true,
     wrapHeaderText: true,
     autoHeaderHeight: true,
+    flex: 1, // Allow columns to flex and auto-size
+    minWidth: 80
   }), [])
 
   // Handle cell value changes
@@ -219,14 +222,10 @@ export function BOMEditor() {
   const handleAddItem = useCallback(() => {
     const newItem: Omit<BOMLine, 'id'> = {
       type: 'component',
-      name: 'New Item',
+      name: 'פריט חדש',
       quantity: 1,
       unitCost: 0,
       totalPrice: 0,
-      markupType: 'percentage',
-      markupValue: 30,
-      customerPrice: 0,
-      level: 0,
     }
 
     // This will be handled by the context
@@ -243,38 +242,38 @@ export function BOMEditor() {
   if (!currentProject) {
     return (
       <div className="flex items-center justify-center h-full">
-        <p className="text-muted-foreground">No project selected</p>
+        <p className="text-muted-foreground">לא נבחר פרויקט</p>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" dir="rtl">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">
-            Bill of Materials
+            ביל חומרים (BOM)
           </h1>
           <p className="text-muted-foreground">
             {currentProject.name} • {currentProject.customerName}
           </p>
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-reverse space-x-2">
           <Button
             variant="outline"
             onClick={handleAddItem}
-            className="flex items-center space-x-2"
+            className="flex items-center space-x-reverse space-x-2"
           >
             <Plus className="h-4 w-4" />
-            <span>Add Item</span>
+            <span>הוסף פריט</span>
           </Button>
           <Button
             onClick={handleSave}
-            className="flex items-center space-x-2"
+            className="flex items-center space-x-reverse space-x-2"
           >
             <Save className="h-4 w-4" />
-            <span>Save Project</span>
+            <span>שמור פרויקט</span>
           </Button>
         </div>
       </div>
@@ -283,9 +282,9 @@ export function BOMEditor() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-reverse space-x-2">
               <Calculator className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium text-muted-foreground">Total Cost</span>
+              <span className="text-sm font-medium text-muted-foreground">עלות כוללת</span>
             </div>
             <p className="text-2xl font-bold text-cost">
               ${totals.totalCost.toFixed(2)}
@@ -295,9 +294,9 @@ export function BOMEditor() {
 
         <Card>
           <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-reverse space-x-2">
               <Calculator className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium text-muted-foreground">Customer Price</span>
+              <span className="text-sm font-medium text-muted-foreground">מחיר ללקוח</span>
             </div>
             <p className="text-2xl font-bold text-quote">
               ${totals.totalPrice.toFixed(2)}
@@ -307,9 +306,9 @@ export function BOMEditor() {
 
         <Card>
           <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-reverse space-x-2">
               <Calculator className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium text-muted-foreground">Total Margin</span>
+              <span className="text-sm font-medium text-muted-foreground">רווח כולל</span>
             </div>
             <p className="text-2xl font-bold text-profit">
               ${totals.margin.toFixed(2)}
@@ -319,9 +318,9 @@ export function BOMEditor() {
 
         <Card>
           <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-reverse space-x-2">
               <Calculator className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium text-muted-foreground">Margin %</span>
+              <span className="text-sm font-medium text-muted-foreground">אחוז רווח</span>
             </div>
             <p className="text-2xl font-bold">
               {totals.totalPrice > 0
@@ -336,7 +335,7 @@ export function BOMEditor() {
       {/* AG Grid Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Bill of Materials</CardTitle>
+          <CardTitle>ביל חומרים (BOM)</CardTitle>
         </CardHeader>
         <CardContent>
           <div

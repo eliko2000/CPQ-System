@@ -2,9 +2,13 @@ import React, { useState, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
-import { Upload, FileText, AlertCircle, CheckCircle, Clock, Eye } from 'lucide-react'
+import { Upload, FileText, AlertCircle, CheckCircle, Clock } from 'lucide-react'
 
-export function QuoteUpload() {
+interface QuoteUploadProps {
+  onQuoteProcessed: () => void
+}
+
+export function QuoteUpload({ onQuoteProcessed }: QuoteUploadProps) {
   const [isDragging, setIsDragging] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'processing' | 'completed' | 'error'>('idle')
@@ -70,9 +74,10 @@ export function QuoteUpload() {
       // הדמיה עיבוד OCR
       setTimeout(() => {
         setUploadStatus('completed')
+        onQuoteProcessed()
       }, 2000)
     }, 1000)
-  }, [])
+  }, [onQuoteProcessed])
 
   const getStatusIcon = () => {
     switch (uploadStatus) {

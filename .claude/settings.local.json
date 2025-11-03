@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "Bash(npm install:*)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(npm run build:*)",
+      "Bash(awk:*)",
+      "Bash(npm run tsc:*)",
+      "Bash(npx tsc --noEmit)"
     ]
   },
   "enableAllProjectMcpServers": true,

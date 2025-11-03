@@ -12,6 +12,7 @@ export interface Component {
   supplier: string;
   unitCostNIS: number;
   unitCostUSD?: number;
+  unitCostEUR?: number;
   currency: 'NIS' | 'USD' | 'EUR'; // מטבע המחיר המקורי
   originalCost: number; // המחיר המקורי במטבע המקורי
   quoteDate: string;
@@ -21,7 +22,119 @@ export interface Component {
   updatedAt: string;
 }
 
-// ============ Projects (פרויקטים) ============
+// ============ Quotation Projects (פרויקטי הצעות מחיר) ============
+export interface QuotationProject {
+  id: string;
+  name: string;
+  customerName: string;
+  description?: string;
+  status: 'draft' | 'sent' | 'won' | 'lost';
+  createdAt: string;
+  updatedAt: string;
+  
+  // Systems for this quotation
+  systems: QuotationSystem[];
+  
+  // Project-level parameters
+  parameters: QuotationParameters;
+  
+  // All items in the quotation
+  items: QuotationItem[];
+  
+  // Calculated totals
+  calculations: QuotationCalculations;
+}
+
+export interface QuotationSystem {
+  id: string;
+  name: string;
+  description?: string;
+  order: number; // For display order
+  quantity: number; // Number of systems (usually 1, but can be 2+)
+  createdAt: string;
+}
+
+export interface QuotationItem {
+  id: string;
+  systemId: string;
+  systemOrder: number; // System's order (1, 2, 3...)
+  itemOrder: number; // Item's order within system (1, 2, 3...)
+  displayNumber: string; // "1.1", "1.2", "2.1", etc.
+  
+  // Linked library component
+  componentId?: string;
+  componentName: string;
+  componentCategory: string;
+  isLabor: boolean; // True for labor items
+  
+  // Quantities and pricing
+  quantity: number;
+  unitPriceUSD: number;
+  unitPriceILS: number;
+  totalPriceUSD: number;
+  totalPriceILS: number;
+  
+  // Markup
+  itemMarkupPercent: number; // Default from project, can override
+  
+  // Calculated customer price
+  customerPriceILS: number;
+  
+  // Metadata
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface QuotationParameters {
+  // Exchange rates
+  usdToIlsRate: number;
+  eurToIlsRate: number;
+  
+  // Pricing
+  markupPercent: number; // Default markup for all items
+  dayWorkCost: number; // Cost per day for labor
+  profitPercent: number; // Target profit percentage
+  
+  // Risk
+  riskPercent: number; // Applied to total project cost
+  
+  // Project info
+  paymentTerms?: string;
+  deliveryTime?: string;
+  includeVAT: boolean;
+  vatRate: number;
+}
+
+export interface QuotationCalculations {
+  // Hardware vs Labor breakdown
+  totalHardwareUSD: number;
+  totalHardwareILS: number;
+  totalLaborUSD: number;
+  totalLaborILS: number;
+  
+  // Subtotals
+  subtotalUSD: number;
+  subtotalILS: number;
+  
+  // Customer price before risk
+  totalCustomerPriceILS: number;
+  
+  // Risk addition
+  riskAdditionILS: number;
+  
+  // Final totals
+  totalQuoteILS: number;
+  totalVATILS: number;
+  finalTotalILS: number;
+  
+  // Profit calculations
+  totalCostILS: number;
+  totalProfitILS: number;
+  profitMarginPercent: number;
+}
+
+// ============ Legacy Project Types (for compatibility) ============
 export interface Project {
   id: string;
   name: string;
@@ -163,7 +276,7 @@ export interface ValidatedComponent {
 
 // ============ UI State ============
 export interface UIState {
-  activeView: 'dashboard' | 'quotes' | 'components' | 'projects' | 'analytics';
+  activeView: 'dashboard' | 'quotes' | 'quotations' | 'components' | 'projects' | 'analytics';
   sidebarCollapsed: boolean;
   theme: 'light' | 'dark' | 'system';
   loading: {
@@ -190,6 +303,7 @@ export interface ComponentFormData {
   supplier: string;
   unitCostNIS: number;
   unitCostUSD?: number;
+  unitCostEUR?: number;
   currency: 'NIS' | 'USD' | 'EUR';
   originalCost: number;
   quoteDate: string;

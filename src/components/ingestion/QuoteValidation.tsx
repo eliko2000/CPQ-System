@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
@@ -26,7 +26,7 @@ interface QuoteValidationProps {
 
 export function QuoteValidation({ extractedData, onComplete }: QuoteValidationProps) {
   const [validatedComponents, setValidatedComponents] = useState<ValidatedComponent[]>(() =>
-    extractedData.items.map((item, index) => ({
+    extractedData.items.map((item) => ({
       extractedItem: item,
       status: item.confidence > 0.8 ? 'approved' : 'modified',
       componentData: {

@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom';
 import { vi } from 'vitest';
+import React from 'react';
 
 // Mock Supabase
 vi.mock('@/src/supabaseClient', () => ({
@@ -75,8 +76,8 @@ vi.mock('react-router-dom', () => ({
   useNavigate: () => vi.fn(),
   useLocation: () => ({ pathname: '/test' }),
   useParams: () => ({ id: 'test-id' }),
-  Link: ({ children, to, ...props }: any) => <a href={to} {...props}>{children}</a>,
-  BrowserRouter: ({ children }: { children: React.ReactNode }) => <div>{children}</div>
+  Link: ({ children, to, ...props }: any) => React.createElement('a', { href: to, ...props }, children),
+  BrowserRouter: ({ children }: { children: React.ReactNode }) => React.createElement('div', null, children)
 }));
 
 // Mock File API for quote uploads

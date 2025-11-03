@@ -4,8 +4,9 @@
  * Helper functions for testing AG Grid components in Vitest/React Testing Library
  */
 
-import { screen, fireEvent, waitFor } from '@testing-library/react';
+import { screen, waitFor, render, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { expect } from 'vitest';
 
 export interface AGGridTestUtils {
   getCell: (rowIndex: number, colId: string) => HTMLElement | null;
@@ -60,7 +61,7 @@ export function createAGGridTestUtils(container: HTMLElement): AGGridTestUtils {
     if (!cell) throw new Error(`Cell not found: row ${rowIndex}, col ${colId}`);
 
     // Double click to start editing
-    fireEvent.doubleClick(cell);
+    cell.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
 
     // Wait for editor to appear
     await waitFor(() => {
@@ -76,7 +77,7 @@ export function createAGGridTestUtils(container: HTMLElement): AGGridTestUtils {
     await userEvent.type(editorInput, value);
 
     // Press Enter to save
-    fireEvent.keyDown(editorInput, { key: 'Enter', code: 'Enter' });
+    editorInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter' }));
   };
 
   const clickCell = async (rowIndex: number, colId: string): Promise<void> => {
@@ -235,7 +236,7 @@ export class AGGridTestScenarios {
   /**
    * Test validation messages
    */
-  static testValidationMessages(container: HTMLElement, expectedMessage: string) {
+  static testValidationMessages(_container: HTMLElement, expectedMessage: string) {
     const validationMessage = screen.queryByText(expectedMessage);
     expect(validationMessage).toBeInTheDocument();
   }
@@ -244,7 +245,18 @@ export class AGGridTestScenarios {
 /**
  * Mock data for AG Grid testing
  */
-export const mockBOMData = [
+export const mockBOMData: Array<{
+  id: string;
+  itemType: 'component' | 'assembly' | 'labor' | 'other';
+  manufacturer?: string;
+  manufacturerPn?: string;
+  description: string;
+  quantity: number;
+  unitCost: number;
+  customerPrice: number;
+  margin: number;
+  supplier?: string;
+}> = [
   {
     id: 'item-1',
     itemType: 'component',
@@ -293,5 +305,5 @@ export const renderAGGridComponent = (Component: React.ComponentType<any>, props
     ...props
   };
 
-  return render(Component, { props: defaultProps });
+  return render(<Component {...defaultProps} />);
 };

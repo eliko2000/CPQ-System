@@ -1,4 +1,3 @@
-import React from 'react'
 import { CPQProvider } from './contexts/CPQContext'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { ToastProvider } from './contexts/ToastContext'

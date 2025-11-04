@@ -47,14 +47,23 @@ export function useTableConfig(tableName: string, defaultConfig: TableConfig) {
     try {
       const userId = 'default-user'
       console.log(`[useTableConfig] Saving config for ${tableName}:`, updatedConfig)
-      await supabase
+
+      const { error } = await supabase
         .from('user_table_configs')
         .upsert({
           user_id: userId,
           table_name: tableName,
           config: updatedConfig,
           updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_id,table_name'
         })
+
+      if (error) {
+        console.error(`[useTableConfig] Error saving config:`, error)
+      } else {
+        console.log(`[useTableConfig] Successfully saved config for ${tableName}`)
+      }
     } catch (err) {
       console.error(`[useTableConfig] Failed to save config for ${tableName}:`, err)
     }

@@ -324,6 +324,82 @@ export function useQuotations() {
     }
   }
 
+  // Duplicate quotation with all systems and items
+  const duplicateQuotation = async (sourceQuotationId: string, newQuotationNumber: string, newVersion?: number) => {
+    try {
+      setError(null)
+
+      // Fetch full quotation with systems and items
+      const sourceQuotation = await getQuotation(sourceQuotationId)
+      if (!sourceQuotation) throw new Error('Source quotation not found')
+
+      // Create new quotation
+      const newQuotation = await addQuotation({
+        quotation_number: newQuotationNumber,
+        version: newVersion || 1,
+        customer_name: sourceQuotation.customer_name,
+        customer_email: sourceQuotation.customer_email,
+        project_name: `${sourceQuotation.project_name || ''} (עותק)`,
+        project_description: sourceQuotation.project_description,
+        currency: sourceQuotation.currency,
+        exchange_rate: sourceQuotation.exchange_rate,
+        margin_percentage: sourceQuotation.margin_percentage,
+        status: 'draft',
+        total_cost: 0,
+        total_price: 0,
+        terms: sourceQuotation.terms,
+        notes: sourceQuotation.notes,
+        valid_until_date: sourceQuotation.valid_until_date
+      })
+
+      if (!newQuotation) throw new Error('Failed to create quotation')
+
+      // Copy systems and items
+      if (sourceQuotation.quotation_systems) {
+        for (const sourceSystem of sourceQuotation.quotation_systems) {
+          const newSystem = await addQuotationSystem({
+            quotation_id: newQuotation.id,
+            system_name: sourceSystem.system_name,
+            system_description: sourceSystem.system_description,
+            quantity: sourceSystem.quantity,
+            unit_cost: sourceSystem.unit_cost,
+            total_cost: sourceSystem.total_cost,
+            margin_percentage: sourceSystem.margin_percentage,
+            unit_price: sourceSystem.unit_price,
+            total_price: sourceSystem.total_price,
+            sort_order: sourceSystem.sort_order
+          })
+
+          if (newSystem && sourceSystem.quotation_items) {
+            for (const sourceItem of sourceSystem.quotation_items) {
+              await addQuotationItem({
+                quotation_system_id: newSystem.id,
+                component_id: sourceItem.component_id,
+                item_name: sourceItem.item_name,
+                manufacturer: sourceItem.manufacturer,
+                manufacturer_part_number: sourceItem.manufacturer_part_number,
+                quantity: sourceItem.quantity,
+                unit_cost: sourceItem.unit_cost,
+                total_cost: sourceItem.total_cost,
+                margin_percentage: sourceItem.margin_percentage,
+                unit_price: sourceItem.unit_price,
+                total_price: sourceItem.total_price,
+                notes: sourceItem.notes,
+                sort_order: sourceItem.sort_order
+              })
+            }
+          }
+        }
+      }
+
+      // Fetch the complete new quotation
+      return await getQuotation(newQuotation.id)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to duplicate quotation')
+      throw err
+    }
+  }
+
   // Load quotations on mount
   useEffect(() => {
     fetchQuotations()
@@ -343,6 +419,7 @@ export function useQuotations() {
     deleteQuotationSystem,
     addQuotationItem,
     updateQuotationItem,
-    deleteQuotationItem
+    deleteQuotationItem,
+    duplicateQuotation
   }
 }

@@ -6,7 +6,9 @@
       "Bash(npm run build:*)",
       "Bash(awk:*)",
       "Bash(npm run tsc:*)",
-      "Bash(npx tsc --noEmit)"
+      "Bash(npx tsc --noEmit)",
+      "mcp__supabase__postgrestRequest",
+      "Bash(timeout 5 npm run dev:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

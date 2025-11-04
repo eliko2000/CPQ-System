@@ -12,6 +12,7 @@ import {
 } from '../types'
 import { useComponents } from '../hooks/useComponents'
 import { useQuotations } from '../hooks/useQuotations'
+import { convertDbQuotationToQuotationProject } from '../lib/utils'
 
 // ============ State Shape ============
 interface CPQState {
@@ -1230,77 +1231,8 @@ export function CPQProvider({ children }: { children: React.ReactNode }) {
   }, [componentsHook.components])
 
   useEffect(() => {
-    // Map DbQuotation to QuotationProject
-    const mappedQuotations = quotationsHook.quotations.map(quote => ({
-      id: quote.id,
-      name: quote.project_name || quote.quotation_number,
-      customerName: quote.customer_name,
-      status: quote.status === 'accepted' ? 'won' : 
-              quote.status === 'rejected' ? 'lost' : 
-              quote.status as 'draft' | 'sent' | 'won' | 'lost',
-      createdAt: quote.created_at,
-      updatedAt: quote.updated_at,
-      systems: quote.quotation_systems?.map(system => ({
-        id: system.id,
-        name: system.system_name,
-        description: system.system_description,
-        order: system.sort_order,
-        quantity: system.quantity,
-        createdAt: system.created_at
-      })) || [],
-      parameters: {
-        usdToIlsRate: quote.exchange_rate || 3.7,
-        eurToIlsRate: 4.0,
-        markupPercent: quote.margin_percentage || 25,
-        dayWorkCost: 1200,
-        profitPercent: 20,
-        riskPercent: 5,
-        deliveryTime: '4-6 שבועות',
-        includeVAT: true,
-        vatRate: 18
-      },
-      items: quote.quotation_systems?.flatMap(system =>
-        system.quotation_items
-          ?.sort((a, b) => a.sort_order - b.sort_order)
-          ?.map((item, index) => ({
-            id: item.id,
-            systemId: system.id,
-            systemOrder: system.sort_order,
-            itemOrder: index + 1,
-            displayNumber: `${system.sort_order}.${index + 1}`,
-            componentId: item.component_id,
-            componentName: item.item_name,
-            componentCategory: item.component?.category || 'Other',
-            isLabor: false,
-            quantity: item.quantity,
-            unitPriceUSD: item.unit_price ? item.unit_price / (quote.exchange_rate || 3.7) : 0,
-            unitPriceILS: item.unit_price || 0,
-            totalPriceUSD: item.total_price ? item.total_price / (quote.exchange_rate || 3.7) : 0,
-            totalPriceILS: item.total_price || 0,
-            itemMarkupPercent: item.margin_percentage || 0,
-            customerPriceILS: item.total_price || 0,
-            notes: item.notes,
-            createdAt: item.created_at,
-            updatedAt: item.updated_at
-          })) || []
-      ) || [],
-      calculations: {
-        totalHardwareUSD: 0,
-        totalHardwareILS: 0,
-        totalLaborUSD: 0,
-        totalLaborILS: 0,
-        subtotalUSD: 0,
-        subtotalILS: 0,
-        totalCustomerPriceILS: quote.total_price || 0,
-        riskAdditionILS: 0,
-        totalQuoteILS: quote.total_price || 0,
-        totalVATILS: 0,
-        finalTotalILS: quote.total_price || 0,
-        totalCostILS: quote.total_cost || 0,
-        totalProfitILS: (quote.total_price || 0) - (quote.total_cost || 0),
-        profitMarginPercent: 0
-      }
-    }))
+    // Convert DbQuotation[] to QuotationProject[] using shared utility
+    const mappedQuotations = quotationsHook.quotations.map(convertDbQuotationToQuotationProject)
     dispatch({ type: 'SET_QUOTATIONS', payload: mappedQuotations })
   }, [quotationsHook.quotations])
 

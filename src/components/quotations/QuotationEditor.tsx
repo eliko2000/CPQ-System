@@ -467,10 +467,14 @@ export function QuotationEditor() {
 
     const data: any[] = []
     const markupPercent = currentQuotation.parameters?.markupPercent ?? 25
-    
+
+    // Defensive: ensure systems and items arrays exist
+    const systems = currentQuotation.systems || []
+    const items = currentQuotation.items || []
+
     // Create tree structure with systems as parent nodes
-    currentQuotation.systems.forEach(system => {
-      const systemItems = currentQuotation.items.filter(item => item.systemId === system.id)
+    systems.forEach(system => {
+      const systemItems = items.filter(item => item.systemId === system.id)
       
       // Calculate system totals with current profit coefficient
       const systemTotalCost = systemItems.reduce((sum, item) => sum + ((item.unitPriceILS || 0) * (item.quantity ||1)), 0)

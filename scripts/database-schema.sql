@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS components (
   description TEXT,
   unit_cost_usd DECIMAL(12,2),
   unit_cost_ils DECIMAL(12,2),
+  unit_cost_eur DECIMAL(12,2),
   supplier TEXT,
   supplier_part_number TEXT,
   lead_time_days INTEGER,
@@ -24,7 +25,8 @@ CREATE TABLE IF NOT EXISTS components (
 -- Create quotations table
 CREATE TABLE IF NOT EXISTS quotations (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  quotation_number TEXT UNIQUE NOT NULL,
+  quotation_number TEXT NOT NULL,
+  version INTEGER DEFAULT 1,
   customer_name TEXT NOT NULL,
   customer_email TEXT,
   project_name TEXT,
@@ -39,7 +41,8 @@ CREATE TABLE IF NOT EXISTS quotations (
   total_cost DECIMAL(15,2),
   total_price DECIMAL(15,2),
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(quotation_number, version)
 );
 
 -- Create quotation_systems table
@@ -90,3 +93,17 @@ CREATE POLICY "Enable all operations for components" ON components FOR ALL USING
 CREATE POLICY "Enable all operations for quotations" ON quotations FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Enable all operations for quotation_systems" ON quotation_systems FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Enable all operations for quotation_items" ON quotation_items FOR ALL USING (true) WITH CHECK (true);
+
+-- Table configuration persistence
+CREATE TABLE IF NOT EXISTS user_table_configs (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    table_name TEXT NOT NULL, -- 'component_library' or 'quotation_editor'
+    config JSONB NOT NULL, -- stores: columnOrder, columnWidths, visibleColumns, filterState
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(user_id, table_name)
+);
+
+ALTER TABLE user_table_configs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Enable all operations for user_table_configs" ON user_table_configs FOR ALL USING (true) WITH CHECK (true);

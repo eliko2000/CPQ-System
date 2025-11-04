@@ -1,6 +1,46 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
-import { DbComponent } from '../types'
+import { DbComponent, Component } from '../types'
+
+// Transform UI Component to DB format
+function componentToDb(component: Partial<Component>): Partial<DbComponent> {
+  return {
+    name: component.name,
+    manufacturer: component.manufacturer,
+    manufacturer_part_number: component.manufacturerPN,
+    category: component.category,
+    description: component.description,
+    unit_cost_usd: component.unitCostUSD,
+    unit_cost_ils: component.unitCostNIS,
+    unit_cost_eur: component.unitCostEUR,
+    supplier: component.supplier,
+    notes: component.notes,
+    is_active: true
+  }
+}
+
+// Transform DB format to UI Component
+function dbToComponent(dbComp: DbComponent): Component {
+  return {
+    id: dbComp.id,
+    name: dbComp.name,
+    manufacturer: dbComp.manufacturer || '',
+    manufacturerPN: dbComp.manufacturer_part_number || '',
+    category: dbComp.category || 'אחר',
+    description: dbComp.description || '',
+    unitCostNIS: dbComp.unit_cost_ils || 0,
+    unitCostUSD: dbComp.unit_cost_usd || 0,
+    unitCostEUR: dbComp.unit_cost_eur || 0,
+    supplier: dbComp.supplier || '',
+    currency: 'NIS',
+    originalCost: dbComp.unit_cost_ils || 0,
+    quoteDate: new Date().toISOString().split('T')[0],
+    quoteFileUrl: '',
+    notes: dbComp.notes || '',
+    createdAt: dbComp.created_at,
+    updatedAt: dbComp.updated_at
+  }
+}
 
 export function useComponents() {
   const [components, setComponents] = useState<DbComponent[]>([])
@@ -29,19 +69,24 @@ export function useComponents() {
   }
 
   // Add a new component
-  const addComponent = async (component: Omit<DbComponent, 'id' | 'created_at' | 'updated_at'>) => {
+  const addComponent = async (component: Omit<Component, 'id' | 'createdAt' | 'updatedAt'>) => {
     try {
       setError(null)
-      
+
+      // Transform to DB format
+      const dbComponent = componentToDb(component)
+
       const { data, error } = await supabase
         .from('components')
-        .insert([component])
+        .insert([dbComponent])
         .select()
         .single()
 
       if (error) throw error
-      
-      setComponents(prev => [...prev, data])
+
+      // Transform back to UI format and update state
+      const uiComponent = dbToComponent(data)
+      setComponents(prev => [...prev, data]) // Keep DB format in state
       return data
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add component')
@@ -50,20 +95,24 @@ export function useComponents() {
   }
 
   // Update an existing component
-  const updateComponent = async (id: string, updates: Partial<DbComponent>) => {
+  const updateComponent = async (id: string, updates: Partial<Component>) => {
     try {
       setError(null)
-      
+
+      // Transform to DB format
+      const dbUpdates = componentToDb(updates)
+
       const { data, error } = await supabase
         .from('components')
-        .update(updates)
+        .update(dbUpdates)
         .eq('id', id)
         .select()
         .single()
 
       if (error) throw error
-      
-      setComponents(prev => 
+
+      // Update state with DB format
+      setComponents(prev =>
         prev.map(comp => comp.id === id ? { ...comp, ...data } : comp)
       )
       return data

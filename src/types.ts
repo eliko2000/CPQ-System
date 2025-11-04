@@ -397,6 +397,7 @@ export interface PricingCondition {
 export interface DbQuotation {
   id: string;
   quotation_number: string;
+  version?: number;
   customer_name: string;
   customer_email?: string;
   project_name?: string;
@@ -412,7 +413,7 @@ export interface DbQuotation {
   total_price?: number;
   created_at: string;
   updated_at: string;
-  
+
   // Related data from joins
   quotation_systems?: DbQuotationSystem[];
 }
@@ -467,6 +468,7 @@ export interface DbComponent {
   description?: string;
   unit_cost_usd?: number;
   unit_cost_ils?: number;
+  unit_cost_eur?: number;
   supplier?: string;
   supplier_part_number?: string;
   lead_time_days?: number;

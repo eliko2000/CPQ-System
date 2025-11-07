@@ -33,9 +33,9 @@ export default defineConfig(({ mode }) => {
       // Environment variables will be loaded from .env.local
     },
     optimizeDeps: {
-      include: ['pdfjs-dist'],
+      include: ['pdfjs-dist', 'xlsx'],
       esbuildOptions: {
-        // Needed for pdfjs-dist to work properly in Vite
+        // Needed for pdfjs-dist and xlsx to work properly in Vite
         target: 'esnext',
       }
     },

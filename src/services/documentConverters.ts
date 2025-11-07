@@ -3,10 +3,9 @@
  * Converts PDF and Excel files to formats Claude Vision API can process
  */
 
-import * as XLSX from 'xlsx';
-
-// Lazy import for PDF.js to work with Vite
+// Lazy imports for PDF.js and XLSX to work with Vite
 let pdfjsLib: any = null;
+let XLSX: any = null;
 
 async function getPdfjs() {
   if (pdfjsLib) return pdfjsLib;
@@ -20,6 +19,15 @@ async function getPdfjs() {
   }
 
   return pdfjsLib;
+}
+
+async function getXLSX() {
+  if (XLSX) return XLSX;
+
+  // Import xlsx dynamically
+  XLSX = await import('xlsx');
+
+  return XLSX;
 }
 
 /**
@@ -95,11 +103,14 @@ export async function convertPdfToImages(file: File): Promise<{
  */
 export async function convertExcelToText(file: File): Promise<string> {
   try {
+    // Get XLSX library dynamically
+    const xlsx = await getXLSX();
+
     // Read file as ArrayBuffer
     const arrayBuffer = await file.arrayBuffer();
 
     // Parse workbook
-    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+    const workbook = xlsx.read(arrayBuffer, { type: 'array' });
 
     // Process all sheets
     let fullText = '';
@@ -108,7 +119,7 @@ export async function convertExcelToText(file: File): Promise<string> {
       const worksheet = workbook.Sheets[sheetName];
 
       // Convert to JSON for structured data
-      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+      const jsonData = xlsx.utils.sheet_to_json(worksheet, { header: 1 });
 
       // Add sheet header
       fullText += `\n\n=== Sheet: ${sheetName} ===\n\n`;
@@ -146,8 +157,11 @@ export async function convertExcelToText(file: File): Promise<string> {
  */
 export async function convertExcelToHtml(file: File): Promise<string> {
   try {
+    // Get XLSX library dynamically
+    const xlsx = await getXLSX();
+
     const arrayBuffer = await file.arrayBuffer();
-    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+    const workbook = xlsx.read(arrayBuffer, { type: 'array' });
 
     let html = '<html><body>';
 
@@ -155,7 +169,7 @@ export async function convertExcelToHtml(file: File): Promise<string> {
       const worksheet = workbook.Sheets[sheetName];
 
       html += `<h2>Sheet: ${sheetName}</h2>`;
-      html += XLSX.utils.sheet_to_html(worksheet);
+      html += xlsx.utils.sheet_to_html(worksheet);
     }
 
     html += '</body></html>';

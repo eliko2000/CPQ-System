@@ -310,10 +310,33 @@ export function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
-  // Load settings from localStorage on mount
+  // Load settings from localStorage on mount and merge with defaults
   const [settings, setSettings] = useState<SettingsData>(() => {
     const savedSettings = localStorage.getItem('cpq-settings')
-    return savedSettings ? JSON.parse(savedSettings) : getDefaultSettings()
+    const defaultSettings = getDefaultSettings()
+
+    if (!savedSettings) {
+      return defaultSettings
+    }
+
+    try {
+      const parsed = JSON.parse(savedSettings)
+      // Deep merge: keep saved values but add any missing default values
+      return {
+        general: { ...defaultSettings.general, ...parsed.general },
+        company: { ...defaultSettings.company, ...parsed.company },
+        pricing: { ...defaultSettings.pricing, ...parsed.pricing },
+        quotations: { ...defaultSettings.quotations, ...parsed.quotations },
+        database: { ...defaultSettings.database, ...parsed.database },
+        security: { ...defaultSettings.security, ...parsed.security },
+        notifications: { ...defaultSettings.notifications, ...parsed.notifications },
+        appearance: { ...defaultSettings.appearance, ...parsed.appearance },
+        workflow: { ...defaultSettings.workflow, ...(parsed.workflow || {}) }
+      }
+    } catch (error) {
+      console.error('Failed to parse saved settings:', error)
+      return defaultSettings
+    }
   })
 
   const settingsSections: SettingsSection[] = [
@@ -849,7 +872,7 @@ function PricingSettings({ settings, updateSettings }: SettingsComponentProps) {
                 id="defaultDiscount"
                 type="number"
                 step="0.1"
-                value={settings.pricing.defaultDiscount}
+                value={settings.pricing.defaultDiscount || 0}
                 onChange={(e) => updateSettings('pricing', 'defaultDiscount', parseFloat(e.target.value))}
               />
             </div>
@@ -861,7 +884,7 @@ function PricingSettings({ settings, updateSettings }: SettingsComponentProps) {
                 id="minMargin"
                 type="number"
                 step="0.1"
-                value={settings.pricing.minMargin}
+                value={settings.pricing.minMargin || 10}
                 onChange={(e) => updateSettings('pricing', 'minMargin', parseFloat(e.target.value))}
               />
               <p className="text-xs text-muted-foreground">המערכת תתריע כשהמרווח נמוך ממינימום זה</p>
@@ -904,7 +927,7 @@ function PricingSettings({ settings, updateSettings }: SettingsComponentProps) {
             </div>
             <Switch
               id="showCostToCustomer"
-              checked={settings.pricing.showCostToCustomer}
+              checked={settings.pricing.showCostToCustomer || false}
               onCheckedChange={(checked) => updateSettings('pricing', 'showCostToCustomer', checked)}
             />
           </div>
@@ -915,10 +938,11 @@ function PricingSettings({ settings, updateSettings }: SettingsComponentProps) {
 }
 
 function QuotationSettings({ settings, updateSettings }: SettingsComponentProps) {
-  const formatPreview = settings.quotations.numberingFormat
+  // Safely generate format preview with fallback
+  const formatPreview = (settings.quotations?.numberingFormat || 'QT-{YEAR}-{NUMBER}')
     .replace('{YEAR}', new Date().getFullYear().toString())
-    .replace('{NUMBER}', settings.quotations.nextNumber.toString().padStart(4, '0'))
-    .replace('{PREFIX}', settings.quotations.numberingPrefix)
+    .replace('{NUMBER}', (settings.quotations?.nextNumber || 1001).toString().padStart(4, '0'))
+    .replace('{PREFIX}', settings.quotations?.numberingPrefix || 'QT')
 
   return (
     <div className="space-y-6">
@@ -936,7 +960,7 @@ function QuotationSettings({ settings, updateSettings }: SettingsComponentProps)
               <Label htmlFor="numberingFormat">פורמט מספור</Label>
               <Input
                 id="numberingFormat"
-                value={settings.quotations.numberingFormat}
+                value={settings.quotations.numberingFormat || 'QT-{YEAR}-{NUMBER}'}
                 onChange={(e) => updateSettings('quotations', 'numberingFormat', e.target.value)}
                 placeholder="QT-{YEAR}-{NUMBER}"
               />
@@ -949,7 +973,7 @@ function QuotationSettings({ settings, updateSettings }: SettingsComponentProps)
               <Input
                 id="nextNumber"
                 type="number"
-                value={settings.quotations.nextNumber}
+                value={settings.quotations.nextNumber || 1001}
                 onChange={(e) => updateSettings('quotations', 'nextNumber', parseInt(e.target.value))}
               />
             </div>
@@ -1015,7 +1039,7 @@ function QuotationSettings({ settings, updateSettings }: SettingsComponentProps)
             <Label htmlFor="termsAndConditions">תנאים כלליים</Label>
             <Textarea
               id="termsAndConditions"
-              value={settings.quotations.termsAndConditions}
+              value={settings.quotations.termsAndConditions || ''}
               onChange={(e) => updateSettings('quotations', 'termsAndConditions', e.target.value)}
               rows={5}
               placeholder="תנאים כלליים להצעת מחיר..."
@@ -1055,7 +1079,7 @@ function QuotationSettings({ settings, updateSettings }: SettingsComponentProps)
               <Input
                 id="validityPeriod"
                 type="number"
-                value={settings.quotations.validityPeriod}
+                value={settings.quotations.validityPeriod || 30}
                 onChange={(e) => updateSettings('quotations', 'validityPeriod', parseInt(e.target.value))}
               />
             </div>
@@ -1084,7 +1108,7 @@ function QuotationSettings({ settings, updateSettings }: SettingsComponentProps)
             </div>
             <Switch
               id="requireApproval"
-              checked={settings.quotations.requireApproval}
+              checked={settings.quotations.requireApproval || false}
               onCheckedChange={(checked) => updateSettings('quotations', 'requireApproval', checked)}
             />
           </div>
@@ -1094,7 +1118,7 @@ function QuotationSettings({ settings, updateSettings }: SettingsComponentProps)
               <Input
                 id="approvalThreshold"
                 type="number"
-                value={settings.quotations.approvalThreshold}
+                value={settings.quotations.approvalThreshold || 50000}
                 onChange={(e) => updateSettings('quotations', 'approvalThreshold', parseFloat(e.target.value))}
               />
               <p className="text-xs text-muted-foreground">
@@ -1157,7 +1181,7 @@ function DatabaseSettings({ settings, updateSettings }: SettingsComponentProps) 
             <div className="space-y-2">
               <Label htmlFor="backupFrequency">תדירות גיבוי</Label>
               <Select
-                value={settings.database.backupFrequency}
+                value={settings.database.backupFrequency || 'daily'}
                 onValueChange={(value) => updateSettings('database', 'backupFrequency', value)}
               >
                 <SelectTrigger id="backupFrequency">
@@ -1269,7 +1293,7 @@ function SecuritySettings({ settings, updateSettings }: SettingsComponentProps) 
           <div className="space-y-2">
             <Label htmlFor="passwordPolicy">מדיניות סיסמאות</Label>
             <Select
-              value={settings.security.passwordPolicy}
+              value={settings.security.passwordPolicy || 'medium'}
               onValueChange={(value) => updateSettings('security', 'passwordPolicy', value)}
             >
               <SelectTrigger id="passwordPolicy">
@@ -1289,7 +1313,7 @@ function SecuritySettings({ settings, updateSettings }: SettingsComponentProps) 
             </div>
             <Switch
               id="twoFactorAuth"
-              checked={settings.security.twoFactorAuth}
+              checked={settings.security.twoFactorAuth || false}
               onCheckedChange={(checked) => updateSettings('security', 'twoFactorAuth', checked)}
             />
           </div>
@@ -1363,7 +1387,7 @@ function NotificationSettings({ settings, updateSettings }: SettingsComponentPro
               <p className="text-xs text-muted-foreground mt-1">קבל התראה כשהצעה ממתינה לאישור</p>
             </div>
             <Switch
-              checked={settings.notifications.notifyOnApproval}
+              checked={settings.notifications.notifyOnApproval || true}
               onCheckedChange={(checked) => updateSettings('notifications', 'notifyOnApproval', checked)}
             />
           </div>
@@ -1373,7 +1397,7 @@ function NotificationSettings({ settings, updateSettings }: SettingsComponentPro
               <p className="text-xs text-muted-foreground mt-1">קבל התראה לפני פקיעת הצעת מחיר</p>
             </div>
             <Switch
-              checked={settings.notifications.notifyOnExpiry}
+              checked={settings.notifications.notifyOnExpiry || true}
               onCheckedChange={(checked) => updateSettings('notifications', 'notifyOnExpiry', checked)}
             />
           </div>
@@ -1455,7 +1479,7 @@ function AppearanceSettings({ settings, updateSettings }: SettingsComponentProps
           <div className="space-y-2">
             <Label htmlFor="fontSize">גודל גופן</Label>
             <Select
-              value={settings.appearance.fontSize}
+              value={settings.appearance.fontSize || 'medium'}
               onValueChange={(value) => updateSettings('appearance', 'fontSize', value)}
             >
               <SelectTrigger id="fontSize">
@@ -1539,6 +1563,15 @@ function AppearanceSettings({ settings, updateSettings }: SettingsComponentProps
 }
 
 function WorkflowSettings({ settings, updateSettings }: SettingsComponentProps) {
+  // Ensure workflow settings exist with fallback
+  const workflowSettings = settings.workflow || {
+    enableApprovalWorkflow: false,
+    approvalLevels: 1,
+    autoApproveBelow: 10000,
+    requireManagerApproval: true,
+    notifyOnStatusChange: true
+  }
+
   return (
     <div className="space-y-6">
       <Card>
@@ -1557,17 +1590,17 @@ function WorkflowSettings({ settings, updateSettings }: SettingsComponentProps) 
             </div>
             <Switch
               id="enableApprovalWorkflow"
-              checked={settings.workflow.enableApprovalWorkflow}
+              checked={workflowSettings.enableApprovalWorkflow}
               onCheckedChange={(checked) => updateSettings('workflow', 'enableApprovalWorkflow', checked)}
             />
           </div>
 
-          {settings.workflow.enableApprovalWorkflow && (
+          {workflowSettings.enableApprovalWorkflow && (
             <>
               <div className="space-y-2">
                 <Label htmlFor="approvalLevels">מספר רמות אישור</Label>
                 <Select
-                  value={settings.workflow.approvalLevels.toString()}
+                  value={workflowSettings.approvalLevels.toString()}
                   onValueChange={(value) => updateSettings('workflow', 'approvalLevels', parseInt(value))}
                 >
                   <SelectTrigger id="approvalLevels">
@@ -1589,7 +1622,7 @@ function WorkflowSettings({ settings, updateSettings }: SettingsComponentProps) 
                 <Input
                   id="autoApproveBelow"
                   type="number"
-                  value={settings.workflow.autoApproveBelow}
+                  value={workflowSettings.autoApproveBelow}
                   onChange={(e) => updateSettings('workflow', 'autoApproveBelow', parseFloat(e.target.value))}
                 />
                 <p className="text-xs text-muted-foreground">
@@ -1604,7 +1637,7 @@ function WorkflowSettings({ settings, updateSettings }: SettingsComponentProps) 
                 </div>
                 <Switch
                   id="requireManagerApproval"
-                  checked={settings.workflow.requireManagerApproval}
+                  checked={workflowSettings.requireManagerApproval}
                   onCheckedChange={(checked) => updateSettings('workflow', 'requireManagerApproval', checked)}
                 />
               </div>
@@ -1616,7 +1649,7 @@ function WorkflowSettings({ settings, updateSettings }: SettingsComponentProps) 
                 </div>
                 <Switch
                   id="notifyOnStatusChange"
-                  checked={settings.workflow.notifyOnStatusChange}
+                  checked={workflowSettings.notifyOnStatusChange}
                   onCheckedChange={(checked) => updateSettings('workflow', 'notifyOnStatusChange', checked)}
                 />
               </div>
@@ -1637,7 +1670,7 @@ function WorkflowSettings({ settings, updateSettings }: SettingsComponentProps) 
               <h4 className="font-medium">כללי אוטומציה פעילים</h4>
             </div>
             <ul className="text-sm text-muted-foreground space-y-1 mr-6">
-              <li>• שליחת התראה אוטומטית למנהל בהצעות מעל {settings.workflow.autoApproveBelow.toLocaleString()}₪</li>
+              <li>• שליחת התראה אוטומטית למנהל בהצעות מעל {workflowSettings.autoApproveBelow.toLocaleString()}₪</li>
               <li>• עדכון סטטוס אוטומטי להצעות שאושרו</li>
               <li>• התראה על הצעות שממתינות לאישור מעל 7 ימים</li>
             </ul>

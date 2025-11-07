@@ -3,12 +3,24 @@
  * Converts PDF and Excel files to formats Claude Vision API can process
  */
 
-import * as pdfjsLib from 'pdfjs-dist';
 import * as XLSX from 'xlsx';
 
-// Configure PDF.js worker
-// @ts-ignore - pdf.js types can be tricky
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+// Lazy import for PDF.js to work with Vite
+let pdfjsLib: any = null;
+
+async function getPdfjs() {
+  if (pdfjsLib) return pdfjsLib;
+
+  // Import pdfjs-dist dynamically
+  pdfjsLib = await import('pdfjs-dist');
+
+  // Configure worker from CDN
+  if (pdfjsLib.GlobalWorkerOptions) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.js`;
+  }
+
+  return pdfjsLib;
+}
 
 /**
  * Convert a PDF file to images (one per page)
@@ -19,6 +31,9 @@ export async function convertPdfToImages(file: File): Promise<{
   totalPages: number;
 }> {
   try {
+    // Get PDF.js library dynamically
+    const pdfjsLib = await getPdfjs();
+
     // Read file as ArrayBuffer
     const arrayBuffer = await file.arrayBuffer();
 

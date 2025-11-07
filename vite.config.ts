@@ -32,6 +32,13 @@ export default defineConfig(({ mode }) => {
     define: {
       // Environment variables will be loaded from .env.local
     },
+    optimizeDeps: {
+      include: ['pdfjs-dist'],
+      esbuildOptions: {
+        // Needed for pdfjs-dist to work properly in Vite
+        target: 'esnext',
+      }
+    },
     test: {
       globals: true,
       environment: 'happy-dom',

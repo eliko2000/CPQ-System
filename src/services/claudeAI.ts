@@ -1,5 +1,12 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { Component, ExtractedItem } from '../types';
+import {
+  convertPdfToImages,
+  convertExcelToText,
+  isSpreadsheetFile,
+  isPdfFile,
+  isImageFile,
+} from './documentConverters';
 
 // Get API key from environment
 const ANTHROPIC_API_KEY = import.meta.env.VITE_ANTHROPIC_API_KEY;
@@ -225,6 +232,7 @@ function parseClaudeResponse(responseText: string): AIExtractionResult {
 
 /**
  * Extract component data from a document using Claude Vision API
+ * Supports: Images (JPEG, PNG, GIF, WebP), PDF files, Excel files (XLSX, XLS, CSV)
  */
 export async function extractComponentsFromDocument(file: File): Promise<AIExtractionResult> {
   try {
@@ -239,73 +247,22 @@ export async function extractComponentsFromDocument(file: File): Promise<AIExtra
       };
     }
 
-    // Validate file - PDF support depends on conversion
-    const validTypes = [
-      'image/jpeg',
-      'image/jpg',
-      'image/png',
-      'image/gif',
-      'image/webp'
-    ];
-
-    // For PDFs, show a helpful error message
-    if (file.type === 'application/pdf') {
+    // Route to appropriate handler based on file type
+    if (isPdfFile(file)) {
+      return await extractFromPdf(file);
+    } else if (isSpreadsheetFile(file)) {
+      return await extractFromSpreadsheet(file);
+    } else if (isImageFile(file)) {
+      return await extractFromImage(file);
+    } else {
       return {
         success: false,
         components: [],
         metadata: { documentType: 'unknown', totalItems: 0 },
         confidence: 0,
-        error: 'PDF support requires conversion to images first. Please convert your PDF pages to images (PNG/JPEG) or use a screenshot.',
+        error: `Unsupported file type: ${file.type}. Supported types: PDF, Excel (XLSX, XLS, CSV), Images (JPEG, PNG, GIF, WebP)`,
       };
     }
-
-    if (!validTypes.includes(file.type)) {
-      return {
-        success: false,
-        components: [],
-        metadata: { documentType: 'unknown', totalItems: 0 },
-        confidence: 0,
-        error: `Unsupported file type: ${file.type}. Supported types: JPEG, PNG, GIF, WebP`,
-      };
-    }
-
-    // Convert file to base64
-    const base64Data = await fileToBase64(file);
-    const mediaType = getMediaType(file);
-
-    // Call Claude Vision API
-    const message = await anthropic.messages.create({
-      model: 'claude-3-7-sonnet-latest', // Using Claude 3.7 Sonnet (current stable vision model)
-      max_tokens: 4096,
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'image',
-              source: {
-                type: 'base64',
-                media_type: mediaType,
-                data: base64Data,
-              },
-            },
-            {
-              type: 'text',
-              text: createExtractionPrompt(),
-            },
-          ],
-        },
-      ],
-    });
-
-    // Extract text from response
-    const responseText = message.content
-      .filter((block) => block.type === 'text')
-      .map((block) => (block as { type: 'text'; text: string }).text)
-      .join('\n');
-
-    // Parse and return result
-    return parseClaudeResponse(responseText);
   } catch (error) {
     console.error('Claude AI extraction error:', error);
 
@@ -341,6 +298,197 @@ export async function extractComponentsFromDocument(file: File): Promise<AIExtra
       metadata: { documentType: 'unknown', totalItems: 0 },
       confidence: 0,
       error: error instanceof Error ? error.message : 'Unknown error during extraction',
+    };
+  }
+}
+
+/**
+ * Extract components from an image file
+ */
+async function extractFromImage(file: File): Promise<AIExtractionResult> {
+  if (!anthropic) {
+    throw new Error('Anthropic client not initialized');
+  }
+
+  const base64Data = await fileToBase64(file);
+  const mediaType = getMediaType(file);
+
+  const message = await anthropic.messages.create({
+    model: 'claude-3-7-sonnet-latest',
+    max_tokens: 4096,
+    messages: [
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'image',
+            source: {
+              type: 'base64',
+              media_type: mediaType,
+              data: base64Data,
+            },
+          },
+          {
+            type: 'text',
+            text: createExtractionPrompt(),
+          },
+        ],
+      },
+    ],
+  });
+
+  const responseText = message.content
+    .filter((block) => block.type === 'text')
+    .map((block) => (block as { type: 'text'; text: string }).text)
+    .join('\n');
+
+  return parseClaudeResponse(responseText);
+}
+
+/**
+ * Extract components from a PDF file
+ * Converts each page to an image and processes with Vision API
+ */
+async function extractFromPdf(file: File): Promise<AIExtractionResult> {
+  if (!anthropic) {
+    throw new Error('Anthropic client not initialized');
+  }
+
+  try {
+    // Convert PDF to images
+    const { images, totalPages } = await convertPdfToImages(file);
+
+    if (images.length === 0) {
+      return {
+        success: false,
+        components: [],
+        metadata: { documentType: 'pdf', totalItems: 0 },
+        confidence: 0,
+        error: 'PDF has no pages or failed to convert',
+      };
+    }
+
+    // Process first page (most PDFs have data on first page)
+    // For multi-page support, we could process all pages and combine results
+    const firstPage = images[0];
+
+    const message = await anthropic.messages.create({
+      model: 'claude-3-7-sonnet-latest',
+      max_tokens: 4096,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'image',
+              source: {
+                type: 'base64',
+                media_type: firstPage.mediaType,
+                data: firstPage.data,
+              },
+            },
+            {
+              type: 'text',
+              text: createExtractionPrompt() + `\n\nNote: This is page ${firstPage.pageNumber} of ${totalPages} from a PDF document.`,
+            },
+          ],
+        },
+      ],
+    });
+
+    const responseText = message.content
+      .filter((block) => block.type === 'text')
+      .map((block) => (block as { type: 'text'; text: string }).text)
+      .join('\n');
+
+    const result = parseClaudeResponse(responseText);
+
+    // Add PDF metadata
+    if (result.success && totalPages > 1) {
+      result.metadata.documentType = 'pdf';
+      // Add note if there are more pages
+      if (result.components.length > 0 && totalPages > 1) {
+        result.components[0].notes = (result.components[0].notes || '') +
+          `\n[Extracted from page 1 of ${totalPages}]`;
+      }
+    }
+
+    return result;
+  } catch (error) {
+    console.error('PDF extraction error:', error);
+    return {
+      success: false,
+      components: [],
+      metadata: { documentType: 'pdf', totalItems: 0 },
+      confidence: 0,
+      error: `Failed to process PDF: ${error instanceof Error ? error.message : 'Unknown error'}`,
+    };
+  }
+}
+
+/**
+ * Extract components from a spreadsheet file (Excel, CSV)
+ * Converts to structured text and processes with Claude
+ */
+async function extractFromSpreadsheet(file: File): Promise<AIExtractionResult> {
+  if (!anthropic) {
+    throw new Error('Anthropic client not initialized');
+  }
+
+  try {
+    // Convert spreadsheet to text
+    const spreadsheetText = await convertExcelToText(file);
+
+    if (!spreadsheetText || spreadsheetText.trim().length === 0) {
+      return {
+        success: false,
+        components: [],
+        metadata: { documentType: 'spreadsheet', totalItems: 0 },
+        confidence: 0,
+        error: 'Spreadsheet is empty or failed to read',
+      };
+    }
+
+    // Process with Claude (text-only, no vision)
+    const message = await anthropic.messages.create({
+      model: 'claude-3-7-sonnet-latest',
+      max_tokens: 4096,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: createExtractionPrompt() +
+                `\n\n=== SPREADSHEET DATA ===\n\n${spreadsheetText}\n\n=== END SPREADSHEET DATA ===\n\n` +
+                `Analyze the above spreadsheet data and extract component information. ` +
+                `The data is in tabular format with columns separated by " | ".`,
+            },
+          ],
+        },
+      ],
+    });
+
+    const responseText = message.content
+      .filter((block) => block.type === 'text')
+      .map((block) => (block as { type: 'text'; text: string }).text)
+      .join('\n');
+
+    const result = parseClaudeResponse(responseText);
+
+    if (result.success) {
+      result.metadata.documentType = 'spreadsheet';
+    }
+
+    return result;
+  } catch (error) {
+    console.error('Spreadsheet extraction error:', error);
+    return {
+      success: false,
+      components: [],
+      metadata: { documentType: 'spreadsheet', totalItems: 0 },
+      confidence: 0,
+      error: `Failed to process spreadsheet: ${error instanceof Error ? error.message : 'Unknown error'}`,
     };
   }
 }

@@ -15,8 +15,10 @@ This feature enables intelligent extraction of component data from supplier quot
 - Extracts manufacturer names, part numbers, categories, prices
 
 🎯 **Flexible Input Formats**
-- Images: JPEG, PNG, GIF, WebP
-- Screenshots of Excel/PDF documents
+- **PDF Files**: Direct PDF upload with automatic conversion to images
+- **Excel/Spreadsheet**: XLSX, XLS, CSV files with intelligent parsing
+- **Images**: JPEG, PNG, GIF, WebP
+- Screenshots of documents
 - Photos of printed price lists
 - Scanned quotations
 
@@ -119,16 +121,20 @@ npm run dev
 
 ### For Excel/PDF Documents
 
-Since PDF direct upload is not yet supported:
+✅ **Now Fully Supported!**
 
-1. **Option A: Screenshot Method**
-   - Open your Excel/PDF file
-   - Take a screenshot of the data table
-   - Upload the screenshot
+1. **PDF Files**
+   - Direct upload supported (automatic conversion to images)
+   - Multi-page PDFs will extract from the first page by default
+   - Simply drag and drop or select your PDF file
 
-2. **Option B: Export as Image**
-   - Excel: Save As → PNG/JPEG
-   - PDF: Export pages as images
+2. **Excel Files**
+   - Direct upload of XLSX, XLS, and CSV files
+   - Automatic parsing of spreadsheet data
+   - Supports multiple sheets (all sheets are analyzed)
+   - No screenshot needed!
+
+**Note**: For best results with multi-page PDFs, ensure the main component table is on the first page.
 
 ### Supported Data Fields
 
@@ -229,13 +235,23 @@ ComponentLibrary (Main UI)
     └── ComponentAIImport (Modal orchestrator)
         ├── IntelligentDocumentUpload (File upload UI)
         ├── AIExtractionPreview (Review & edit UI)
-        └── claudeAI.ts (API service)
+        ├── claudeAI.ts (API service)
+        └── documentConverters.ts (PDF & Excel conversion)
 ```
+
+### Libraries Used
+
+| Library | Version | Purpose |
+|---------|---------|---------|
+| **pdfjs-dist** | Latest | PDF rendering and conversion to images (Mozilla PDF.js) |
+| **xlsx** | Latest | Excel/CSV parsing and data extraction (SheetJS) |
+| **@anthropic-ai/sdk** | Latest | Claude AI Vision API integration |
 
 ### Data Flow
 
+**For Image Files:**
 ```
-1. User uploads image file
+1. User uploads image file (JPEG, PNG, GIF, WebP)
 2. File converted to base64
 3. Sent to Claude Vision API with extraction prompt
 4. API returns structured JSON with component data
@@ -244,12 +260,34 @@ ComponentLibrary (Main UI)
 7. Success toast notification shown
 ```
 
-### Files Created
+**For PDF Files:**
+```
+1. User uploads PDF file
+2. PDF converted to images using pdf.js (one image per page)
+3. First page image sent to Claude Vision API
+4. API extracts component data from the image
+5. User reviews/edits in preview screen
+6. Approved components imported to Supabase
+```
+
+**For Excel/CSV Files:**
+```
+1. User uploads spreadsheet file (XLSX, XLS, CSV)
+2. File parsed using SheetJS library
+3. Spreadsheet data converted to structured text format
+4. Text sent to Claude AI (text mode, not vision)
+5. API extracts component data from structured text
+6. User reviews/edits in preview screen
+7. Approved components imported to Supabase
+```
+
+### Files Created/Modified
 
 | File | Purpose |
 |------|---------|
-| `src/services/claudeAI.ts` | Claude API integration & prompts |
-| `src/components/library/IntelligentDocumentUpload.tsx` | File upload component |
+| `src/services/claudeAI.ts` | Claude API integration & prompts, handles all file types |
+| `src/services/documentConverters.ts` | **NEW** - PDF & Excel conversion utilities |
+| `src/components/library/IntelligentDocumentUpload.tsx` | File upload component (updated for all formats) |
 | `src/components/library/AIExtractionPreview.tsx` | Preview & validation UI |
 | `src/components/library/ComponentAIImport.tsx` | Modal orchestrator |
 | `src/components/ui/dialog.tsx` | Dialog component (Radix UI) |
@@ -294,10 +332,11 @@ User → Your Backend → Claude API → Your Backend → User
 
 Potential improvements:
 
-- [ ] PDF direct upload support (requires pdf-parse library)
-- [ ] Batch processing (upload multiple files)
-- [ ] Excel file direct parsing (no screenshot needed)
-- [ ] CSV import integration
+- [x] ✅ PDF direct upload support (implemented with pdf.js)
+- [x] ✅ Excel file direct parsing (implemented with SheetJS)
+- [x] ✅ CSV import integration (implemented)
+- [ ] Multi-page PDF processing (currently only first page)
+- [ ] Batch processing (upload multiple files at once)
 - [ ] Duplicate detection before import
 - [ ] Price history tracking
 - [ ] Auto-currency conversion using live rates
@@ -340,5 +379,11 @@ The AI-powered import feature saves hours of manual data entry by intelligently 
 
 ---
 
+**Recent Updates (2025-11-07):**
+- ✅ Added full PDF support with automatic conversion to images
+- ✅ Added Excel/CSV direct parsing (no screenshots needed)
+- ✅ Integrated pdf.js for PDF rendering
+- ✅ Integrated SheetJS for spreadsheet parsing
+
 *Last updated: 2025-11-07*
-*Feature version: 1.0.0*
+*Feature version: 2.0.0* - **Now with PDF & Excel support!**

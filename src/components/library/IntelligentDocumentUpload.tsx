@@ -51,7 +51,7 @@ export const IntelligentDocumentUpload: React.FC<IntelligentDocumentUploadProps>
       setFile(droppedFile);
       setError('');
     } else {
-      setError('Invalid file type. Please upload PDF, image, or spreadsheet files.');
+      setError('סוג קובץ לא נתמך. אנא העלה PDF, אקסל (XLSX, XLS, CSV) או תמונה (JPEG, PNG, GIF, WebP).');
     }
   }, []);
 
@@ -126,7 +126,7 @@ export const IntelligentDocumentUpload: React.FC<IntelligentDocumentUploadProps>
         <div>
           <h2 className="text-xl font-semibold">ייבוא מסמכים חכם עם AI</h2>
           <p className="text-sm text-muted-foreground">
-            העלה הצעת מחיר, מחירון או קטלוג ותן ל-AI לחלץ את נתוני הרכיבים
+            העלה PDF, אקסל, הצעת מחיר, מחירון או קטלוג ותן ל-AI לחלץ את נתוני הרכיבים
           </p>
         </div>
       </div>
@@ -160,7 +160,7 @@ export const IntelligentDocumentUpload: React.FC<IntelligentDocumentUploadProps>
             </Button>
           </label>
           <p className="text-xs text-muted-foreground mt-4">
-            פורמטים נתמכים: JPEG, PNG, GIF, WebP (עד 10MB)
+            פורמטים נתמכים: PDF, Excel (XLSX, XLS, CSV), תמונות (JPEG, PNG, GIF, WebP) - עד 10MB
           </p>
         </div>
       )}

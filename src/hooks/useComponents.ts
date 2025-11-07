@@ -84,9 +84,12 @@ export function useComponents() {
 
       if (error) throw error
 
-      // Transform back to UI format and update state
-      const uiComponent = dbToComponent(data)
-      setComponents(prev => [...prev, data]) // Keep DB format in state
+      // Update state immediately with new component
+      setComponents(prev => [...prev, data])
+
+      // Also fetch fresh data to ensure consistency
+      await fetchComponents()
+
       return data
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add component')

@@ -1,6 +1,6 @@
-import { useMemo, useRef, useState, useCallback, useEffect } from 'react'
+import { useMemo, useRef, useState, useCallback } from 'react'
 import { AgGridReact } from 'ag-grid-react'
-import { ColDef, ICellRendererParams, ValueSetterParams, GridReadyEvent, Column } from 'ag-grid-community'
+import { ColDef, ICellRendererParams, ValueSetterParams } from 'ag-grid-community'
 import 'ag-grid-community/styles/ag-grid.css'
 import 'ag-grid-community/styles/ag-theme-alpine.css'
 import { Button } from '../ui/button'
@@ -10,7 +10,6 @@ import { Component } from '../../types'
 import { useClickOutside } from '../../hooks/useClickOutside'
 import { useTableConfig } from '../../hooks/useTableConfig'
 import { CustomHeader } from '../grid/CustomHeader'
-import { CustomSetFilter } from '../grid/CustomSetFilter'
 
 // Unified categories for both form and grid
 const UNIFIED_CATEGORIES = [
@@ -47,11 +46,11 @@ export function EnhancedComponentGrid({
   const gridRef = useRef<AgGridReact>(null)
   const [showColumnManager, setShowColumnManager] = useState(false)
 
-  // Use table configuration hook - FIXED: Reversed column order for RTL display
+  // Use table configuration hook - RTL order
   const { config, saveConfig, loading } = useTableConfig('component_library', {
-    columnOrder: ['quoteDate', 'unitCostUSD', 'unitCostNIS', 'supplier', 'manufacturer', 'name', 'manufacturerPN', 'actions'],
+    columnOrder: ['actions', 'manufacturerPN', 'name', 'manufacturer', 'supplier', 'unitCostNIS', 'unitCostUSD', 'quoteDate'],
     columnWidths: {},
-    visibleColumns: ['quoteDate', 'unitCostUSD', 'unitCostNIS', 'supplier', 'manufacturer', 'name', 'manufacturerPN', 'actions'],
+    visibleColumns: ['actions', 'manufacturerPN', 'name', 'manufacturer', 'supplier', 'unitCostNIS', 'unitCostUSD', 'quoteDate'],
     filterState: {}
   })
 
@@ -86,8 +85,204 @@ export function EnhancedComponentGrid({
     // Smart filter is now handled by the CustomHeader component
   }, [])
 
-  // Column definitions with enhanced filtering and editing - REORDERED
+  // Column definitions with enhanced filtering and editing - RTL order
   const columnDefs: ColDef[] = useMemo(() => [
+    {
+      headerName: 'תאריך הצעה',
+      field: 'quoteDate',
+      sortable: true,
+      filter: 'agDateColumnFilter',
+      resizable: true,
+      width: 120,
+      editable: true,
+      cellEditor: 'agDateStringCellEditor',
+      onCellValueChanged: handleCellEdit,
+      headerComponent: CustomHeader,
+      headerComponentParams: (params: any) => ({
+        displayName: 'תאריך הצעה',
+        onMenuClick: handleColumnMenuClick,
+        onFilterClick: handleFilterClick,
+        api: params.api,
+        columnApi: params.columnApi,
+        column: params.column,
+        filterType: 'date'
+      }),
+      valueFormatter: (params: any) => {
+        if (!params.value) return '-'
+        return new Date(params.value).toLocaleDateString('he-IL')
+      },
+      filterParams: {
+        buttons: ['reset']
+      }
+    },
+    {
+      headerName: 'מחיר בדולר',
+      field: 'unitCostUSD',
+      sortable: true,
+      filter: 'agNumberColumnFilter',
+      resizable: true,
+      width: 120,
+      type: 'numericColumn',
+      editable: true,
+      cellEditor: 'agNumberCellEditor',
+      onCellValueChanged: handleCellEdit,
+      headerComponent: CustomHeader,
+      headerComponentParams: (params: any) => ({
+        displayName: 'מחיר בדולר',
+        onMenuClick: handleColumnMenuClick,
+        onFilterClick: handleFilterClick,
+        api: params.api,
+        columnApi: params.columnApi,
+        column: params.column,
+        filterType: 'number'
+      }),
+      valueFormatter: (params: any) => {
+        return new Intl.NumberFormat('en-US', {
+          style: 'currency',
+          currency: 'USD',
+          minimumFractionDigits: 2
+        }).format(params.value || 0)
+      },
+      cellClass: 'font-semibold text-blue-600',
+      filterParams: {
+        buttons: ['reset']
+      }
+    },
+    {
+      headerName: 'מחיר בש"ח',
+      field: 'unitCostNIS',
+      sortable: true,
+      filter: 'agNumberColumnFilter',
+      resizable: true,
+      width: 120,
+      type: 'numericColumn',
+      editable: true,
+      cellEditor: 'agNumberCellEditor',
+      onCellValueChanged: handleCellEdit,
+      headerComponent: CustomHeader,
+      headerComponentParams: (params: any) => ({
+        displayName: 'מחיר בש"ח',
+        onMenuClick: handleColumnMenuClick,
+        onFilterClick: handleFilterClick,
+        api: params.api,
+        columnApi: params.columnApi,
+        column: params.column,
+        filterType: 'number'
+      }),
+      valueFormatter: (params: any) => {
+        return new Intl.NumberFormat('he-IL', {
+          style: 'currency',
+          currency: 'ILS',
+          minimumFractionDigits: 2
+        }).format(params.value || 0)
+      },
+      cellClass: 'font-semibold text-green-600',
+      filterParams: {
+        buttons: ['reset']
+      }
+    },
+    {
+      headerName: 'ספק',
+      field: 'supplier',
+      sortable: true,
+      filter: 'agSetColumnFilter',
+      resizable: true,
+      width: 120,
+      editable: true,
+      cellEditor: 'agTextCellEditor',
+      onCellValueChanged: handleCellEdit,
+      headerComponent: CustomHeader,
+      headerComponentParams: (params: any) => ({
+        displayName: 'ספק',
+        onMenuClick: handleColumnMenuClick,
+        onFilterClick: handleFilterClick,
+        api: params.api,
+        columnApi: params.columnApi,
+        column: params.column,
+        uniqueValues: getUniqueValues('supplier')
+      }),
+      filterParams: {
+        values: (params: any) => getUniqueValues('supplier')
+      }
+    },
+    {
+      headerName: 'יצרן',
+      field: 'manufacturer',
+      sortable: true,
+      filter: 'agSetColumnFilter',
+      resizable: true,
+      width: 120,
+      editable: true,
+      cellEditor: 'agTextCellEditor',
+      onCellValueChanged: handleCellEdit,
+      headerComponent: CustomHeader,
+      headerComponentParams: (params: any) => ({
+        displayName: 'יצרן',
+        onMenuClick: handleColumnMenuClick,
+        onFilterClick: handleFilterClick,
+        api: params.api,
+        columnApi: params.columnApi,
+        column: params.column,
+        uniqueValues: getUniqueValues('manufacturer')
+      }),
+      filterParams: {
+        values: (params: any) => getUniqueValues('manufacturer')
+      }
+    },
+    {
+      headerName: 'שם רכיב',
+      field: 'name',
+      sortable: true,
+      filter: 'agSetColumnFilter',
+      resizable: true,
+      width: 180,
+      editable: true,
+      cellEditor: 'agTextCellEditor',
+      onCellValueChanged: handleCellEdit,
+      headerComponent: CustomHeader,
+      headerComponentParams: (params: any) => ({
+        displayName: 'שם רכיב',
+        onMenuClick: handleColumnMenuClick,
+        onFilterClick: handleFilterClick,
+        api: params.api,
+        columnApi: params.columnApi,
+        column: params.column,
+        uniqueValues: getUniqueValues('name')
+      }),
+      cellRenderer: (params: ICellRendererParams) => (
+        <div className="py-1">
+          <div className="font-medium">{params.value}</div>
+        </div>
+      ),
+      filterParams: {
+        values: (params: any) => getUniqueValues('name')
+      }
+    },
+    {
+      headerName: 'מק"ט יצרן',
+      field: 'manufacturerPN',
+      sortable: true,
+      filter: 'agSetColumnFilter',
+      resizable: true,
+      width: 140,
+      editable: true,
+      cellEditor: 'agTextCellEditor',
+      onCellValueChanged: handleCellEdit,
+      headerComponent: CustomHeader,
+      headerComponentParams: (params: any) => ({
+        displayName: 'מק"ט יצרן',
+        onMenuClick: handleColumnMenuClick,
+        onFilterClick: handleFilterClick,
+        api: params.api,
+        columnApi: params.columnApi,
+        column: params.column,
+        uniqueValues: getUniqueValues('manufacturerPN')
+      }),
+      cellClass: 'font-mono text-sm',
+      filterParams: {
+        values: (params: any) => getUniqueValues('manufacturerPN')
+      }
+    },
     {
       headerName: 'פעולות',
       field: 'actions',
@@ -95,7 +290,6 @@ export function EnhancedComponentGrid({
       filter: false,
       resizable: false,
       width: 180,
-      pinned: 'right', // Pin to right side for RTL
       cellRenderer: (params: ICellRendererParams) => (
         <div className="flex gap-1 items-center justify-center">
           {onView && (
@@ -142,204 +336,12 @@ export function EnhancedComponentGrid({
       )
     },
     {
-      headerName: 'מק"ט יצרן',
-      field: 'manufacturerPN',
-      sortable: true,
-      filter: CustomSetFilter, // Use custom filter component
-      resizable: true,
-      width: 140,
-      pinned: 'right',
-      editable: true,
-      cellEditor: 'agTextCellEditor',
-      onCellValueChanged: handleCellEdit,
-      headerComponent: CustomHeader,
-      headerComponentParams: (params: any) => ({
-        displayName: 'מק"ט יצרן',
-        onMenuClick: handleColumnMenuClick,
-        onFilterClick: handleFilterClick,
-        api: params.api,
-        columnApi: params.columnApi,
-        column: params.column,
-        uniqueValues: getUniqueValues('manufacturerPN')
-      }),
-      cellClass: 'font-mono text-sm'
-    },
-    {
-      headerName: 'שם רכיב',
-      field: 'name',
-      sortable: true,
-      filter: CustomSetFilter, // Use custom filter component
-      resizable: true,
-      width: 180,
-      pinned: 'right',
-      editable: true,
-      cellEditor: 'agTextCellEditor',
-      onCellValueChanged: handleCellEdit,
-      headerComponent: CustomHeader,
-      headerComponentParams: (params: any) => ({
-        displayName: 'שם רכיב',
-        onMenuClick: handleColumnMenuClick,
-        onFilterClick: handleFilterClick,
-        api: params.api,
-        columnApi: params.columnApi,
-        column: params.column,
-        uniqueValues: getUniqueValues('name')
-      }),
-      cellRenderer: (params: ICellRendererParams) => (
-        <div className="py-1">
-          <div className="font-medium">{params.value}</div>
-        </div>
-      )
-    },
-    {
-      headerName: 'יצרן',
-      field: 'manufacturer',
-      sortable: true,
-      filter: CustomSetFilter, // Use custom filter component
-      resizable: true,
-      width: 120,
-      pinned: 'right',
-      editable: true,
-      cellEditor: 'agTextCellEditor',
-      onCellValueChanged: handleCellEdit,
-      headerComponent: CustomHeader,
-      headerComponentParams: (params: any) => ({
-        displayName: 'יצרן',
-        onMenuClick: handleColumnMenuClick,
-        onFilterClick: handleFilterClick,
-        api: params.api,
-        columnApi: params.columnApi,
-        column: params.column,
-        uniqueValues: getUniqueValues('manufacturer')
-      })
-    },
-    {
-      headerName: 'ספק',
-      field: 'supplier',
-      sortable: true,
-      filter: CustomSetFilter, // Use custom filter component
-      resizable: true,
-      width: 120,
-      pinned: 'right',
-      editable: true,
-      cellEditor: 'agTextCellEditor',
-      onCellValueChanged: handleCellEdit,
-      headerComponent: CustomHeader,
-      headerComponentParams: (params: any) => ({
-        displayName: 'ספק',
-        onMenuClick: handleColumnMenuClick,
-        onFilterClick: handleFilterClick,
-        api: params.api,
-        columnApi: params.columnApi,
-        column: params.column,
-        uniqueValues: getUniqueValues('supplier')
-      })
-    },
-    {
-      headerName: 'מחיר בש"ח',
-      field: 'unitCostNIS',
-      sortable: true,
-      filter: 'agNumberColumnFilter',
-      resizable: true,
-      width: 120,
-      pinned: 'right',
-      type: 'numericColumn',
-      editable: true,
-      cellEditor: 'agNumberCellEditor',
-      onCellValueChanged: handleCellEdit,
-      headerComponent: CustomHeader,
-      headerComponentParams: (params: any) => ({
-        displayName: 'מחיר בש"ח',
-        onMenuClick: handleColumnMenuClick,
-        onFilterClick: handleFilterClick,
-        api: params.api,
-        columnApi: params.columnApi,
-        column: params.column,
-        filterType: 'number'
-      }),
-      valueFormatter: (params: any) => {
-        return new Intl.NumberFormat('he-IL', {
-          style: 'currency',
-          currency: 'ILS',
-          minimumFractionDigits: 2
-        }).format(params.value || 0)
-      },
-      cellClass: 'font-semibold text-green-600',
-      filterParams: {
-        buttons: ['reset']
-      }
-    },
-    {
-      headerName: 'מחיר בדולר',
-      field: 'unitCostUSD',
-      sortable: true,
-      filter: 'agNumberColumnFilter',
-      resizable: true,
-      width: 120,
-      pinned: 'right',
-      type: 'numericColumn',
-      editable: true,
-      cellEditor: 'agNumberCellEditor',
-      onCellValueChanged: handleCellEdit,
-      headerComponent: CustomHeader,
-      headerComponentParams: (params: any) => ({
-        displayName: 'מחיר בדולר',
-        onMenuClick: handleColumnMenuClick,
-        onFilterClick: handleFilterClick,
-        api: params.api,
-        columnApi: params.columnApi,
-        column: params.column,
-        filterType: 'number'
-      }),
-      valueFormatter: (params: any) => {
-        return new Intl.NumberFormat('en-US', {
-          style: 'currency',
-          currency: 'USD',
-          minimumFractionDigits: 2
-        }).format(params.value || 0)
-      },
-      cellClass: 'font-semibold text-blue-600',
-      filterParams: {
-        buttons: ['reset']
-      }
-    },
-    {
-      headerName: 'תאריך הצעה',
-      field: 'quoteDate',
-      sortable: true,
-      filter: 'agDateColumnFilter',
-      resizable: true,
-      width: 120,
-      pinned: 'right',
-      editable: true,
-      cellEditor: 'agDateStringCellEditor',
-      onCellValueChanged: handleCellEdit,
-      headerComponent: CustomHeader,
-      headerComponentParams: (params: any) => ({
-        displayName: 'תאריך הצעה',
-        onMenuClick: handleColumnMenuClick,
-        onFilterClick: handleFilterClick,
-        api: params.api,
-        columnApi: params.columnApi,
-        column: params.column,
-        filterType: 'date'
-      }),
-      valueFormatter: (params: any) => {
-        if (!params.value) return '-'
-        return new Date(params.value).toLocaleDateString('he-IL')
-      },
-      filterParams: {
-        buttons: ['reset']
-      }
-    },
-    {
       headerName: 'קטגוריה',
       field: 'category',
       sortable: true,
-      filter: CustomSetFilter, // Use custom filter component
+      filter: 'agSetColumnFilter',
       resizable: true,
       width: 120,
-      pinned: 'right',
       editable: true,
       cellEditor: 'agSelectCellEditor',
       cellEditorParams: {
@@ -360,7 +362,10 @@ export function EnhancedComponentGrid({
         <Badge variant="secondary" className="text-xs">
           {params.value}
         </Badge>
-      )
+      ),
+      filterParams: {
+        values: UNIFIED_CATEGORIES
+      }
     },
     {
       headerName: 'מחיר באירו',
@@ -369,7 +374,6 @@ export function EnhancedComponentGrid({
       filter: 'agNumberColumnFilter',
       resizable: true,
       width: 120,
-      pinned: 'right',
       type: 'numericColumn',
       editable: true,
       cellEditor: 'agNumberCellEditor',
@@ -400,10 +404,9 @@ export function EnhancedComponentGrid({
       headerName: 'מטבע',
       field: 'currency',
       sortable: true,
-      filter: CustomSetFilter, // Use custom filter component
+      filter: 'agSetColumnFilter',
       resizable: true,
       width: 80,
-      pinned: 'right',
       editable: true,
       cellEditor: 'agSelectCellEditor',
       cellEditorParams: {
@@ -424,16 +427,18 @@ export function EnhancedComponentGrid({
         <Badge variant="outline" className="text-xs">
           {params.value}
         </Badge>
-      )
+      ),
+      filterParams: {
+        values: ['NIS', 'USD', 'EUR']
+      }
     },
     {
       headerName: 'תיאור',
       field: 'description',
       sortable: true,
-      filter: CustomSetFilter, // Use custom filter component
+      filter: 'agSetColumnFilter',
       resizable: true,
       width: 200,
-      pinned: 'right',
       editable: true,
       cellEditor: 'agLargeTextCellEditor',
       cellEditorPopup: true,
@@ -447,16 +452,18 @@ export function EnhancedComponentGrid({
         columnApi: params.columnApi,
         column: params.column,
         uniqueValues: getUniqueValues('description')
-      })
+      }),
+      filterParams: {
+        values: (params: any) => getUniqueValues('description')
+      }
     },
     {
       headerName: 'הערות',
       field: 'notes',
       sortable: true,
-      filter: CustomSetFilter, // Use custom filter component
+      filter: 'agSetColumnFilter',
       resizable: true,
       width: 150,
-      pinned: 'right',
       editable: true,
       cellEditor: 'agLargeTextCellEditor',
       cellEditorPopup: true,
@@ -470,21 +477,25 @@ export function EnhancedComponentGrid({
         columnApi: params.columnApi,
         column: params.column,
         uniqueValues: getUniqueValues('notes')
-      })
+      }),
+      filterParams: {
+        values: (params: any) => getUniqueValues('notes')
+      }
     }
-  ], [getUniqueValues, handleCellEdit, onEdit, onDelete, onView])
+  ], [getUniqueValues, handleCellEdit, onEdit, onDelete, onView, onDuplicate])
 
   // Filter and reorder columns based on config
   const visibleColumnDefs = useMemo(() => {
     // First filter by visibility, then reorder
     const visible = columnDefs.filter(col => config.visibleColumns.includes(col.field!))
-    
+
     // Reorder according to config.columnOrder
     const ordered = config.columnOrder
       .filter(fieldId => visible.some(col => col.field === fieldId))
       .map(fieldId => visible.find(col => col.field === fieldId)!)
-    
-    return ordered
+
+    // Reverse the order because AG Grid with RTL will reverse it again
+    return ordered.reverse()
   }, [columnDefs, config.visibleColumns, config.columnOrder])
 
   const defaultColDef = useMemo(() => ({
@@ -554,8 +565,10 @@ export function EnhancedComponentGrid({
   // Handle column move
   const onColumnMoved = useCallback((params: any) => {
     if (params.finished) {
-      const order = params.columnApi.getAllDisplayedColumns()?.map((col: any) => col.getColId()) || []
-      saveConfig({ columnOrder: order })
+      const displayedOrder = params.columnApi.getAllDisplayedColumns()?.map((col: any) => col.getColId()) || []
+      // Reverse the order because AG Grid shows it reversed in RTL mode
+      const actualOrder = [...displayedOrder].reverse()
+      saveConfig({ columnOrder: actualOrder })
     }
   }, [saveConfig])
 
@@ -629,12 +642,13 @@ export function EnhancedComponentGrid({
       </div>
 
       {/* Grid */}
-      <div className="ag-theme-alpine" style={{ height: '600px', width: '100%' }} dir="rtl">
+      <div className="ag-theme-alpine" style={{ height: '600px', width: '100%' }}>
         <AgGridReact
           ref={gridRef}
           rowData={components}
           columnDefs={visibleColumnDefs}
           defaultColDef={defaultColDef}
+          enableRtl={true}
           onGridReady={onGridReady}
           onFirstDataRendered={onFirstDataRendered}
           onColumnResized={onColumnResized}
@@ -645,8 +659,6 @@ export function EnhancedComponentGrid({
           animateRows={true}
           pagination={true}
           paginationPageSize={20}
-          enableRangeSelection={true}
-          enableFillHandle={true}
           enableCellTextSelection={true}
           localeText={{
             page: 'עמוד',

@@ -8,17 +8,23 @@ import {
   Search,
   DollarSign,
   Building,
-  Calendar
+  Calendar,
+  Sparkles
 } from 'lucide-react'
 import { useCPQ } from '../../contexts/CPQContext'
 import { Component } from '../../types'
 import { ComponentForm } from './ComponentForm'
 import { ConfirmDialog } from '../ui/ConfirmDialog'
 import { EnhancedComponentGrid } from './EnhancedComponentGrid'
+import { ComponentAIImport } from './ComponentAIImport'
+import { useComponents } from '../../hooks/useComponents'
+import { toast } from 'sonner'
 
 export function ComponentLibrary() {
   const { components, updateComponent, deleteComponent, setModal, modalState, closeModal } = useCPQ()
+  const { addComponent } = useComponents()
   const [searchTerm, setSearchTerm] = useState('')
+  const [isAIImportOpen, setIsAIImportOpen] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; componentId: string | null; componentName: string }>({
     isOpen: false,
     componentId: null,
@@ -100,6 +106,28 @@ export function ComponentLibrary() {
     setDeleteConfirm({ isOpen: false, componentId: null, componentName: '' })
   }
 
+  const handleAIImport = async (componentsToImport: Partial<Component>[]) => {
+    let successCount = 0
+    let failureCount = 0
+
+    for (const component of componentsToImport) {
+      try {
+        await addComponent(component as any)
+        successCount++
+      } catch (error) {
+        console.error('Failed to import component:', error)
+        failureCount++
+      }
+    }
+
+    if (successCount > 0) {
+      toast.success(`Successfully imported ${successCount} component${successCount > 1 ? 's' : ''}`)
+    }
+    if (failureCount > 0) {
+      toast.error(`Failed to import ${failureCount} component${failureCount > 1 ? 's' : ''}`)
+    }
+  }
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -117,10 +145,16 @@ export function ComponentLibrary() {
             נהל את הרכיבים והאסמבלים שלך ({components.length} רכיבים)
           </p>
         </div>
-        <Button onClick={handleAddComponent}>
-          <Plus className="h-4 w-4 ml-2" />
-          הוסף רכיב
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setIsAIImportOpen(true)} className="gap-2">
+            <Sparkles className="h-4 w-4" />
+            ייבוא חכם
+          </Button>
+          <Button onClick={handleAddComponent}>
+            <Plus className="h-4 w-4 ml-2" />
+            הוסף רכיב
+          </Button>
+        </div>
       </div>
 
       {/* Search */}
@@ -228,6 +262,13 @@ export function ComponentLibrary() {
         component={modalState?.type === 'edit-component' || modalState?.type === 'add-component' ? modalState.data : null}
         isOpen={modalState?.type === 'add-component' || modalState?.type === 'edit-component'}
         onClose={closeModal}
+      />
+
+      {/* AI Import Modal */}
+      <ComponentAIImport
+        isOpen={isAIImportOpen}
+        onClose={() => setIsAIImportOpen(false)}
+        onImport={handleAIImport}
       />
 
       {/* Delete Confirmation Dialog */}

@@ -1,6 +1,6 @@
 import React, { useRef, useState, useCallback, useMemo } from 'react'
 import { AgGridReact } from 'ag-grid-react'
-import { ColDef, GridReadyEvent, NewValueParams, ValueFormatterParams, ICellRendererParams, ICellEditorParams } from 'ag-grid-community'
+import { ColDef, NewValueParams, ValueFormatterParams, ICellRendererParams } from 'ag-grid-community'
 import { useQuotations } from '../../hooks/useQuotations'
 import { useCPQ } from '../../contexts/CPQContext'
 import { DbQuotation } from '../../types'
@@ -122,11 +122,11 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
   const [showColumnManager, setShowColumnManager] = useState(false)
   const isInitialMount = useRef(true)
 
-  // Use table configuration hook
-  const { config, saveConfig, loading: configLoading } = useTableConfig('quotation_grid', {
-    columnOrder: ['quotation_number', 'version', 'customer_name', 'project_name', 'status', 'displayTotalPrice', 'displayTotalCost', 'created_at', 'updated_at', 'actions'],
+  // Use table configuration hook - RTL order (stored order matches desired display order)
+  const { config, saveConfig } = useTableConfig('quotation_grid', {
+    columnOrder: ['actions', 'customer_name', 'project_name', 'version', 'status', 'displayTotalPrice', 'created_at', 'updated_at'],
     columnWidths: {},
-    visibleColumns: ['quotation_number', 'version', 'customer_name', 'project_name', 'status', 'displayTotalPrice', 'displayTotalCost', 'created_at', 'updated_at', 'actions'],
+    visibleColumns: ['actions', 'customer_name', 'project_name', 'version', 'status', 'displayTotalPrice', 'created_at', 'updated_at'],
     filterState: {}
   })
 
@@ -174,10 +174,10 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
       const newQuotation = await duplicateQuotation(quotation.id, newQuotationNumber)
 
       if (newQuotation) {
-        const quotationProject = convertDbQuotationToQuotationProject(newQuotation)
         if (onQuotationEdit) {
-          onQuotationEdit(quotationProject)
+          onQuotationEdit(newQuotation)
         } else {
+          const quotationProject = convertDbQuotationToQuotationProject(newQuotation)
           setCurrentQuotation(quotationProject)
         }
       }
@@ -196,10 +196,10 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
       const newQuotation = await duplicateQuotation(quotation.id, newQuotationNumber, newVersion)
 
       if (newQuotation) {
-        const quotationProject = convertDbQuotationToQuotationProject(newQuotation)
         if (onQuotationEdit) {
-          onQuotationEdit(quotationProject)
+          onQuotationEdit(newQuotation)
         } else {
+          const quotationProject = convertDbQuotationToQuotationProject(newQuotation)
           setCurrentQuotation(quotationProject)
         }
       }
@@ -230,23 +230,96 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
     }))
   }, [quotations])
 
-  // Column definitions with RTL support - no pinning
+  // Column definitions with RTL support - order will be reversed by AG Grid
   const columnDefs: ColDef[] = useMemo(() => [
     {
-      headerName: 'מספר הצעה',
-      field: 'quotation_number',
-      width: 140,
-      editable: false,
-      filter: 'agTextColumnFilter',
+      headerName: 'תאריך עדכון',
+      field: 'updated_at',
+      width: 120,
+      valueFormatter: (params: ValueFormatterParams) => {
+        if (!params.value) return '-'
+        return new Date(params.value).toLocaleDateString('he-IL')
+      },
+      filter: 'agDateColumnFilter',
+      comparator: (dateA: string, dateB: string) => {
+        return new Date(dateA).getTime() - new Date(dateB).getTime()
+      },
       headerComponent: CustomHeader,
       headerComponentParams: (params: any) => ({
-        displayName: 'מספר הצעה',
+        displayName: 'תאריך עדכון',
         onMenuClick: handleColumnMenuClick,
         onFilterClick: handleFilterClick,
         api: params.api,
         columnApi: params.columnApi,
         column: params.column,
-        uniqueValues: getUniqueValues('quotation_number')
+        filterType: 'date'
+      })
+    },
+    {
+      headerName: 'תאריך יצירה',
+      field: 'created_at',
+      width: 120,
+      valueFormatter: (params: ValueFormatterParams) => {
+        if (!params.value) return '-'
+        return new Date(params.value).toLocaleDateString('he-IL')
+      },
+      filter: 'agDateColumnFilter',
+      comparator: (dateA: string, dateB: string) => {
+        return new Date(dateA).getTime() - new Date(dateB).getTime()
+      },
+      headerComponent: CustomHeader,
+      headerComponentParams: (params: any) => ({
+        displayName: 'תאריך יצירה',
+        onMenuClick: handleColumnMenuClick,
+        onFilterClick: handleFilterClick,
+        api: params.api,
+        columnApi: params.columnApi,
+        column: params.column,
+        filterType: 'date'
+      })
+    },
+    {
+      headerName: 'מחיר סופי',
+      field: 'displayTotalPrice',
+      width: 130,
+      editable: false,
+      cellRenderer: CurrencyRenderer,
+      valueGetter: (params) => params.data?.total_price || 0,
+      filter: 'agNumberColumnFilter',
+      headerComponent: CustomHeader,
+      headerComponentParams: (params: any) => ({
+        displayName: 'מחיר סופי',
+        onMenuClick: handleColumnMenuClick,
+        onFilterClick: handleFilterClick,
+        api: params.api,
+        columnApi: params.columnApi,
+        column: params.column,
+        filterType: 'number'
+      })
+    },
+    {
+      headerName: 'סטטוס',
+      field: 'status',
+      width: 120,
+      editable: true,
+      cellEditor: 'agSelectCellEditor',
+      cellEditorParams: {
+        values: ['draft', 'sent', 'accepted', 'rejected', 'expired']
+      },
+      cellRenderer: StatusRenderer,
+      filter: 'agSetColumnFilter',
+      filterParams: {
+        values: ['draft', 'sent', 'accepted', 'rejected', 'expired']
+      },
+      headerComponent: CustomHeader,
+      headerComponentParams: (params: any) => ({
+        displayName: 'סטטוס',
+        onMenuClick: handleColumnMenuClick,
+        onFilterClick: handleFilterClick,
+        api: params.api,
+        columnApi: params.columnApi,
+        column: params.column,
+        uniqueValues: ['draft', 'sent', 'accepted', 'rejected', 'expired']
       })
     },
     {
@@ -272,33 +345,18 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
       })
     },
     {
-      headerName: 'שם לקוח',
-      field: 'customer_name',
-      width: 180,
-      editable: true,
-      cellEditor: 'agTextCellEditor',
-      filter: 'agTextColumnFilter',
-      headerComponent: CustomHeader,
-      headerComponentParams: (params: any) => ({
-        displayName: 'שם לקוח',
-        onMenuClick: handleColumnMenuClick,
-        onFilterClick: handleFilterClick,
-        api: params.api,
-        columnApi: params.columnApi,
-        column: params.column,
-        uniqueValues: getUniqueValues('customer_name')
-      })
-    },
-    {
-      headerName: 'שם פרויקט',
+      headerName: 'שם פרוייקט',
       field: 'project_name',
       width: 200,
       editable: true,
       cellEditor: 'agTextCellEditor',
-      filter: 'agTextColumnFilter',
+      filter: 'agSetColumnFilter',
+      filterParams: {
+        values: () => getUniqueValues('project_name')
+      },
       headerComponent: CustomHeader,
       headerComponentParams: (params: any) => ({
-        displayName: 'שם פרויקט',
+        displayName: 'שם פרוייקט',
         onMenuClick: handleColumnMenuClick,
         onFilterClick: handleFilterClick,
         api: params.api,
@@ -308,63 +366,25 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
       })
     },
     {
-      headerName: 'סטטוס',
-      field: 'status',
-      width: 120,
+      headerName: 'לקוח',
+      field: 'customer_name',
+      width: 180,
       editable: true,
-      cellEditor: 'agSelectCellEditor',
-      cellEditorParams: {
-        values: ['draft', 'sent', 'accepted', 'rejected', 'expired']
-      },
-      cellRenderer: StatusRenderer,
+      cellEditor: 'agTextCellEditor',
       filter: 'agSetColumnFilter',
       filterParams: {
-        values: ['draft', 'sent', 'accepted', 'rejected', 'expired']
-      }
-    },
-    {
-      headerName: 'מחיר סופי',
-      field: 'displayTotalPrice',
-      width: 130,
-      editable: false,
-      cellRenderer: CurrencyRenderer,
-      valueGetter: (params) => params.data?.total_price || 0,
-      filter: 'agNumberColumnFilter'
-    },
-    {
-      headerName: 'עלות כוללת',
-      field: 'displayTotalCost',
-      width: 130,
-      editable: false,
-      cellRenderer: CurrencyRenderer,
-      valueGetter: (params) => params.data?.total_cost || 0,
-      filter: 'agNumberColumnFilter'
-    },
-    {
-      headerName: 'תאריך יצירה',
-      field: 'created_at',
-      width: 120,
-      valueFormatter: (params: ValueFormatterParams) => {
-        if (!params.value) return '-'
-        return new Date(params.value).toLocaleDateString('he-IL')
+        values: () => getUniqueValues('customer_name')
       },
-      filter: 'agDateColumnFilter',
-      comparator: (dateA: string, dateB: string) => {
-        return new Date(dateA).getTime() - new Date(dateB).getTime()
-      }
-    },
-    {
-      headerName: 'תאריך עדכון',
-      field: 'updated_at',
-      width: 120,
-      valueFormatter: (params: ValueFormatterParams) => {
-        if (!params.value) return '-'
-        return new Date(params.value).toLocaleDateString('he-IL')
-      },
-      filter: 'agDateColumnFilter',
-      comparator: (dateA: string, dateB: string) => {
-        return new Date(dateA).getTime() - new Date(dateB).getTime()
-      }
+      headerComponent: CustomHeader,
+      headerComponentParams: (params: any) => ({
+        displayName: 'לקוח',
+        onMenuClick: handleColumnMenuClick,
+        onFilterClick: handleFilterClick,
+        api: params.api,
+        columnApi: params.columnApi,
+        column: params.column,
+        uniqueValues: getUniqueValues('customer_name')
+      })
     },
     {
       headerName: 'פעולות',
@@ -378,6 +398,17 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
 
   // Filter and reorder columns based on config
   const visibleColumnDefs = useMemo(() => {
+    // Default column order if not configured
+    const defaultOrder = ['actions', 'customer_name', 'project_name', 'version', 'status', 'displayTotalPrice', 'created_at', 'updated_at']
+
+    // Use saved order if exists and not empty, otherwise use default
+    const effectiveOrder = (config.columnOrder && config.columnOrder.length > 0)
+      ? config.columnOrder
+      : defaultOrder
+
+    console.log('QuotationDataGrid - effectiveOrder:', effectiveOrder)
+    console.log('QuotationDataGrid - config.visibleColumns:', config.visibleColumns)
+
     // If no visible columns configured, show all columns
     if (!config.visibleColumns || config.visibleColumns.length === 0) {
       return columnDefs
@@ -390,11 +421,13 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
       return columnDefs
     }
 
-    const ordered = config.columnOrder
+    const ordered = effectiveOrder
       .filter(fieldId => visible.some(col => col.field === fieldId))
       .map(fieldId => visible.find(col => col.field === fieldId)!)
 
-    // If ordering results in no columns, return visible columns as-is
+    console.log('QuotationDataGrid - ordered:', ordered.map(c => c?.field))
+
+    // Don't reverse! columnDefs is already reversed and AG Grid RTL will handle it
     return ordered.length > 0 ? ordered : visible
   }, [columnDefs, config.visibleColumns, config.columnOrder])
 
@@ -500,6 +533,7 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
       params.columnApi?.getAllColumns()?.forEach((col: any) => {
         widths[col.getColId()] = col.getActualWidth()
       })
+      console.log('Column resized, saving widths:', widths)
       saveConfig({ columnWidths: widths })
     }
   }, [saveConfig])
@@ -507,8 +541,11 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
   // Handle column move
   const onColumnMoved = useCallback((params: any) => {
     if (params.finished && !isInitialMount.current) {
-      const order = params.columnApi?.getAllDisplayedColumns()?.map((col: any) => col.getColId()) || []
-      saveConfig({ columnOrder: order })
+      const displayedOrder = params.columnApi?.getAllDisplayedColumns()?.map((col: any) => col.getColId()) || []
+      // Reverse because AG Grid gives us reversed order in RTL
+      const actualOrder = [...displayedOrder].reverse()
+      console.log('Column moved - displayed:', displayedOrder, 'saving:', actualOrder)
+      saveConfig({ columnOrder: actualOrder })
     }
   }, [saveConfig])
 
@@ -539,10 +576,10 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
       })
 
       if (newQuotation) {
-        const quotationProject = convertDbQuotationToQuotationProject(newQuotation)
         if (onQuotationEdit) {
-          onQuotationEdit(quotationProject)
+          onQuotationEdit(newQuotation)
         } else {
+          const quotationProject = convertDbQuotationToQuotationProject(newQuotation)
           setCurrentQuotation(quotationProject)
         }
       }
@@ -724,8 +761,7 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
               defaultColDef={{
                 sortable: true,
                 filter: true,
-                resizable: true,
-                floatingFilter: true
+                resizable: true
               }}
               onGridReady={onGridReady}
               onFirstDataRendered={onFirstDataRendered}

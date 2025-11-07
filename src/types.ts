@@ -276,7 +276,7 @@ export interface ValidatedComponent {
 
 // ============ UI State ============
 export interface UIState {
-  activeView: 'dashboard' | 'quotes' | 'quotations' | 'components' | 'projects' | 'analytics';
+  activeView: 'dashboard' | 'quotes' | 'quotations' | 'components' | 'projects' | 'analytics' | 'settings';
   sidebarCollapsed: boolean;
   theme: 'light' | 'dark' | 'system';
   loading: {

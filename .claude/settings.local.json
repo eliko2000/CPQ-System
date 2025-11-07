@@ -1,15 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm install:*)",
-      "WebSearch",
-      "Bash(npm run build:*)",
-      "Bash(awk:*)",
-      "Bash(npm run tsc:*)",
-      "Bash(npx tsc --noEmit)",
-      "mcp__supabase__postgrestRequest",
-      "Bash(timeout 5 npm run dev:*)"
-    ]
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:maximechampoux.medium.com)"
+    ],
+    "deny": [],
+    "ask": []
   },
   "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [

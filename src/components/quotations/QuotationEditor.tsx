@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo, useEffect } from 'react'
 import { AgGridReact } from 'ag-grid-react'
 import { ColDef, ICellRendererParams, ValueGetterParams, ICellEditorParams } from 'ag-grid-community'
 import { useCPQ } from '../../contexts/CPQContext'
-import { QuotationProject, QuotationItem, QuotationSystem, Component } from '../../types'
+import { QuotationItem, QuotationSystem, Component } from '../../types'
 import { QuotationParameters } from './QuotationParameters'
 import { calculateQuotationTotals, renumberItems } from '../../utils/quotationCalculations'
 import { Button } from '../ui/button'
@@ -163,7 +163,6 @@ export function QuotationEditor() {
     components,
     setCurrentQuotation,
     updateQuotation,
-    addQuotation,
     setModal,
     modalState,
     closeModal
@@ -519,13 +518,12 @@ export function QuotationEditor() {
     return data
   }, [currentQuotation])
 
-  // Grid column definitions (RTL order - all pinned to right)
+  // Grid column definitions (RTL order)
   const columnDefs: ColDef[] = useMemo(() => [
     {
       headerName: 'מחיר ללקוח',
       field: 'customerPriceILS',
       width: 120,
-      pinned: 'right',
       cellRenderer: CurrencyRenderer,
       cellClass: params => params.data?.isSystemGroup ? 'ag-cell-bold' : 'ag-cell-right',
       valueGetter: (params: ValueGetterParams) => {
@@ -569,7 +567,6 @@ export function QuotationEditor() {
       headerName: 'מחיר נטו שקלים',
       field: 'totalPriceILS',
       width: 120,
-      pinned: 'right',
       cellRenderer: CurrencyRenderer,
       cellClass: params => params.data?.isSystemGroup ? 'ag-cell-bold' : 'ag-cell-right',
       valueGetter: (params: ValueGetterParams) => {
@@ -605,7 +602,6 @@ export function QuotationEditor() {
       headerName: 'מחיר נטו דולר',
       field: 'totalPriceUSD',
       width: 120,
-      pinned: 'right',
       cellRenderer: USDCurrencyRenderer,
       cellClass: params => params.data?.isSystemGroup ? 'ag-cell-bold' : 'ag-cell-right',
       valueGetter: (params: ValueGetterParams) => {
@@ -641,7 +637,6 @@ export function QuotationEditor() {
       headerName: 'מחיר יחידה',
       field: 'unitPriceILS',
       width: 100,
-      pinned: 'right',
       editable: false,
       cellRenderer: CurrencyRenderer,
       cellClass: params => params.data?.isSystemGroup ? 'ag-cell-bold' : 'ag-cell-right',
@@ -674,7 +669,6 @@ export function QuotationEditor() {
       headerName: 'כמות',
       field: 'quantity',
       width: 80,
-      pinned: 'right',
       editable: true,
       cellEditor: 'agNumberCellEditor',
       cellEditorParams: {
@@ -702,7 +696,6 @@ export function QuotationEditor() {
       headerName: 'שם פריט',
       field: 'componentName',
       width: 200,
-      pinned: 'right',
       editable: (params: any) => params.data?.isSystemGroup, // ✅ Only systems editable
       cellEditor: SystemNameEditor, // ✅ Direct class assignment
       cellClass: params => params.data?.isSystemGroup ? 'ag-cell-bold' : 'ag-cell-right',
@@ -751,7 +744,6 @@ export function QuotationEditor() {
       headerName: 'מס"ד',
       field: 'displayNumber',
       width: 80,
-      pinned: 'right',
       cellRenderer: (props: ICellRendererParams) => {
         if (props.data?.isSystemGroup) {
           return (
@@ -783,7 +775,6 @@ export function QuotationEditor() {
       headerName: 'פעולות',
       field: 'actions',
       width: 150, // Increased width to accommodate edit button
-      pinned: 'right',
       sortable: false,
       filter: false,
       cellClass: params => params.data?.isSystemGroup ? 'ag-cell-bold' : 'ag-cell-center',
@@ -892,15 +883,32 @@ export function QuotationEditor() {
 
   // Filter and reorder columns based on config
   const visibleColumnDefs = useMemo(() => {
-    // First filter by visibility, then reorder
+    // Default column order if not configured
+    const defaultOrder = ['actions', 'displayNumber', 'componentName', 'quantity', 'unitPriceILS', 'totalPriceUSD', 'totalPriceILS', 'customerPriceILS']
+
+    // Use saved order if exists and not empty, otherwise use default
+    const effectiveOrder = (config.columnOrder && config.columnOrder.length > 0)
+      ? config.columnOrder
+      : defaultOrder
+
+    // If no visible columns configured, show all columns
+    if (!config.visibleColumns || config.visibleColumns.length === 0) {
+      return columnDefs
+    }
+
     const visible = columnDefs.filter(col => config.visibleColumns.includes(col.field!))
-    
-    // Reorder according to config.columnOrder
-    const ordered = config.columnOrder
+
+    // If filtering results in no columns, fall back to all columns
+    if (visible.length === 0) {
+      return columnDefs
+    }
+
+    const ordered = effectiveOrder
       .filter(fieldId => visible.some(col => col.field === fieldId))
       .map(fieldId => visible.find(col => col.field === fieldId)!)
-    
-    return ordered
+
+    // Don't reverse! columnDefs is already in correct order and AG Grid RTL will handle it
+    return ordered.length > 0 ? ordered : visible
   }, [columnDefs, config.visibleColumns, config.columnOrder])
 
   // Auto-group column definition
@@ -1173,6 +1181,7 @@ export function QuotationEditor() {
             columnDefs={visibleColumnDefs}
             autoGroupColumnDef={autoGroupColumnDef}
             gridOptions={gridOptions}
+            enableRtl={true}
             onGridReady={onGridReady}
             onColumnResized={onColumnResized}
             onColumnMoved={onColumnMoved}

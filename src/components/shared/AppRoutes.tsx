@@ -7,6 +7,7 @@ import { BOMEditor } from '../projects/BOMEditor'
 import { Analytics } from '../analytics/Analytics'
 import { QuotationEditor } from '../quotations/QuotationEditor'
 import { QuotationList } from '../quotations/QuotationList'
+import { SettingsPage } from '../settings/SettingsPage'
 
 export function AppRoutes() {
   const { uiState, currentProject, currentQuotation } = useCPQ()
@@ -35,6 +36,8 @@ export function AppRoutes() {
       return <ProjectList />
     case 'analytics':
       return <Analytics />
+    case 'settings':
+      return <SettingsPage />
     default:
       return <Dashboard />
   }

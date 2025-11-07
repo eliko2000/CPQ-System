@@ -3,14 +3,24 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Badge } from '../ui/badge'
-import { 
-  Settings, 
-  User, 
-  Building, 
-  DollarSign, 
-  FileText, 
-  Database, 
-  Shield, 
+import { Label } from '../ui/label'
+import { Switch } from '../ui/switch'
+import { Textarea } from '../ui/textarea'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../ui/select'
+import {
+  Settings,
+  User,
+  Building,
+  DollarSign,
+  FileText,
+  Database,
+  Shield,
   Bell,
   Globe,
   Palette,
@@ -19,7 +29,9 @@ import {
   Download,
   Upload,
   Check,
-  AlertCircle
+  AlertCircle,
+  Hash,
+  Workflow
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -51,6 +63,9 @@ interface SettingsData {
     dayWorkCost: number
     vatRate: number
     deliveryTime: string
+    defaultDiscount: number
+    minMargin: number
+    showCostToCustomer: boolean
   }
   quotations: {
     titleTemplate: string
@@ -59,14 +74,25 @@ interface SettingsData {
     signature: string
     paymentTerms: string
     warranty: string
+    numberingFormat: string
+    numberingPrefix: string
+    nextNumber: number
+    termsAndConditions: string
+    validityPeriod: number
+    requireApproval: boolean
+    approvalThreshold: number
   }
   database: {
     autoBackup: boolean
+    backupFrequency: string
+    lastBackup: string
   }
   security: {
     requireLogin: boolean
     sessionTimeout: boolean
     timeoutMinutes: number
+    passwordPolicy: string
+    twoFactorAuth: boolean
   }
   notifications: {
     emailNotifications: boolean
@@ -75,6 +101,8 @@ interface SettingsData {
     systemNotifications: boolean
     primaryEmail: string
     additionalEmails: string
+    notifyOnApproval: boolean
+    notifyOnExpiry: boolean
   }
   appearance: {
     theme: string
@@ -84,6 +112,14 @@ interface SettingsData {
     autoSave: boolean
     confirmActions: boolean
     itemsPerPage: string
+    fontSize: string
+  }
+  workflow: {
+    enableApprovalWorkflow: boolean
+    approvalLevels: number
+    autoApproveBelow: number
+    requireManagerApproval: boolean
+    notifyOnStatusChange: boolean
   }
 }
 
@@ -124,7 +160,10 @@ function getDefaultSettings(): SettingsData {
       defaultRisk: 5,
       dayWorkCost: 1200,
       vatRate: 17,
-      deliveryTime: '4-6 שבועות'
+      deliveryTime: '4-6 שבועות',
+      defaultDiscount: 0,
+      minMargin: 10,
+      showCostToCustomer: false
     },
     quotations: {
       titleTemplate: 'הצעת מחיר - {{project_name}}',
@@ -132,15 +171,26 @@ function getDefaultSettings(): SettingsData {
       footer: 'תודה על אמונכם',
       signature: '',
       paymentTerms: 'net30',
-      warranty: 'שנת אחריות על חלקים ועבודה'
+      warranty: 'שנת אחריות על חלקים ועבודה',
+      numberingFormat: 'QT-{YEAR}-{NUMBER}',
+      numberingPrefix: 'QT',
+      nextNumber: 1001,
+      termsAndConditions: 'תנאים כלליים:\n1. ההצעה תקפה ל-30 יום\n2. המחירים אינם כוללים מע"מ\n3. זמני אספקה בכפוף לזמינות',
+      validityPeriod: 30,
+      requireApproval: false,
+      approvalThreshold: 50000
     },
     database: {
-      autoBackup: false
+      autoBackup: false,
+      backupFrequency: 'daily',
+      lastBackup: ''
     },
     security: {
       requireLogin: true,
       sessionTimeout: true,
-      timeoutMinutes: 30
+      timeoutMinutes: 30,
+      passwordPolicy: 'medium',
+      twoFactorAuth: false
     },
     notifications: {
       emailNotifications: true,
@@ -148,7 +198,9 @@ function getDefaultSettings(): SettingsData {
       quotationNotifications: true,
       systemNotifications: false,
       primaryEmail: '',
-      additionalEmails: ''
+      additionalEmails: '',
+      notifyOnApproval: true,
+      notifyOnExpiry: true
     },
     appearance: {
       theme: 'light',
@@ -157,14 +209,22 @@ function getDefaultSettings(): SettingsData {
       showTooltips: true,
       autoSave: true,
       confirmActions: true,
-      itemsPerPage: '25'
+      itemsPerPage: '25',
+      fontSize: 'medium'
+    },
+    workflow: {
+      enableApprovalWorkflow: false,
+      approvalLevels: 1,
+      autoApproveBelow: 10000,
+      requireManagerApproval: true,
+      notifyOnStatusChange: true
     }
   }
 }
 
 function validateSettings(settings: SettingsData): string[] {
   const errors: string[] = []
-  
+
   // Validate pricing settings
   if (settings.pricing.usdToIlsRate <= 0) {
     errors.push('שער דולר לשקל חייב להיות חיובי')
@@ -184,17 +244,39 @@ function validateSettings(settings: SettingsData): string[] {
   if (settings.pricing.vatRate < 0 || settings.pricing.vatRate > 100) {
     errors.push('שיעור מע"מ חייב להיות בין 0 ל-100')
   }
-  
+  if (settings.pricing.minMargin < 0 || settings.pricing.minMargin > 100) {
+    errors.push('מרווח מינימלי חייב להיות בין 0 ל-100')
+  }
+  if (settings.pricing.defaultDiscount < 0 || settings.pricing.defaultDiscount > 100) {
+    errors.push('הנחה ברירת מחדל חייבת להיות בין 0 ל-100')
+  }
+
+  // Validate quotation settings
+  if (settings.quotations.validityPeriod < 1 || settings.quotations.validityPeriod > 365) {
+    errors.push('תקופת תוקף חייבת להיות בין 1 ל-365 יום')
+  }
+  if (settings.quotations.nextNumber < 1) {
+    errors.push('מספר הבא חייב להיות חיובי')
+  }
+
   // Validate email
   if (settings.notifications.primaryEmail && !isValidEmail(settings.notifications.primaryEmail)) {
     errors.push('כתובת דוא"ל ראשית אינה תקינה')
   }
-  
+
   // Validate security settings
   if (settings.security.timeoutMinutes < 1 || settings.security.timeoutMinutes > 480) {
     errors.push('זמן ניתוק חייב להיות בין 1 ל-480 דקות')
   }
-  
+
+  // Validate workflow settings
+  if (settings.workflow.approvalLevels < 1 || settings.workflow.approvalLevels > 5) {
+    errors.push('מספר רמות אישור חייב להיות בין 1 ל-5')
+  }
+  if (settings.workflow.autoApproveBelow < 0) {
+    errors.push('סכום אישור אוטומטי חייב להיות חיובי')
+  }
+
   return errors
 }
 
@@ -259,9 +341,16 @@ export function SettingsPage() {
     {
       id: 'quotations',
       title: 'הגדרות הצעות מחיר',
-      description: 'תבניות והגדרות להצעות מחיר',
+      description: 'תבניות, מספור והגדרות להצעות מחיר',
       icon: FileText,
       component: QuotationSettings
+    },
+    {
+      id: 'workflow',
+      title: 'תהליכי עבודה',
+      description: 'אישורים ותהליכי עבודה אוטומטיים',
+      icon: Workflow,
+      component: WorkflowSettings
     },
     {
       id: 'database',
@@ -335,6 +424,22 @@ export function SettingsPage() {
   const resetSettings = () => {
     const defaultSettings = getDefaultSettings()
     setSettings(defaultSettings)
+    setHasChanges(true)
+  }
+
+  // Update settings helper
+  const updateSettings = <K extends keyof SettingsData>(
+    section: K,
+    field: keyof SettingsData[K],
+    value: any
+  ) => {
+    setSettings(prev => ({
+      ...prev,
+      [section]: {
+        ...prev[section],
+        [field]: value
+      }
+    }))
     setHasChanges(true)
   }
 
@@ -438,7 +543,10 @@ export function SettingsPage() {
               </p>
             </div>
 
-            <ActiveComponent onSettingsChange={() => setHasChanges(true)} />
+            <ActiveComponent
+              settings={settings}
+              updateSettings={updateSettings}
+            />
           </div>
         </div>
       </div>
@@ -448,7 +556,16 @@ export function SettingsPage() {
 
 // ============ Individual Settings Sections ============
 
-function GeneralSettings({ onSettingsChange }: { onSettingsChange: () => void }) {
+interface SettingsComponentProps {
+  settings: SettingsData
+  updateSettings: <K extends keyof SettingsData>(
+    section: K,
+    field: keyof SettingsData[K],
+    value: any
+  ) => void
+}
+
+function GeneralSettings({ settings, updateSettings }: SettingsComponentProps) {
   return (
     <div className="space-y-6">
       <Card>
@@ -458,23 +575,26 @@ function GeneralSettings({ onSettingsChange }: { onSettingsChange: () => void })
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">שם המערכת</label>
-              <Input 
-                defaultValue="מערכת CPQ חכמה" 
-                onChange={onSettingsChange}
+            <div className="space-y-2">
+              <Label htmlFor="systemName">שם המערכת</Label>
+              <Input
+                id="systemName"
+                value={settings.general.systemName}
+                onChange={(e) => updateSettings('general', 'systemName', e.target.value)}
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-2">גרסת מערכת</label>
-              <Input defaultValue="1.0.0" disabled />
+            <div className="space-y-2">
+              <Label htmlFor="version">גרסת מערכת</Label>
+              <Input id="version" value="1.0.0" disabled />
             </div>
           </div>
-          <div>
-            <label className="block text-sm font-medium mb-2">תיאור מערכת</label>
-            <Input 
-              defaultValue="מערכת לניהול הצעות מחיר לפרויקטי רובוטיקה" 
-              onChange={onSettingsChange}
+          <div className="space-y-2">
+            <Label htmlFor="systemDescription">תיאור מערכת</Label>
+            <Textarea
+              id="systemDescription"
+              value={settings.general.systemDescription}
+              onChange={(e) => updateSettings('general', 'systemDescription', e.target.value)}
+              rows={3}
             />
           </div>
         </CardContent>
@@ -487,21 +607,38 @@ function GeneralSettings({ onSettingsChange }: { onSettingsChange: () => void })
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">אזור זמן</label>
-              <select className="w-full p-2 border rounded-md" onChange={onSettingsChange}>
-                <option value="Asia/Jerusalem">ישראל (GMT+2)</option>
-                <option value="UTC">UTC (GMT+0)</option>
-                <option value="America/New_York">ניו יורק (GMT-5)</option>
-              </select>
+            <div className="space-y-2">
+              <Label htmlFor="timezone">אזור זמן</Label>
+              <Select
+                value={settings.general.timezone}
+                onValueChange={(value) => updateSettings('general', 'timezone', value)}
+              >
+                <SelectTrigger id="timezone">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Asia/Jerusalem">ישראל (GMT+2)</SelectItem>
+                  <SelectItem value="UTC">UTC (GMT+0)</SelectItem>
+                  <SelectItem value="America/New_York">ניו יורק (GMT-5)</SelectItem>
+                  <SelectItem value="Europe/London">לונדון (GMT+0)</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-2">פורמט תאריך</label>
-              <select className="w-full p-2 border rounded-md" onChange={onSettingsChange}>
-                <option value="DD/MM/YYYY">DD/MM/YYYY</option>
-                <option value="MM/DD/YYYY">MM/DD/YYYY</option>
-                <option value="YYYY-MM-DD">YYYY-MM-DD</option>
-              </select>
+            <div className="space-y-2">
+              <Label htmlFor="dateFormat">פורמט תאריך</Label>
+              <Select
+                value={settings.general.dateFormat}
+                onValueChange={(value) => updateSettings('general', 'dateFormat', value)}
+              >
+                <SelectTrigger id="dateFormat">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="DD/MM/YYYY">DD/MM/YYYY</SelectItem>
+                  <SelectItem value="MM/DD/YYYY">MM/DD/YYYY</SelectItem>
+                  <SelectItem value="YYYY-MM-DD">YYYY-MM-DD</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </CardContent>
@@ -510,7 +647,7 @@ function GeneralSettings({ onSettingsChange }: { onSettingsChange: () => void })
   )
 }
 
-function CompanySettings({ onSettingsChange }: { onSettingsChange: () => void }) {
+function CompanySettings({ settings, updateSettings }: SettingsComponentProps) {
   return (
     <div className="space-y-6">
       <Card>
@@ -520,32 +657,62 @@ function CompanySettings({ onSettingsChange }: { onSettingsChange: () => void })
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">שם חברה</label>
-              <Input placeholder="שם החברה" onChange={onSettingsChange} />
+            <div className="space-y-2">
+              <Label htmlFor="companyName">שם חברה</Label>
+              <Input
+                id="companyName"
+                placeholder="שם החברה"
+                value={settings.company.name}
+                onChange={(e) => updateSettings('company', 'name', e.target.value)}
+              />
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-2">ח.פ./ע.מ.</label>
-              <Input placeholder="ח.פ. או ע.מ." onChange={onSettingsChange} />
+            <div className="space-y-2">
+              <Label htmlFor="taxId">ח.פ./ע.מ.</Label>
+              <Input
+                id="taxId"
+                placeholder="ח.פ. או ע.מ."
+                value={settings.company.taxId}
+                onChange={(e) => updateSettings('company', 'taxId', e.target.value)}
+              />
             </div>
           </div>
-          <div>
-            <label className="block text-sm font-medium mb-2">כתובת</label>
-            <Input placeholder="רחוב, מספר, עיר" onChange={onSettingsChange} />
+          <div className="space-y-2">
+            <Label htmlFor="address">כתובת</Label>
+            <Input
+              id="address"
+              placeholder="רחוב, מספר, עיר"
+              value={settings.company.address}
+              onChange={(e) => updateSettings('company', 'address', e.target.value)}
+            />
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">טלפון</label>
-              <Input placeholder="טלפון ראשי" onChange={onSettingsChange} />
+            <div className="space-y-2">
+              <Label htmlFor="phone">טלפון</Label>
+              <Input
+                id="phone"
+                placeholder="טלפון ראשי"
+                value={settings.company.phone}
+                onChange={(e) => updateSettings('company', 'phone', e.target.value)}
+              />
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-2">פקס</label>
-              <Input placeholder="מספר פקס" onChange={onSettingsChange} />
+            <div className="space-y-2">
+              <Label htmlFor="fax">פקס</Label>
+              <Input
+                id="fax"
+                placeholder="מספר פקס"
+                value={settings.company.fax}
+                onChange={(e) => updateSettings('company', 'fax', e.target.value)}
+              />
             </div>
           </div>
-          <div>
-            <label className="block text-sm font-medium mb-2">אתר אינטרנט</label>
-            <Input placeholder="www.example.com" onChange={onSettingsChange} />
+          <div className="space-y-2">
+            <Label htmlFor="website">אתר אינטרנט</Label>
+            <Input
+              id="website"
+              placeholder="www.example.com"
+              value={settings.company.website}
+              onChange={(e) => updateSettings('company', 'website', e.target.value)}
+            />
           </div>
         </CardContent>
       </Card>
@@ -557,23 +724,44 @@ function CompanySettings({ onSettingsChange }: { onSettingsChange: () => void })
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">שם איש קשר</label>
-              <Input placeholder="שם מלא" onChange={onSettingsChange} />
+            <div className="space-y-2">
+              <Label htmlFor="contactName">שם איש קשר</Label>
+              <Input
+                id="contactName"
+                placeholder="שם מלא"
+                value={settings.company.contactName}
+                onChange={(e) => updateSettings('company', 'contactName', e.target.value)}
+              />
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-2">תפקיד</label>
-              <Input placeholder="תפקיד בחברה" onChange={onSettingsChange} />
+            <div className="space-y-2">
+              <Label htmlFor="contactTitle">תפקיד</Label>
+              <Input
+                id="contactTitle"
+                placeholder="תפקיד בחברה"
+                value={settings.company.contactTitle}
+                onChange={(e) => updateSettings('company', 'contactTitle', e.target.value)}
+              />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">אימייל</label>
-              <Input type="email" placeholder="email@company.com" onChange={onSettingsChange} />
+            <div className="space-y-2">
+              <Label htmlFor="contactEmail">אימייל</Label>
+              <Input
+                id="contactEmail"
+                type="email"
+                placeholder="email@company.com"
+                value={settings.company.contactEmail}
+                onChange={(e) => updateSettings('company', 'contactEmail', e.target.value)}
+              />
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-2">טלפון נייד</label>
-              <Input placeholder="טלפון נייד" onChange={onSettingsChange} />
+            <div className="space-y-2">
+              <Label htmlFor="contactMobile">טלפון נייד</Label>
+              <Input
+                id="contactMobile"
+                placeholder="טלפון נייד"
+                value={settings.company.contactMobile}
+                onChange={(e) => updateSettings('company', 'contactMobile', e.target.value)}
+              />
             </div>
           </div>
         </CardContent>
@@ -582,7 +770,7 @@ function CompanySettings({ onSettingsChange }: { onSettingsChange: () => void })
   )
 }
 
-function PricingSettings({ onSettingsChange }: { onSettingsChange: () => void }) {
+function PricingSettings({ settings, updateSettings }: SettingsComponentProps) {
   return (
     <div className="space-y-6">
       <Card>
@@ -592,28 +780,34 @@ function PricingSettings({ onSettingsChange }: { onSettingsChange: () => void })
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">דולר לשקל (USD/ILS)</label>
-              <Input 
-                type="number" 
-                step="0.01" 
-                defaultValue="3.70" 
-                onChange={onSettingsChange}
+            <div className="space-y-2">
+              <Label htmlFor="usdRate">דולר לשקל (USD/ILS)</Label>
+              <Input
+                id="usdRate"
+                type="number"
+                step="0.01"
+                value={settings.pricing.usdToIlsRate}
+                onChange={(e) => updateSettings('pricing', 'usdToIlsRate', parseFloat(e.target.value))}
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-2">אירו לשקל (EUR/ILS)</label>
-              <Input 
-                type="number" 
-                step="0.01" 
-                defaultValue="4.00" 
-                onChange={onSettingsChange}
+            <div className="space-y-2">
+              <Label htmlFor="eurRate">אירו לשקל (EUR/ILS)</Label>
+              <Input
+                id="eurRate"
+                type="number"
+                step="0.01"
+                value={settings.pricing.eurToIlsRate}
+                onChange={(e) => updateSettings('pricing', 'eurToIlsRate', parseFloat(e.target.value))}
               />
             </div>
           </div>
-          <div className="flex items-center space-x-reverse space-x-2">
-            <input type="checkbox" id="autoUpdate" onChange={onSettingsChange} />
-            <label htmlFor="autoUpdate" className="text-sm">עדכון אוטומטי מדי יום</label>
+          <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+            <Label htmlFor="autoUpdate" className="cursor-pointer">עדכון אוטומטי מדי יום</Label>
+            <Switch
+              id="autoUpdate"
+              checked={settings.pricing.autoUpdateRates}
+              onCheckedChange={(checked) => updateSettings('pricing', 'autoUpdateRates', checked)}
+            />
           </div>
           <Button variant="outline" className="w-full">
             <Download className="h-4 w-4 ml-2" />
@@ -628,52 +822,91 @@ function PricingSettings({ onSettingsChange }: { onSettingsChange: () => void })
           <CardDescription>הגדרות תמחור ברירת מחדל להצעות מחיר</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">אחוז רווח ברירת מחדל (%)</label>
-              <Input 
-                type="number" 
-                step="0.1" 
-                defaultValue="25" 
-                onChange={onSettingsChange}
+          <div className="grid grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="defaultMarkup">אחוז רווח ברירת מחדל (%)</Label>
+              <Input
+                id="defaultMarkup"
+                type="number"
+                step="0.1"
+                value={settings.pricing.defaultMarkup}
+                onChange={(e) => updateSettings('pricing', 'defaultMarkup', parseFloat(e.target.value))}
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-2">אחוז סיכון ברירת מחדל (%)</label>
-              <Input 
-                type="number" 
-                step="0.1" 
-                defaultValue="5" 
-                onChange={onSettingsChange}
+            <div className="space-y-2">
+              <Label htmlFor="defaultRisk">אחוז סיכון ברירת מחדל (%)</Label>
+              <Input
+                id="defaultRisk"
+                type="number"
+                step="0.1"
+                value={settings.pricing.defaultRisk}
+                onChange={(e) => updateSettings('pricing', 'defaultRisk', parseFloat(e.target.value))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="defaultDiscount">הנחה ברירת מחדל (%)</Label>
+              <Input
+                id="defaultDiscount"
+                type="number"
+                step="0.1"
+                value={settings.pricing.defaultDiscount}
+                onChange={(e) => updateSettings('pricing', 'defaultDiscount', parseFloat(e.target.value))}
               />
             </div>
           </div>
-          <div>
-            <label className="block text-sm font-medium mb-2">עלות יום עבודה (₪)</label>
-            <Input 
-              type="number" 
-              step="10" 
-              defaultValue="1200" 
-              onChange={onSettingsChange}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="minMargin">מרווח מינימלי (%)</Label>
+              <Input
+                id="minMargin"
+                type="number"
+                step="0.1"
+                value={settings.pricing.minMargin}
+                onChange={(e) => updateSettings('pricing', 'minMargin', parseFloat(e.target.value))}
+              />
+              <p className="text-xs text-muted-foreground">המערכת תתריע כשהמרווח נמוך ממינימום זה</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="dayWorkCost">עלות יום עבודה (₪)</Label>
+              <Input
+                id="dayWorkCost"
+                type="number"
+                step="10"
+                value={settings.pricing.dayWorkCost}
+                onChange={(e) => updateSettings('pricing', 'dayWorkCost', parseFloat(e.target.value))}
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="vatRate">שיעור מע"מ (%)</Label>
+              <Input
+                id="vatRate"
+                type="number"
+                step="0.1"
+                value={settings.pricing.vatRate}
+                onChange={(e) => updateSettings('pricing', 'vatRate', parseFloat(e.target.value))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="deliveryTime">זמן אספקה ברירת מחדל</Label>
+              <Input
+                id="deliveryTime"
+                value={settings.pricing.deliveryTime}
+                onChange={(e) => updateSettings('pricing', 'deliveryTime', e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+            <div>
+              <Label htmlFor="showCostToCustomer" className="cursor-pointer">הצג עלות ללקוח</Label>
+              <p className="text-xs text-muted-foreground mt-1">הצג פירוט עלויות בהצעת המחיר</p>
+            </div>
+            <Switch
+              id="showCostToCustomer"
+              checked={settings.pricing.showCostToCustomer}
+              onCheckedChange={(checked) => updateSettings('pricing', 'showCostToCustomer', checked)}
             />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">שיעור מע"מ (%)</label>
-              <Input 
-                type="number" 
-                step="0.1" 
-                defaultValue="17" 
-                onChange={onSettingsChange}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-2">זמן אספקה ברירת מחדל</label>
-              <Input 
-                defaultValue="4-6 שבועות" 
-                onChange={onSettingsChange}
-              />
-            </div>
           </div>
         </CardContent>
       </Card>
@@ -681,80 +914,201 @@ function PricingSettings({ onSettingsChange }: { onSettingsChange: () => void })
   )
 }
 
-function QuotationSettings({ onSettingsChange }: { onSettingsChange: () => void }) {
+function QuotationSettings({ settings, updateSettings }: SettingsComponentProps) {
+  const formatPreview = settings.quotations.numberingFormat
+    .replace('{YEAR}', new Date().getFullYear().toString())
+    .replace('{NUMBER}', settings.quotations.nextNumber.toString().padStart(4, '0'))
+    .replace('{PREFIX}', settings.quotations.numberingPrefix)
+
   return (
     <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>
+            <Hash className="h-5 w-5 inline ml-2" />
+            מספור הצעות מחיר
+          </CardTitle>
+          <CardDescription>הגדרת פורמט מספור אוטומטי להצעות מחיר</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="numberingFormat">פורמט מספור</Label>
+              <Input
+                id="numberingFormat"
+                value={settings.quotations.numberingFormat}
+                onChange={(e) => updateSettings('quotations', 'numberingFormat', e.target.value)}
+                placeholder="QT-{YEAR}-{NUMBER}"
+              />
+              <p className="text-xs text-muted-foreground">
+                משתנים זמינים: {'{YEAR}'}, {'{NUMBER}'}, {'{PREFIX}'}
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="nextNumber">מספר הבא</Label>
+              <Input
+                id="nextNumber"
+                type="number"
+                value={settings.quotations.nextNumber}
+                onChange={(e) => updateSettings('quotations', 'nextNumber', parseInt(e.target.value))}
+              />
+            </div>
+          </div>
+          <div className="p-3 rounded-lg bg-primary/10 border border-primary/20">
+            <div className="text-sm font-medium mb-1">דוגמה:</div>
+            <div className="text-lg font-mono font-bold text-primary">{formatPreview}</div>
+          </div>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>תבנית הצעת מחיר</CardTitle>
           <CardDescription>הגדרות תבנית ומראה הצעת המחיר</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-2">כותרת הצעת מחיר</label>
-            <Input 
-              defaultValue="הצעת מחיר - {{project_name}}" 
-              onChange={onSettingsChange}
+          <div className="space-y-2">
+            <Label htmlFor="titleTemplate">כותרת הצעת מחיר</Label>
+            <Input
+              id="titleTemplate"
+              value={settings.quotations.titleTemplate}
+              onChange={(e) => updateSettings('quotations', 'titleTemplate', e.target.value)}
+              placeholder="הצעת מחיר - {{project_name}}"
             />
+            <p className="text-xs text-muted-foreground">
+              משתנה זמין: {'{{project_name}}'}
+            </p>
           </div>
-          <div>
-            <label className="block text-sm font-medium mb-2">לוגו חברה</label>
+          <div className="space-y-2">
+            <Label>לוגו חברה</Label>
             <div className="flex items-center space-x-reverse space-x-3">
               <Button variant="outline">
                 <Upload className="h-4 w-4 ml-2" />
                 העלה לוגו
               </Button>
-              <Badge variant="secondary">אין לוגו</Badge>
+              <Badge variant={settings.quotations.logoUploaded ? "default" : "secondary"}>
+                {settings.quotations.logoUploaded ? "לוגו הועלה" : "אין לוגו"}
+              </Badge>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">כותרת תחתונה</label>
-              <Input 
-                placeholder="תודה על אמונכם" 
-                onChange={onSettingsChange}
+            <div className="space-y-2">
+              <Label htmlFor="footer">כותרת תחתונה</Label>
+              <Input
+                id="footer"
+                value={settings.quotations.footer}
+                onChange={(e) => updateSettings('quotations', 'footer', e.target.value)}
+                placeholder="תודה על אמונכם"
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-2">חתימה</label>
-              <Input 
-                placeholder="שם החותם" 
-                onChange={onSettingsChange}
+            <div className="space-y-2">
+              <Label htmlFor="signature">חתימה</Label>
+              <Input
+                id="signature"
+                value={settings.quotations.signature}
+                onChange={(e) => updateSettings('quotations', 'signature', e.target.value)}
+                placeholder="שם החותם"
               />
             </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="termsAndConditions">תנאים כלליים</Label>
+            <Textarea
+              id="termsAndConditions"
+              value={settings.quotations.termsAndConditions}
+              onChange={(e) => updateSettings('quotations', 'termsAndConditions', e.target.value)}
+              rows={5}
+              placeholder="תנאים כלליים להצעת מחיר..."
+            />
           </div>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>תנאי תשלום</CardTitle>
-          <CardDescription>תנאי תשלום ברירת מחדל</CardDescription>
+          <CardTitle>תנאים מסחריים</CardTitle>
+          <CardDescription>תנאי תשלום, תוקף ואחריות</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-2">תנאי תשלום</label>
-            <select className="w-full p-2 border rounded-md" onChange={onSettingsChange}>
-              <option value="net30">30 יום מקבלת חשבונית</option>
-              <option value="net45">45 יום מקבלת חשבונית</option>
-              <option value="net60">60 יום מקבלת חשבונית</option>
-              <option value="immediate">מיידי</option>
-            </select>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="paymentTerms">תנאי תשלום</Label>
+              <Select
+                value={settings.quotations.paymentTerms}
+                onValueChange={(value) => updateSettings('quotations', 'paymentTerms', value)}
+              >
+                <SelectTrigger id="paymentTerms">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="net30">30 יום מקבלת חשבונית</SelectItem>
+                  <SelectItem value="net45">45 יום מקבלת חשבונית</SelectItem>
+                  <SelectItem value="net60">60 יום מקבלת חשבונית</SelectItem>
+                  <SelectItem value="net90">90 יום מקבלת חשבונית</SelectItem>
+                  <SelectItem value="immediate">מיידי</SelectItem>
+                  <SelectItem value="advance">מקדמה</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="validityPeriod">תקופת תוקף (ימים)</Label>
+              <Input
+                id="validityPeriod"
+                type="number"
+                value={settings.quotations.validityPeriod}
+                onChange={(e) => updateSettings('quotations', 'validityPeriod', parseInt(e.target.value))}
+              />
+            </div>
           </div>
-          <div>
-            <label className="block text-sm font-medium mb-2">תנאי אחריות</label>
-            <Input 
-              defaultValue="שנת אחריות על חלקים ועבודה" 
-              onChange={onSettingsChange}
+          <div className="space-y-2">
+            <Label htmlFor="warranty">תנאי אחריות</Label>
+            <Input
+              id="warranty"
+              value={settings.quotations.warranty}
+              onChange={(e) => updateSettings('quotations', 'warranty', e.target.value)}
             />
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>הגדרות אישור</CardTitle>
+          <CardDescription>דרישות אישור להצעות מחיר</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+            <div>
+              <Label htmlFor="requireApproval" className="cursor-pointer">דרוש אישור להצעות מחיר</Label>
+              <p className="text-xs text-muted-foreground mt-1">הצעות מעל סכום מסוים ידרשו אישור</p>
+            </div>
+            <Switch
+              id="requireApproval"
+              checked={settings.quotations.requireApproval}
+              onCheckedChange={(checked) => updateSettings('quotations', 'requireApproval', checked)}
+            />
+          </div>
+          {settings.quotations.requireApproval && (
+            <div className="space-y-2">
+              <Label htmlFor="approvalThreshold">סכום לאישור (₪)</Label>
+              <Input
+                id="approvalThreshold"
+                type="number"
+                value={settings.quotations.approvalThreshold}
+                onChange={(e) => updateSettings('quotations', 'approvalThreshold', parseFloat(e.target.value))}
+              />
+              <p className="text-xs text-muted-foreground">
+                הצעות מעל סכום זה ידרשו אישור מנהל
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
   )
 }
 
-function DatabaseSettings({ onSettingsChange }: { onSettingsChange: () => void }) {
+function DatabaseSettings({ settings, updateSettings }: SettingsComponentProps) {
   return (
     <div className="space-y-6">
       <Card>
@@ -777,7 +1131,7 @@ function DatabaseSettings({ onSettingsChange }: { onSettingsChange: () => void }
             <div className="text-sm space-y-2">
               <div className="flex justify-between">
                 <span>גיבוי אחרון:</span>
-                <span className="font-medium">לא בוצע גיבוי</span>
+                <span className="font-medium">{settings.database.lastBackup || 'לא בוצע גיבוי'}</span>
               </div>
               <div className="flex justify-between">
                 <span>גודל מסד נתונים:</span>
@@ -785,14 +1139,39 @@ function DatabaseSettings({ onSettingsChange }: { onSettingsChange: () => void }
               </div>
               <div className="flex justify-between">
                 <span>גיבוי אוטומטי:</span>
-                <Badge variant="secondary">כבוי</Badge>
+                <Badge variant={settings.database.autoBackup ? "default" : "secondary"}>
+                  {settings.database.autoBackup ? 'פעיל' : 'כבוי'}
+                </Badge>
               </div>
             </div>
           </div>
-          <div className="flex items-center space-x-reverse space-x-2">
-            <input type="checkbox" id="autoBackup" onChange={onSettingsChange} />
-            <label htmlFor="autoBackup" className="text-sm">גיבוי אוטומטי יומי</label>
+          <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+            <Label htmlFor="autoBackup" className="cursor-pointer">גיבוי אוטומטי</Label>
+            <Switch
+              id="autoBackup"
+              checked={settings.database.autoBackup}
+              onCheckedChange={(checked) => updateSettings('database', 'autoBackup', checked)}
+            />
           </div>
+          {settings.database.autoBackup && (
+            <div className="space-y-2">
+              <Label htmlFor="backupFrequency">תדירות גיבוי</Label>
+              <Select
+                value={settings.database.backupFrequency}
+                onValueChange={(value) => updateSettings('database', 'backupFrequency', value)}
+              >
+                <SelectTrigger id="backupFrequency">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="hourly">כל שעה</SelectItem>
+                  <SelectItem value="daily">יומי</SelectItem>
+                  <SelectItem value="weekly">שבועי</SelectItem>
+                  <SelectItem value="monthly">חודשי</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -831,7 +1210,7 @@ function DatabaseSettings({ onSettingsChange }: { onSettingsChange: () => void }
   )
 }
 
-function SecuritySettings({ onSettingsChange }: { onSettingsChange: () => void }) {
+function SecuritySettings({ settings, updateSettings }: SettingsComponentProps) {
   return (
     <div className="space-y-6">
       <Card>
@@ -860,17 +1239,59 @@ function SecuritySettings({ onSettingsChange }: { onSettingsChange: () => void }
           <CardDescription>הגדרות אבטחה כלליות</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center space-x-reverse space-x-2">
-            <input type="checkbox" id="requireLogin" defaultChecked onChange={onSettingsChange} />
-            <label htmlFor="requireLogin" className="text-sm">דרוש התחברות</label>
+          <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+            <Label htmlFor="requireLogin" className="cursor-pointer">דרוש התחברות</Label>
+            <Switch
+              id="requireLogin"
+              checked={settings.security.requireLogin}
+              onCheckedChange={(checked) => updateSettings('security', 'requireLogin', checked)}
+            />
           </div>
-          <div className="flex items-center space-x-reverse space-x-2">
-            <input type="checkbox" id="sessionTimeout" defaultChecked onChange={onSettingsChange} />
-            <label htmlFor="sessionTimeout" className="text-sm">ניתוק אוטומטי אחרי חוסר פעילות</label>
+          <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+            <Label htmlFor="sessionTimeout" className="cursor-pointer">ניתוק אוטומטי אחרי חוסר פעילות</Label>
+            <Switch
+              id="sessionTimeout"
+              checked={settings.security.sessionTimeout}
+              onCheckedChange={(checked) => updateSettings('security', 'sessionTimeout', checked)}
+            />
           </div>
-          <div>
-            <label className="block text-sm font-medium mb-2">זמן ניתוק (דקות)</label>
-            <Input type="number" defaultValue="30" onChange={onSettingsChange} />
+          {settings.security.sessionTimeout && (
+            <div className="space-y-2">
+              <Label htmlFor="timeoutMinutes">זמן ניתוק (דקות)</Label>
+              <Input
+                id="timeoutMinutes"
+                type="number"
+                value={settings.security.timeoutMinutes}
+                onChange={(e) => updateSettings('security', 'timeoutMinutes', parseInt(e.target.value))}
+              />
+            </div>
+          )}
+          <div className="space-y-2">
+            <Label htmlFor="passwordPolicy">מדיניות סיסמאות</Label>
+            <Select
+              value={settings.security.passwordPolicy}
+              onValueChange={(value) => updateSettings('security', 'passwordPolicy', value)}
+            >
+              <SelectTrigger id="passwordPolicy">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="low">נמוכה - 6 תווים</SelectItem>
+                <SelectItem value="medium">בינונית - 8 תווים, אותיות ומספרים</SelectItem>
+                <SelectItem value="high">גבוהה - 12 תווים, אותיות, מספרים ותווים מיוחדים</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+            <div>
+              <Label htmlFor="twoFactorAuth" className="cursor-pointer">אימות דו-שלבי</Label>
+              <p className="text-xs text-muted-foreground mt-1">דרוש אימות נוסף בכל התחברות</p>
+            </div>
+            <Switch
+              id="twoFactorAuth"
+              checked={settings.security.twoFactorAuth}
+              onCheckedChange={(checked) => updateSettings('security', 'twoFactorAuth', checked)}
+            />
           </div>
         </CardContent>
       </Card>
@@ -878,7 +1299,7 @@ function SecuritySettings({ onSettingsChange }: { onSettingsChange: () => void }
   )
 }
 
-function NotificationSettings({ onSettingsChange }: { onSettingsChange: () => void }) {
+function NotificationSettings({ settings, updateSettings }: SettingsComponentProps) {
   return (
     <div className="space-y-6">
       <Card>
@@ -886,36 +1307,75 @@ function NotificationSettings({ onSettingsChange }: { onSettingsChange: () => vo
           <CardTitle>התראות מערכת</CardTitle>
           <CardDescription>הגדרות התראות ודיוורים</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="font-medium">התראות דוא"ל</div>
-                <div className="text-sm text-muted-foreground">קבל התראות בדוא"ל</div>
-              </div>
-              <input type="checkbox" defaultChecked onChange={onSettingsChange} />
+        <CardContent className="space-y-3">
+          <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+            <div>
+              <Label className="cursor-pointer">התראות דוא"ל</Label>
+              <p className="text-xs text-muted-foreground mt-1">קבל התראות בדוא"ל</p>
             </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="font-medium">התראות דפדפן</div>
-                <div className="text-sm text-muted-foreground">התראות בדפדפן</div>
-              </div>
-              <input type="checkbox" defaultChecked onChange={onSettingsChange} />
+            <Switch
+              checked={settings.notifications.emailNotifications}
+              onCheckedChange={(checked) => updateSettings('notifications', 'emailNotifications', checked)}
+            />
+          </div>
+          <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+            <div>
+              <Label className="cursor-pointer">התראות דפדפן</Label>
+              <p className="text-xs text-muted-foreground mt-1">התראות בדפדפן</p>
             </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="font-medium">התראות הצעות</div>
-                <div className="text-sm text-muted-foreground">עדכונים על הצעות מחיר</div>
-              </div>
-              <input type="checkbox" defaultChecked onChange={onSettingsChange} />
+            <Switch
+              checked={settings.notifications.browserNotifications}
+              onCheckedChange={(checked) => updateSettings('notifications', 'browserNotifications', checked)}
+            />
+          </div>
+          <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+            <div>
+              <Label className="cursor-pointer">התראות הצעות</Label>
+              <p className="text-xs text-muted-foreground mt-1">עדכונים על הצעות מחיר</p>
             </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="font-medium">התראות מערכת</div>
-                <div className="text-sm text-muted-foreground">עדכוני מערכת ותחזוקה</div>
-              </div>
-              <input type="checkbox" onChange={onSettingsChange} />
+            <Switch
+              checked={settings.notifications.quotationNotifications}
+              onCheckedChange={(checked) => updateSettings('notifications', 'quotationNotifications', checked)}
+            />
+          </div>
+          <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+            <div>
+              <Label className="cursor-pointer">התראות מערכת</Label>
+              <p className="text-xs text-muted-foreground mt-1">עדכוני מערכת ותחזוקה</p>
             </div>
+            <Switch
+              checked={settings.notifications.systemNotifications}
+              onCheckedChange={(checked) => updateSettings('notifications', 'systemNotifications', checked)}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>התראות CPQ ספציפיות</CardTitle>
+          <CardDescription>התראות ספציפיות למערכת הצעות מחיר</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+            <div>
+              <Label className="cursor-pointer">התרעה על אישורים</Label>
+              <p className="text-xs text-muted-foreground mt-1">קבל התראה כשהצעה ממתינה לאישור</p>
+            </div>
+            <Switch
+              checked={settings.notifications.notifyOnApproval}
+              onCheckedChange={(checked) => updateSettings('notifications', 'notifyOnApproval', checked)}
+            />
+          </div>
+          <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+            <div>
+              <Label className="cursor-pointer">התרעה על פקיעת תוקף</Label>
+              <p className="text-xs text-muted-foreground mt-1">קבל התראה לפני פקיעת הצעת מחיר</p>
+            </div>
+            <Switch
+              checked={settings.notifications.notifyOnExpiry}
+              onCheckedChange={(checked) => updateSettings('notifications', 'notifyOnExpiry', checked)}
+            />
           </div>
         </CardContent>
       </Card>
@@ -926,13 +1386,25 @@ function NotificationSettings({ onSettingsChange }: { onSettingsChange: () => vo
           <CardDescription>ניהול כתובות לקבלת התראות</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-2">כתובת דוא"ל ראשית</label>
-            <Input type="email" placeholder="admin@company.com" onChange={onSettingsChange} />
+          <div className="space-y-2">
+            <Label htmlFor="primaryEmail">כתובת דוא"ל ראשית</Label>
+            <Input
+              id="primaryEmail"
+              type="email"
+              placeholder="admin@company.com"
+              value={settings.notifications.primaryEmail}
+              onChange={(e) => updateSettings('notifications', 'primaryEmail', e.target.value)}
+            />
           </div>
-          <div>
-            <label className="block text-sm font-medium mb-2">כתובות נוספות</label>
-            <Input placeholder="email1@company.com, email2@company.com" onChange={onSettingsChange} />
+          <div className="space-y-2">
+            <Label htmlFor="additionalEmails">כתובות נוספות</Label>
+            <Input
+              id="additionalEmails"
+              placeholder="email1@company.com, email2@company.com"
+              value={settings.notifications.additionalEmails}
+              onChange={(e) => updateSettings('notifications', 'additionalEmails', e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">הפרד כתובות עם פסיק</p>
           </div>
         </CardContent>
       </Card>
@@ -940,7 +1412,7 @@ function NotificationSettings({ onSettingsChange }: { onSettingsChange: () => vo
   )
 }
 
-function AppearanceSettings({ onSettingsChange }: { onSettingsChange: () => void }) {
+function AppearanceSettings({ settings, updateSettings }: SettingsComponentProps) {
   return (
     <div className="space-y-6">
       <Card>
@@ -949,28 +1421,68 @@ function AppearanceSettings({ onSettingsChange }: { onSettingsChange: () => void
           <CardDescription>הגדרות מראה והתנהגות הממשק</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-2">ערכת נושא</label>
-            <select className="w-full p-2 border rounded-md" onChange={onSettingsChange}>
-              <option value="light">בהיר</option>
-              <option value="dark">כהה</option>
-              <option value="system">ברירת מחדל מערכת</option>
-            </select>
+          <div className="space-y-2">
+            <Label htmlFor="theme">ערכת נושא</Label>
+            <Select
+              value={settings.appearance.theme}
+              onValueChange={(value) => updateSettings('appearance', 'theme', value)}
+            >
+              <SelectTrigger id="theme">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="light">בהיר</SelectItem>
+                <SelectItem value="dark">כהה</SelectItem>
+                <SelectItem value="system">ברירת מחדל מערכת</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-          <div>
-            <label className="block text-sm font-medium mb-2">שפה</label>
-            <select className="w-full p-2 border rounded-md" onChange={onSettingsChange}>
-              <option value="he">עברית</option>
-              <option value="en">English</option>
-            </select>
+          <div className="space-y-2">
+            <Label htmlFor="language">שפה</Label>
+            <Select
+              value={settings.appearance.language}
+              onValueChange={(value) => updateSettings('appearance', 'language', value)}
+            >
+              <SelectTrigger id="language">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="he">עברית</SelectItem>
+                <SelectItem value="en">English</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-          <div className="flex items-center space-x-reverse space-x-2">
-            <input type="checkbox" id="compactMode" onChange={onSettingsChange} />
-            <label htmlFor="compactMode" className="text-sm">מצב קומפקטי</label>
+          <div className="space-y-2">
+            <Label htmlFor="fontSize">גודל גופן</Label>
+            <Select
+              value={settings.appearance.fontSize}
+              onValueChange={(value) => updateSettings('appearance', 'fontSize', value)}
+            >
+              <SelectTrigger id="fontSize">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="small">קטן</SelectItem>
+                <SelectItem value="medium">בינוני</SelectItem>
+                <SelectItem value="large">גדול</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-          <div className="flex items-center space-x-reverse space-x-2">
-            <input type="checkbox" id="showTooltips" defaultChecked onChange={onSettingsChange} />
-            <label htmlFor="showTooltips" className="text-sm">הצג טיפים</label>
+          <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+            <Label htmlFor="compactMode" className="cursor-pointer">מצב קומפקטי</Label>
+            <Switch
+              id="compactMode"
+              checked={settings.appearance.compactMode}
+              onCheckedChange={(checked) => updateSettings('appearance', 'compactMode', checked)}
+            />
+          </div>
+          <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+            <Label htmlFor="showTooltips" className="cursor-pointer">הצג טיפים</Label>
+            <Switch
+              id="showTooltips"
+              checked={settings.appearance.showTooltips}
+              onCheckedChange={(checked) => updateSettings('appearance', 'showTooltips', checked)}
+            />
           </div>
         </CardContent>
       </Card>
@@ -981,21 +1493,154 @@ function AppearanceSettings({ onSettingsChange }: { onSettingsChange: () => void
           <CardDescription>הגדרות התנהגות ואינטראקציה</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center space-x-reverse space-x-2">
-            <input type="checkbox" id="autoSave" defaultChecked onChange={onSettingsChange} />
-            <label htmlFor="autoSave" className="text-sm">שמירה אוטומטית</label>
+          <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+            <div>
+              <Label htmlFor="autoSave" className="cursor-pointer">שמירה אוטומטית</Label>
+              <p className="text-xs text-muted-foreground mt-1">שמור שינויים אוטומטית</p>
+            </div>
+            <Switch
+              id="autoSave"
+              checked={settings.appearance.autoSave}
+              onCheckedChange={(checked) => updateSettings('appearance', 'autoSave', checked)}
+            />
           </div>
-          <div className="flex items-center space-x-reverse space-x-2">
-            <input type="checkbox" id="confirmActions" defaultChecked onChange={onSettingsChange} />
-            <label htmlFor="confirmActions" className="text-sm">אישור פעולות מסוכנות</label>
+          <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+            <div>
+              <Label htmlFor="confirmActions" className="cursor-pointer">אישור פעולות מסוכנות</Label>
+              <p className="text-xs text-muted-foreground mt-1">הצג אישור למחיקה ופעולות בלתי הפיכות</p>
+            </div>
+            <Switch
+              id="confirmActions"
+              checked={settings.appearance.confirmActions}
+              onCheckedChange={(checked) => updateSettings('appearance', 'confirmActions', checked)}
+            />
           </div>
-          <div>
-            <label className="block text-sm font-medium mb-2">פריטים בעמוד</label>
-            <select className="w-full p-2 border rounded-md" onChange={onSettingsChange}>
-              <option value="25">25</option>
-              <option value="50">50</option>
-              <option value="100">100</option>
-            </select>
+          <div className="space-y-2">
+            <Label htmlFor="itemsPerPage">פריטים בעמוד</Label>
+            <Select
+              value={settings.appearance.itemsPerPage}
+              onValueChange={(value) => updateSettings('appearance', 'itemsPerPage', value)}
+            >
+              <SelectTrigger id="itemsPerPage">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="10">10</SelectItem>
+                <SelectItem value="25">25</SelectItem>
+                <SelectItem value="50">50</SelectItem>
+                <SelectItem value="100">100</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+function WorkflowSettings({ settings, updateSettings }: SettingsComponentProps) {
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>
+            <Workflow className="h-5 w-5 inline ml-2" />
+            תהליך אישור הצעות מחיר
+          </CardTitle>
+          <CardDescription>הגדר תהליך אישור אוטומטי להצעות מחיר</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+            <div>
+              <Label htmlFor="enableApprovalWorkflow" className="cursor-pointer">הפעל תהליך אישור</Label>
+              <p className="text-xs text-muted-foreground mt-1">דרוש אישור מנהל להצעות מחיר</p>
+            </div>
+            <Switch
+              id="enableApprovalWorkflow"
+              checked={settings.workflow.enableApprovalWorkflow}
+              onCheckedChange={(checked) => updateSettings('workflow', 'enableApprovalWorkflow', checked)}
+            />
+          </div>
+
+          {settings.workflow.enableApprovalWorkflow && (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="approvalLevels">מספר רמות אישור</Label>
+                <Select
+                  value={settings.workflow.approvalLevels.toString()}
+                  onValueChange={(value) => updateSettings('workflow', 'approvalLevels', parseInt(value))}
+                >
+                  <SelectTrigger id="approvalLevels">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">רמה אחת</SelectItem>
+                    <SelectItem value="2">שתי רמות</SelectItem>
+                    <SelectItem value="3">שלוש רמות</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  מספר המנהלים שצריכים לאשר הצעה
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="autoApproveBelow">אישור אוטומטי מתחת ל-₪</Label>
+                <Input
+                  id="autoApproveBelow"
+                  type="number"
+                  value={settings.workflow.autoApproveBelow}
+                  onChange={(e) => updateSettings('workflow', 'autoApproveBelow', parseFloat(e.target.value))}
+                />
+                <p className="text-xs text-muted-foreground">
+                  הצעות מתחת לסכום זה יאושרו אוטומטית
+                </p>
+              </div>
+
+              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                <div>
+                  <Label htmlFor="requireManagerApproval" className="cursor-pointer">דרוש אישור מנהל</Label>
+                  <p className="text-xs text-muted-foreground mt-1">כל הצעה תדרוש אישור מנהל</p>
+                </div>
+                <Switch
+                  id="requireManagerApproval"
+                  checked={settings.workflow.requireManagerApproval}
+                  onCheckedChange={(checked) => updateSettings('workflow', 'requireManagerApproval', checked)}
+                />
+              </div>
+
+              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                <div>
+                  <Label htmlFor="notifyOnStatusChange" className="cursor-pointer">התראה על שינוי סטטוס</Label>
+                  <p className="text-xs text-muted-foreground mt-1">שלח התראה כשסטטוס ההצעה משתנה</p>
+                </div>
+                <Switch
+                  id="notifyOnStatusChange"
+                  checked={settings.workflow.notifyOnStatusChange}
+                  onCheckedChange={(checked) => updateSettings('workflow', 'notifyOnStatusChange', checked)}
+                />
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>תהליך אוטומציה</CardTitle>
+          <CardDescription>כללי אוטומציה נוספים</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="p-4 rounded-lg border border-muted-foreground/20 bg-muted/30">
+            <div className="flex items-center space-x-reverse space-x-2 mb-2">
+              <AlertCircle className="h-4 w-4 text-primary" />
+              <h4 className="font-medium">כללי אוטומציה פעילים</h4>
+            </div>
+            <ul className="text-sm text-muted-foreground space-y-1 mr-6">
+              <li>• שליחת התראה אוטומטית למנהל בהצעות מעל {settings.workflow.autoApproveBelow.toLocaleString()}₪</li>
+              <li>• עדכון סטטוס אוטומטי להצעות שאושרו</li>
+              <li>• התראה על הצעות שממתינות לאישור מעל 7 ימים</li>
+            </ul>
           </div>
         </CardContent>
       </Card>

@@ -246,15 +246,6 @@ function applySettings(settings: SettingsData): void {
 
 export function SettingsPage() {
   const [activeSection, setActiveSection] = useState('general')
-  const [hasChanges, setHasChanges] = useState(false)
-  const [isSaving, setIsSaving] = useState(false)
-  const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
-
-  // Load settings from localStorage on mount
-  const [settings, setSettings] = useState<SettingsData>(() => {
-    const savedSettings = localStorage.getItem('cpq-settings')
-    return savedSettings ? JSON.parse(savedSettings) : getDefaultSettings()
-  })
 
   const settingsSections: SettingsSection[] = [
     {
@@ -329,51 +320,6 @@ export function SettingsPage() {
     }
   ]
 
-  // Save settings to localStorage
-  const saveSettings = async () => {
-    setIsSaving(true)
-    setSaveMessage(null)
-    
-    try {
-      // Validate settings
-      const validationErrors = validateSettings(settings)
-      if (validationErrors.length > 0) {
-        setSaveMessage({
-          type: 'error',
-          message: `שגיאות באימות: ${validationErrors.join(', ')}`
-        })
-        return
-      }
-
-      // Save to localStorage
-      localStorage.setItem('cpq-settings', JSON.stringify(settings))
-      
-      // Apply settings to application
-      applySettings(settings)
-      
-      setHasChanges(false)
-      setSaveMessage({
-        type: 'success',
-        message: 'ההגדרות נשמרו בהצלחה'
-      })
-    } catch (error) {
-      setSaveMessage({
-        type: 'error',
-        message: 'שגיאה בשמירת ההגדרות'
-      })
-    } finally {
-      setIsSaving(false)
-      setTimeout(() => setSaveMessage(null), 3000)
-    }
-  }
-
-  // Reset settings to defaults
-  const resetSettings = () => {
-    const defaultSettings = getDefaultSettings()
-    setSettings(defaultSettings)
-    setHasChanges(true)
-  }
-
   const ActiveComponent = settingsSections.find(section => section.id === activeSection)?.component || GeneralSettings
 
   return (
@@ -422,43 +368,6 @@ export function SettingsPage() {
             })}
           </nav>
         </div>
-
-        {/* Action Buttons */}
-        <div className="p-6 border-t border-border space-y-3">
-          {/* Save Message */}
-          {saveMessage && (
-            <div className={cn(
-              "p-3 rounded-lg mb-3 flex items-center space-x-reverse space-x-2",
-              saveMessage.type === 'success' 
-                ? "bg-green-50 text-green-800 border border-green-200" 
-                : "bg-red-50 text-red-800 border border-red-200"
-            )}>
-              {saveMessage.type === 'success' ? (
-                <Check className="h-4 w-4" />
-              ) : (
-                <AlertCircle className="h-4 w-4" />
-              )}
-              <span className="text-sm font-medium">{saveMessage.message}</span>
-            </div>
-          )}
-          
-          <Button 
-            className="w-full" 
-            onClick={saveSettings}
-            disabled={!hasChanges || isSaving}
-          >
-            <Save className="h-4 w-4 ml-2" />
-            {isSaving ? 'שומר...' : 'שמור שינויים'}
-          </Button>
-          <Button 
-            variant="outline" 
-            className="w-full"
-            onClick={resetSettings}
-          >
-            <RotateCcw className="h-4 w-4 ml-2" />
-            אפס לברירת מחדל
-          </Button>
-        </div>
       </div>
 
       {/* Main Content */}
@@ -474,7 +383,7 @@ export function SettingsPage() {
               </p>
             </div>
 
-            <ActiveComponent onSettingsChange={() => setHasChanges(true)} />
+            <ActiveComponent />
           </div>
         </div>
       </div>
@@ -484,7 +393,7 @@ export function SettingsPage() {
 
 // ============ Individual Settings Sections ============
 
-function GeneralSettings({ onSettingsChange }: { onSettingsChange: () => void }) {
+function GeneralSettings() {
   return (
     <div className="space-y-6">
       <Card>
@@ -498,7 +407,7 @@ function GeneralSettings({ onSettingsChange }: { onSettingsChange: () => void })
               <label className="block text-sm font-medium mb-2">שם המערכת</label>
               <Input 
                 defaultValue="מערכת CPQ חכמה" 
-                onChange={onSettingsChange}
+                
               />
             </div>
             <div>
@@ -510,7 +419,7 @@ function GeneralSettings({ onSettingsChange }: { onSettingsChange: () => void })
             <label className="block text-sm font-medium mb-2">תיאור מערכת</label>
             <Input 
               defaultValue="מערכת לניהול הצעות מחיר לפרויקטי רובוטיקה" 
-              onChange={onSettingsChange}
+              
             />
           </div>
         </CardContent>
@@ -525,7 +434,7 @@ function GeneralSettings({ onSettingsChange }: { onSettingsChange: () => void })
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-2">אזור זמן</label>
-              <select className="w-full p-2 border rounded-md" onChange={onSettingsChange}>
+              <select className="w-full p-2 border rounded-md" >
                 <option value="Asia/Jerusalem">ישראל (GMT+2)</option>
                 <option value="UTC">UTC (GMT+0)</option>
                 <option value="America/New_York">ניו יורק (GMT-5)</option>
@@ -533,7 +442,7 @@ function GeneralSettings({ onSettingsChange }: { onSettingsChange: () => void })
             </div>
             <div>
               <label className="block text-sm font-medium mb-2">פורמט תאריך</label>
-              <select className="w-full p-2 border rounded-md" onChange={onSettingsChange}>
+              <select className="w-full p-2 border rounded-md" >
                 <option value="DD/MM/YYYY">DD/MM/YYYY</option>
                 <option value="MM/DD/YYYY">MM/DD/YYYY</option>
                 <option value="YYYY-MM-DD">YYYY-MM-DD</option>
@@ -546,7 +455,7 @@ function GeneralSettings({ onSettingsChange }: { onSettingsChange: () => void })
   )
 }
 
-function CompanySettings({ onSettingsChange }: { onSettingsChange: () => void }) {
+function CompanySettings() {
   return (
     <div className="space-y-6">
       <Card>
@@ -558,30 +467,30 @@ function CompanySettings({ onSettingsChange }: { onSettingsChange: () => void })
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-2">שם חברה</label>
-              <Input placeholder="שם החברה" onChange={onSettingsChange} />
+              <Input placeholder="שם החברה"  />
             </div>
             <div>
               <label className="block text-sm font-medium mb-2">ח.פ./ע.מ.</label>
-              <Input placeholder="ח.פ. או ע.מ." onChange={onSettingsChange} />
+              <Input placeholder="ח.פ. או ע.מ."  />
             </div>
           </div>
           <div>
             <label className="block text-sm font-medium mb-2">כתובת</label>
-            <Input placeholder="רחוב, מספר, עיר" onChange={onSettingsChange} />
+            <Input placeholder="רחוב, מספר, עיר"  />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-2">טלפון</label>
-              <Input placeholder="טלפון ראשי" onChange={onSettingsChange} />
+              <Input placeholder="טלפון ראשי"  />
             </div>
             <div>
               <label className="block text-sm font-medium mb-2">פקס</label>
-              <Input placeholder="מספר פקס" onChange={onSettingsChange} />
+              <Input placeholder="מספר פקס"  />
             </div>
           </div>
           <div>
             <label className="block text-sm font-medium mb-2">אתר אינטרנט</label>
-            <Input placeholder="www.example.com" onChange={onSettingsChange} />
+            <Input placeholder="www.example.com"  />
           </div>
         </CardContent>
       </Card>
@@ -595,21 +504,21 @@ function CompanySettings({ onSettingsChange }: { onSettingsChange: () => void })
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-2">שם איש קשר</label>
-              <Input placeholder="שם מלא" onChange={onSettingsChange} />
+              <Input placeholder="שם מלא"  />
             </div>
             <div>
               <label className="block text-sm font-medium mb-2">תפקיד</label>
-              <Input placeholder="תפקיד בחברה" onChange={onSettingsChange} />
+              <Input placeholder="תפקיד בחברה"  />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-2">אימייל</label>
-              <Input type="email" placeholder="email@company.com" onChange={onSettingsChange} />
+              <Input type="email" placeholder="email@company.com"  />
             </div>
             <div>
               <label className="block text-sm font-medium mb-2">טלפון נייד</label>
-              <Input placeholder="טלפון נייד" onChange={onSettingsChange} />
+              <Input placeholder="טלפון נייד"  />
             </div>
           </div>
         </CardContent>
@@ -618,7 +527,7 @@ function CompanySettings({ onSettingsChange }: { onSettingsChange: () => void })
   )
 }
 
-function PricingSettings({ onSettingsChange }: { onSettingsChange: () => void }) {
+function PricingSettings() {
   return (
     <div className="space-y-6">
       <Card>
@@ -634,7 +543,7 @@ function PricingSettings({ onSettingsChange }: { onSettingsChange: () => void })
                 type="number" 
                 step="0.01" 
                 defaultValue="3.70" 
-                onChange={onSettingsChange}
+                
               />
             </div>
             <div>
@@ -643,12 +552,12 @@ function PricingSettings({ onSettingsChange }: { onSettingsChange: () => void })
                 type="number" 
                 step="0.01" 
                 defaultValue="4.00" 
-                onChange={onSettingsChange}
+                
               />
             </div>
           </div>
           <div className="flex items-center space-x-reverse space-x-2">
-            <input type="checkbox" id="autoUpdate" onChange={onSettingsChange} />
+            <input type="checkbox" id="autoUpdate"  />
             <label htmlFor="autoUpdate" className="text-sm">עדכון אוטומטי מדי יום</label>
           </div>
           <Button variant="outline" className="w-full">
@@ -671,7 +580,7 @@ function PricingSettings({ onSettingsChange }: { onSettingsChange: () => void })
                 type="number" 
                 step="0.1" 
                 defaultValue="25" 
-                onChange={onSettingsChange}
+                
               />
             </div>
             <div>
@@ -680,7 +589,7 @@ function PricingSettings({ onSettingsChange }: { onSettingsChange: () => void })
                 type="number" 
                 step="0.1" 
                 defaultValue="5" 
-                onChange={onSettingsChange}
+                
               />
             </div>
           </div>
@@ -690,7 +599,7 @@ function PricingSettings({ onSettingsChange }: { onSettingsChange: () => void })
               type="number" 
               step="10" 
               defaultValue="1200" 
-              onChange={onSettingsChange}
+              
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -700,14 +609,14 @@ function PricingSettings({ onSettingsChange }: { onSettingsChange: () => void })
                 type="number" 
                 step="0.1" 
                 defaultValue="17" 
-                onChange={onSettingsChange}
+                
               />
             </div>
             <div>
               <label className="block text-sm font-medium mb-2">זמן אספקה ברירת מחדל</label>
               <Input 
                 defaultValue="4-6 שבועות" 
-                onChange={onSettingsChange}
+                
               />
             </div>
           </div>
@@ -717,7 +626,7 @@ function PricingSettings({ onSettingsChange }: { onSettingsChange: () => void })
   )
 }
 
-function QuotationSettings({ onSettingsChange }: { onSettingsChange: () => void }) {
+function QuotationSettings() {
   return (
     <div className="space-y-6">
       <Card>
@@ -730,7 +639,7 @@ function QuotationSettings({ onSettingsChange }: { onSettingsChange: () => void 
             <label className="block text-sm font-medium mb-2">כותרת הצעת מחיר</label>
             <Input 
               defaultValue="הצעת מחיר - {{project_name}}" 
-              onChange={onSettingsChange}
+              
             />
           </div>
           <div>
@@ -748,14 +657,14 @@ function QuotationSettings({ onSettingsChange }: { onSettingsChange: () => void 
               <label className="block text-sm font-medium mb-2">כותרת תחתונה</label>
               <Input 
                 placeholder="תודה על אמונכם" 
-                onChange={onSettingsChange}
+                
               />
             </div>
             <div>
               <label className="block text-sm font-medium mb-2">חתימה</label>
               <Input 
                 placeholder="שם החותם" 
-                onChange={onSettingsChange}
+                
               />
             </div>
           </div>
@@ -770,7 +679,7 @@ function QuotationSettings({ onSettingsChange }: { onSettingsChange: () => void 
         <CardContent className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-2">תנאי תשלום</label>
-            <select className="w-full p-2 border rounded-md" onChange={onSettingsChange}>
+            <select className="w-full p-2 border rounded-md" >
               <option value="net30">30 יום מקבלת חשבונית</option>
               <option value="net45">45 יום מקבלת חשבונית</option>
               <option value="net60">60 יום מקבלת חשבונית</option>
@@ -781,7 +690,7 @@ function QuotationSettings({ onSettingsChange }: { onSettingsChange: () => void 
             <label className="block text-sm font-medium mb-2">תנאי אחריות</label>
             <Input 
               defaultValue="שנת אחריות על חלקים ועבודה" 
-              onChange={onSettingsChange}
+              
             />
           </div>
         </CardContent>
@@ -790,7 +699,7 @@ function QuotationSettings({ onSettingsChange }: { onSettingsChange: () => void 
   )
 }
 
-function DatabaseSettings({ onSettingsChange }: { onSettingsChange: () => void }) {
+function DatabaseSettings() {
   return (
     <div className="space-y-6">
       <Card>
@@ -826,7 +735,7 @@ function DatabaseSettings({ onSettingsChange }: { onSettingsChange: () => void }
             </div>
           </div>
           <div className="flex items-center space-x-reverse space-x-2">
-            <input type="checkbox" id="autoBackup" onChange={onSettingsChange} />
+            <input type="checkbox" id="autoBackup"  />
             <label htmlFor="autoBackup" className="text-sm">גיבוי אוטומטי יומי</label>
           </div>
         </CardContent>
@@ -867,7 +776,7 @@ function DatabaseSettings({ onSettingsChange }: { onSettingsChange: () => void }
   )
 }
 
-function SecuritySettings({ onSettingsChange }: { onSettingsChange: () => void }) {
+function SecuritySettings() {
   return (
     <div className="space-y-6">
       <Card>
@@ -897,16 +806,16 @@ function SecuritySettings({ onSettingsChange }: { onSettingsChange: () => void }
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center space-x-reverse space-x-2">
-            <input type="checkbox" id="requireLogin" defaultChecked onChange={onSettingsChange} />
+            <input type="checkbox" id="requireLogin" defaultChecked  />
             <label htmlFor="requireLogin" className="text-sm">דרוש התחברות</label>
           </div>
           <div className="flex items-center space-x-reverse space-x-2">
-            <input type="checkbox" id="sessionTimeout" defaultChecked onChange={onSettingsChange} />
+            <input type="checkbox" id="sessionTimeout" defaultChecked  />
             <label htmlFor="sessionTimeout" className="text-sm">ניתוק אוטומטי אחרי חוסר פעילות</label>
           </div>
           <div>
             <label className="block text-sm font-medium mb-2">זמן ניתוק (דקות)</label>
-            <Input type="number" defaultValue="30" onChange={onSettingsChange} />
+            <Input type="number" defaultValue="30"  />
           </div>
         </CardContent>
       </Card>
@@ -914,7 +823,7 @@ function SecuritySettings({ onSettingsChange }: { onSettingsChange: () => void }
   )
 }
 
-function NotificationSettings({ onSettingsChange }: { onSettingsChange: () => void }) {
+function NotificationSettings() {
   return (
     <div className="space-y-6">
       <Card>
@@ -929,28 +838,28 @@ function NotificationSettings({ onSettingsChange }: { onSettingsChange: () => vo
                 <div className="font-medium">התראות דוא"ל</div>
                 <div className="text-sm text-muted-foreground">קבל התראות בדוא"ל</div>
               </div>
-              <input type="checkbox" defaultChecked onChange={onSettingsChange} />
+              <input type="checkbox" defaultChecked  />
             </div>
             <div className="flex items-center justify-between">
               <div>
                 <div className="font-medium">התראות דפדפן</div>
                 <div className="text-sm text-muted-foreground">התראות בדפדפן</div>
               </div>
-              <input type="checkbox" defaultChecked onChange={onSettingsChange} />
+              <input type="checkbox" defaultChecked  />
             </div>
             <div className="flex items-center justify-between">
               <div>
                 <div className="font-medium">התראות הצעות</div>
                 <div className="text-sm text-muted-foreground">עדכונים על הצעות מחיר</div>
               </div>
-              <input type="checkbox" defaultChecked onChange={onSettingsChange} />
+              <input type="checkbox" defaultChecked  />
             </div>
             <div className="flex items-center justify-between">
               <div>
                 <div className="font-medium">התראות מערכת</div>
                 <div className="text-sm text-muted-foreground">עדכוני מערכת ותחזוקה</div>
               </div>
-              <input type="checkbox" onChange={onSettingsChange} />
+              <input type="checkbox"  />
             </div>
           </div>
         </CardContent>
@@ -964,11 +873,11 @@ function NotificationSettings({ onSettingsChange }: { onSettingsChange: () => vo
         <CardContent className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-2">כתובת דוא"ל ראשית</label>
-            <Input type="email" placeholder="admin@company.com" onChange={onSettingsChange} />
+            <Input type="email" placeholder="admin@company.com"  />
           </div>
           <div>
             <label className="block text-sm font-medium mb-2">כתובות נוספות</label>
-            <Input placeholder="email1@company.com, email2@company.com" onChange={onSettingsChange} />
+            <Input placeholder="email1@company.com, email2@company.com"  />
           </div>
         </CardContent>
       </Card>
@@ -976,7 +885,7 @@ function NotificationSettings({ onSettingsChange }: { onSettingsChange: () => vo
   )
 }
 
-function AppearanceSettings({ onSettingsChange }: { onSettingsChange: () => void }) {
+function AppearanceSettings() {
   return (
     <div className="space-y-6">
       <Card>
@@ -987,7 +896,7 @@ function AppearanceSettings({ onSettingsChange }: { onSettingsChange: () => void
         <CardContent className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-2">ערכת נושא</label>
-            <select className="w-full p-2 border rounded-md" onChange={onSettingsChange}>
+            <select className="w-full p-2 border rounded-md" >
               <option value="light">בהיר</option>
               <option value="dark">כהה</option>
               <option value="system">ברירת מחדל מערכת</option>
@@ -995,17 +904,17 @@ function AppearanceSettings({ onSettingsChange }: { onSettingsChange: () => void
           </div>
           <div>
             <label className="block text-sm font-medium mb-2">שפה</label>
-            <select className="w-full p-2 border rounded-md" onChange={onSettingsChange}>
+            <select className="w-full p-2 border rounded-md" >
               <option value="he">עברית</option>
               <option value="en">English</option>
             </select>
           </div>
           <div className="flex items-center space-x-reverse space-x-2">
-            <input type="checkbox" id="compactMode" onChange={onSettingsChange} />
+            <input type="checkbox" id="compactMode"  />
             <label htmlFor="compactMode" className="text-sm">מצב קומפקטי</label>
           </div>
           <div className="flex items-center space-x-reverse space-x-2">
-            <input type="checkbox" id="showTooltips" defaultChecked onChange={onSettingsChange} />
+            <input type="checkbox" id="showTooltips" defaultChecked  />
             <label htmlFor="showTooltips" className="text-sm">הצג טיפים</label>
           </div>
         </CardContent>
@@ -1018,16 +927,16 @@ function AppearanceSettings({ onSettingsChange }: { onSettingsChange: () => void
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center space-x-reverse space-x-2">
-            <input type="checkbox" id="autoSave" defaultChecked onChange={onSettingsChange} />
+            <input type="checkbox" id="autoSave" defaultChecked  />
             <label htmlFor="autoSave" className="text-sm">שמירה אוטומטית</label>
           </div>
           <div className="flex items-center space-x-reverse space-x-2">
-            <input type="checkbox" id="confirmActions" defaultChecked onChange={onSettingsChange} />
+            <input type="checkbox" id="confirmActions" defaultChecked  />
             <label htmlFor="confirmActions" className="text-sm">אישור פעולות מסוכנות</label>
           </div>
           <div>
             <label className="block text-sm font-medium mb-2">פריטים בעמוד</label>
-            <select className="w-full p-2 border rounded-md" onChange={onSettingsChange}>
+            <select className="w-full p-2 border rounded-md" >
               <option value="25">25</option>
               <option value="50">50</option>
               <option value="100">100</option>
@@ -1039,7 +948,7 @@ function AppearanceSettings({ onSettingsChange }: { onSettingsChange: () => void
   )
 }
 
-function ComponentCategoriesSettings({ onSettingsChange }: { onSettingsChange: () => void }) {
+function ComponentCategoriesSettings() {
   const { components, updateComponent } = useCPQ()
   const [categories, setCategories] = useState<string[]>(() => {
     const savedSettings = localStorage.getItem('cpq-settings')
@@ -1055,6 +964,7 @@ function ComponentCategoriesSettings({ onSettingsChange }: { onSettingsChange: (
     oldName: string
     newName: string
   } | null>(null)
+  const [isSavingRename, setIsSavingRename] = useState(false)
   const [migrationDialog, setMigrationDialog] = useState<{
     isOpen: boolean
     categoryToDelete: string
@@ -1073,7 +983,6 @@ function ComponentCategoriesSettings({ onSettingsChange }: { onSettingsChange: (
       localStorage.setItem('cpq-settings', JSON.stringify(parsed))
     }
     notifyCategoriesUpdated()
-    onSettingsChange()
   }
 
   const handleAddCategory = () => {
@@ -1109,11 +1018,15 @@ function ComponentCategoriesSettings({ onSettingsChange }: { onSettingsChange: (
       return
     }
 
+    setIsSavingRename(true)
     try {
       // Update all components with the old category to the new category name
       const componentsToUpdate = components.filter(c => c.category === oldName)
-      for (const component of componentsToUpdate) {
-        await updateComponent(component.id, { category: newName })
+
+      if (componentsToUpdate.length > 0) {
+        for (const component of componentsToUpdate) {
+          await updateComponent(component.id, { category: newName })
+        }
       }
 
       // Update the category in the list
@@ -1126,6 +1039,8 @@ function ComponentCategoriesSettings({ onSettingsChange }: { onSettingsChange: (
     } catch (error) {
       console.error('Error renaming category:', error)
       alert('שגיאה בשינוי שם הקטגוריה. אנא נסה שוב.')
+    } finally {
+      setIsSavingRename(false)
     }
   }
 
@@ -1246,8 +1161,8 @@ function ComponentCategoriesSettings({ onSettingsChange }: { onSettingsChange: (
                         className="flex-1"
                         autoFocus
                       />
-                      <Button size="sm" onClick={handleSaveEdit}>
-                        שמור
+                      <Button size="sm" onClick={handleSaveEdit} disabled={isSavingRename}>
+                        {isSavingRename ? 'שומר...' : 'שמור'}
                       </Button>
                       <Button size="sm" variant="outline" onClick={handleCancelEdit}>
                         ביטול
@@ -1302,7 +1217,7 @@ function ComponentCategoriesSettings({ onSettingsChange }: { onSettingsChange: (
   )
 }
 
-function TableColumnsSettings({ onSettingsChange }: { onSettingsChange: () => void }) {
+function TableColumnsSettings() {
   const [activeTable, setActiveTable] = useState<'component_library' | 'bom_grid' | 'quotation_data_grid'>('component_library')
   const [tableSettings, setTableSettings] = useState(() => {
     const savedSettings = localStorage.getItem('cpq-settings')
@@ -1347,7 +1262,6 @@ function TableColumnsSettings({ onSettingsChange }: { onSettingsChange: () => vo
       parsed.tableColumns = updatedSettings
       localStorage.setItem('cpq-settings', JSON.stringify(parsed))
     }
-    onSettingsChange()
   }
 
   const handleResetTable = (tableType: typeof activeTable) => {
@@ -1366,7 +1280,6 @@ function TableColumnsSettings({ onSettingsChange }: { onSettingsChange: () => vo
       parsed.tableColumns = updatedSettings
       localStorage.setItem('cpq-settings', JSON.stringify(parsed))
     }
-    onSettingsChange()
   }
 
   return (

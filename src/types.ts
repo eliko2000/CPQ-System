@@ -469,6 +469,8 @@ export interface DbComponent {
   unit_cost_usd?: number;
   unit_cost_ils?: number;
   unit_cost_eur?: number;
+  currency?: 'NIS' | 'USD' | 'EUR'; // Original currency the component was priced in
+  original_cost?: number; // Original cost in the original currency
   supplier?: string;
   supplier_part_number?: string;
   lead_time_days?: number;

@@ -13,9 +13,34 @@ function componentToDb(component: Partial<Component>): Partial<DbComponent> {
     unit_cost_usd: component.unitCostUSD,
     unit_cost_ils: component.unitCostNIS,
     unit_cost_eur: component.unitCostEUR,
+    currency: component.currency,
+    original_cost: component.originalCost,
     supplier: component.supplier,
     notes: component.notes,
     is_active: true
+  }
+}
+
+// Transform DB format to UI Component
+function dbToComponent(dbComp: DbComponent): Component {
+  return {
+    id: dbComp.id,
+    name: dbComp.name,
+    manufacturer: dbComp.manufacturer || '',
+    manufacturerPN: dbComp.manufacturer_part_number || '',
+    category: dbComp.category || 'אחר',
+    description: dbComp.description || '',
+    unitCostNIS: dbComp.unit_cost_ils || 0,
+    unitCostUSD: dbComp.unit_cost_usd || 0,
+    unitCostEUR: dbComp.unit_cost_eur || 0,
+    supplier: dbComp.supplier || '',
+    currency: dbComp.currency || 'NIS',
+    originalCost: dbComp.original_cost || dbComp.unit_cost_ils || 0,
+    quoteDate: new Date().toISOString().split('T')[0],
+    quoteFileUrl: '',
+    notes: dbComp.notes || '',
+    createdAt: dbComp.created_at,
+    updatedAt: dbComp.updated_at
   }
 }
 

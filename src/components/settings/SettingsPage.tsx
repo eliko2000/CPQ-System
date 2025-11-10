@@ -24,7 +24,9 @@ import {
   Trash2
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { DEFAULT_COMPONENT_CATEGORIES, TABLE_COLUMN_DEFINITIONS, getDefaultVisibleColumns } from '@/constants/settings'
+import { DEFAULT_COMPONENT_CATEGORIES, TABLE_COLUMN_DEFINITIONS, getDefaultVisibleColumns, notifyCategoriesUpdated } from '@/constants/settings'
+import { CategoryMigrationDialog } from '../ui/CategoryMigrationDialog'
+import { useCPQ } from '@/contexts/CPQContext'
 
 interface SettingsData {
   general: {
@@ -1037,6 +1039,7 @@ function AppearanceSettings({ onSettingsChange }: { onSettingsChange: () => void
 }
 
 function ComponentCategoriesSettings({ onSettingsChange }: { onSettingsChange: () => void }) {
+  const { components, updateComponent } = useCPQ()
   const [categories, setCategories] = useState<string[]>(() => {
     const savedSettings = localStorage.getItem('cpq-settings')
     if (savedSettings) {
@@ -1046,36 +1049,74 @@ function ComponentCategoriesSettings({ onSettingsChange }: { onSettingsChange: (
     return [...DEFAULT_COMPONENT_CATEGORIES]
   })
   const [newCategory, setNewCategory] = useState('')
+  const [migrationDialog, setMigrationDialog] = useState<{
+    isOpen: boolean
+    categoryToDelete: string
+    componentCount: number
+  }>({
+    isOpen: false,
+    categoryToDelete: '',
+    componentCount: 0
+  })
 
-  const handleAddCategory = () => {
-    if (newCategory.trim() && !categories.includes(newCategory.trim())) {
-      const updatedCategories = [...categories, newCategory.trim()]
-      setCategories(updatedCategories)
-      setNewCategory('')
-
-      // Update settings in localStorage
-      const savedSettings = localStorage.getItem('cpq-settings')
-      if (savedSettings) {
-        const parsed = JSON.parse(savedSettings)
-        parsed.componentCategories = { categories: updatedCategories }
-        localStorage.setItem('cpq-settings', JSON.stringify(parsed))
-      }
-      onSettingsChange()
-    }
-  }
-
-  const handleDeleteCategory = (category: string) => {
-    const updatedCategories = categories.filter(c => c !== category)
-    setCategories(updatedCategories)
-
-    // Update settings in localStorage
+  const updateCategoriesInStorage = (updatedCategories: string[]) => {
     const savedSettings = localStorage.getItem('cpq-settings')
     if (savedSettings) {
       const parsed = JSON.parse(savedSettings)
       parsed.componentCategories = { categories: updatedCategories }
       localStorage.setItem('cpq-settings', JSON.stringify(parsed))
     }
+    notifyCategoriesUpdated()
     onSettingsChange()
+  }
+
+  const handleAddCategory = () => {
+    if (newCategory.trim() && !categories.includes(newCategory.trim())) {
+      const updatedCategories = [...categories, newCategory.trim()]
+      setCategories(updatedCategories)
+      setNewCategory('')
+      updateCategoriesInStorage(updatedCategories)
+    }
+  }
+
+  const handleDeleteCategoryClick = (category: string) => {
+    // Count components with this category
+    const componentsInCategory = components.filter(c => c.category === category)
+
+    setMigrationDialog({
+      isOpen: true,
+      categoryToDelete: category,
+      componentCount: componentsInCategory.length
+    })
+  }
+
+  const handleConfirmDelete = async (targetCategory: string) => {
+    const categoryToDelete = migrationDialog.categoryToDelete
+
+    // Migrate all components from deleted category to target category
+    const componentsToMigrate = components.filter(c => c.category === categoryToDelete)
+
+    try {
+      // Update all components with the deleted category to the new category
+      for (const component of componentsToMigrate) {
+        await updateComponent(component.id, { category: targetCategory })
+      }
+
+      // Remove the category from the list
+      const updatedCategories = categories.filter(c => c !== categoryToDelete)
+      setCategories(updatedCategories)
+      updateCategoriesInStorage(updatedCategories)
+
+      // Close dialog
+      setMigrationDialog({ isOpen: false, categoryToDelete: '', componentCount: 0 })
+    } catch (error) {
+      console.error('Error migrating components:', error)
+      alert('שגיאה בהעברת הרכיבים. אנא נסה שוב.')
+    }
+  }
+
+  const handleCancelDelete = () => {
+    setMigrationDialog({ isOpen: false, categoryToDelete: '', componentCount: 0 })
   }
 
   const handleMoveUp = (index: number) => {
@@ -1084,15 +1125,7 @@ function ComponentCategoriesSettings({ onSettingsChange }: { onSettingsChange: (
       ;[updatedCategories[index - 1], updatedCategories[index]] =
         [updatedCategories[index], updatedCategories[index - 1]]
       setCategories(updatedCategories)
-
-      // Update settings in localStorage
-      const savedSettings = localStorage.getItem('cpq-settings')
-      if (savedSettings) {
-        const parsed = JSON.parse(savedSettings)
-        parsed.componentCategories = { categories: updatedCategories }
-        localStorage.setItem('cpq-settings', JSON.stringify(parsed))
-      }
-      onSettingsChange()
+      updateCategoriesInStorage(updatedCategories)
     }
   }
 
@@ -1102,98 +1135,85 @@ function ComponentCategoriesSettings({ onSettingsChange }: { onSettingsChange: (
       ;[updatedCategories[index], updatedCategories[index + 1]] =
         [updatedCategories[index + 1], updatedCategories[index]]
       setCategories(updatedCategories)
-
-      // Update settings in localStorage
-      const savedSettings = localStorage.getItem('cpq-settings')
-      if (savedSettings) {
-        const parsed = JSON.parse(savedSettings)
-        parsed.componentCategories = { categories: updatedCategories }
-        localStorage.setItem('cpq-settings', JSON.stringify(parsed))
-      }
-      onSettingsChange()
+      updateCategoriesInStorage(updatedCategories)
     }
   }
 
-  const handleResetToDefaults = () => {
-    setCategories([...DEFAULT_COMPONENT_CATEGORIES])
-
-    // Update settings in localStorage
-    const savedSettings = localStorage.getItem('cpq-settings')
-    if (savedSettings) {
-      const parsed = JSON.parse(savedSettings)
-      parsed.componentCategories = { categories: [...DEFAULT_COMPONENT_CATEGORIES] }
-      localStorage.setItem('cpq-settings', JSON.stringify(parsed))
-    }
-    onSettingsChange()
-  }
+  const availableCategoriesForMigration = categories.filter(
+    c => c !== migrationDialog.categoryToDelete
+  )
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>קטגוריות רכיבים</CardTitle>
-          <CardDescription>ניהול רשימת הקטגוריות לרכיבים במערכת</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex gap-2">
-            <Input
-              placeholder="הוסף קטגוריה חדשה"
-              value={newCategory}
-              onChange={(e) => setNewCategory(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  handleAddCategory()
-                }
-              }}
-            />
-            <Button onClick={handleAddCategory}>הוסף</Button>
-          </div>
+    <>
+      <CategoryMigrationDialog
+        isOpen={migrationDialog.isOpen}
+        categoryToDelete={migrationDialog.categoryToDelete}
+        componentCount={migrationDialog.componentCount}
+        availableCategories={availableCategoriesForMigration}
+        onConfirm={handleConfirmDelete}
+        onCancel={handleCancelDelete}
+      />
 
-          <div className="space-y-2">
-            {categories.map((category, index) => (
-              <div
-                key={category}
-                className="flex items-center justify-between p-3 bg-muted rounded-lg"
-              >
-                <span className="font-medium">{category}</span>
-                <div className="flex gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleMoveUp(index)}
-                    disabled={index === 0}
-                  >
-                    ↑
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleMoveDown(index)}
-                    disabled={index === categories.length - 1}
-                  >
-                    ↓
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDeleteCategory(category)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>קטגוריות רכיבים</CardTitle>
+            <CardDescription>ניהול רשימת הקטגוריות לרכיבים במערכת</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex gap-2">
+              <Input
+                placeholder="הוסף קטגוריה חדשה"
+                value={newCategory}
+                onChange={(e) => setNewCategory(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleAddCategory()
+                  }
+                }}
+              />
+              <Button onClick={handleAddCategory}>הוסף</Button>
+            </div>
+
+            <div className="space-y-2">
+              {categories.map((category, index) => (
+                <div
+                  key={category}
+                  className="flex items-center justify-between p-3 bg-muted rounded-lg"
+                >
+                  <span className="font-medium">{category}</span>
+                  <div className="flex gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleMoveUp(index)}
+                      disabled={index === 0}
+                    >
+                      ↑
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleMoveDown(index)}
+                      disabled={index === categories.length - 1}
+                    >
+                      ↓
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDeleteCategoryClick(category)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="pt-4 border-t">
-            <Button variant="outline" onClick={handleResetToDefaults} className="w-full">
-              <RotateCcw className="h-4 w-4 ml-2" />
-              אפס לברירת מחדל
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </>
   )
 }
 

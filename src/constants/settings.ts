@@ -81,6 +81,18 @@ export const TABLE_COLUMN_DEFINITIONS: Record<TableType, TableColumnDefinition[]
 // ============ Helper Functions ============
 
 /**
+ * Event to notify components when categories change
+ */
+export const CATEGORIES_UPDATED_EVENT = 'cpq-categories-updated';
+
+/**
+ * Dispatch event to notify all components that categories have been updated
+ */
+export function notifyCategoriesUpdated(): void {
+  window.dispatchEvent(new CustomEvent(CATEGORIES_UPDATED_EVENT));
+}
+
+/**
  * Get component categories from localStorage or default
  */
 export function getComponentCategories(): string[] {
@@ -88,8 +100,8 @@ export function getComponentCategories(): string[] {
     const settings = localStorage.getItem('cpq-settings');
     if (settings) {
       const parsed = JSON.parse(settings);
-      if (parsed.componentCategories && Array.isArray(parsed.componentCategories)) {
-        return parsed.componentCategories;
+      if (parsed.componentCategories?.categories && Array.isArray(parsed.componentCategories.categories)) {
+        return parsed.componentCategories.categories;
       }
     }
   } catch (error) {

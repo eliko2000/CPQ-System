@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { useCPQ } from '../../contexts/CPQContext'
 import { Component, ComponentFormData } from '../../types'
 import { useClickOutside } from '../../hooks/useClickOutside'
-import { getComponentCategories } from '../../constants/settings'
+import { getComponentCategories, CATEGORIES_UPDATED_EVENT } from '../../constants/settings'
 
 // Exchange rates (can be moved to a config file or fetched from API)
 const EXCHANGE_RATES = {
@@ -22,6 +22,7 @@ interface ComponentFormProps {
 
 export function ComponentForm({ component, isOpen, onClose }: ComponentFormProps) {
   const { addComponent, updateComponent } = useCPQ()
+  const [categories, setCategories] = useState<string[]>(() => getComponentCategories())
   const [formData, setFormData] = useState<ComponentFormData>({
     name: '',
     description: '',
@@ -41,6 +42,18 @@ export function ComponentForm({ component, isOpen, onClose }: ComponentFormProps
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [priceInputField, setPriceInputField] = useState<'NIS' | 'USD' | 'EUR'>('NIS')
   const modalRef = useClickOutside<HTMLDivElement>(() => handleClose())
+
+  // Listen for category updates from settings
+  useEffect(() => {
+    const handleCategoriesUpdate = () => {
+      setCategories(getComponentCategories())
+    }
+
+    window.addEventListener(CATEGORIES_UPDATED_EVENT, handleCategoriesUpdate)
+    return () => {
+      window.removeEventListener(CATEGORIES_UPDATED_EVENT, handleCategoriesUpdate)
+    }
+  }, [])
 
   // Initialize form data when component changes
   useEffect(() => {
@@ -217,7 +230,7 @@ export function ComponentForm({ component, isOpen, onClose }: ComponentFormProps
                     onChange={(e) => handleInputChange('category', e.target.value)}
                     className="w-full px-3 py-2 border border-input bg-background rounded-md text-sm"
                   >
-                    {getComponentCategories().map(category => (
+                    {categories.map(category => (
                       <option key={category} value={category}>{category}</option>
                     ))}
                   </select>

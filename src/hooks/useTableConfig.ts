@@ -29,12 +29,49 @@ export function useTableConfig(tableName: string, defaultConfig: TableConfig) {
 
       if (data?.config) {
         console.log(`[useTableConfig] Loaded config for ${tableName}:`, data.config)
-        setConfig(data.config)
+
+        // Smart merge: Use default order and add any missing columns from saved config
+        const savedConfig = data.config as TableConfig
+
+        // Build columnOrder: Start with default order, then append saved columns not in defaults
+        const newColumnOrder = [
+          ...defaultConfig.columnOrder,
+          ...savedConfig.columnOrder.filter(col => !defaultConfig.columnOrder.includes(col))
+        ]
+
+        // Build visibleColumns: Include saved visible columns that are in the new order,
+        // plus any new default visible columns
+        const newVisibleColumns = [
+          ...savedConfig.visibleColumns.filter(col => newColumnOrder.includes(col)),
+          ...defaultConfig.visibleColumns.filter(col => !savedConfig.visibleColumns.includes(col))
+        ]
+
+        const mergedConfig: TableConfig = {
+          columnOrder: newColumnOrder,
+          columnWidths: { ...savedConfig.columnWidths },
+          visibleColumns: newVisibleColumns,
+          filterState: savedConfig.filterState || {}
+        }
+
+        console.log(`[useTableConfig] Merged config for ${tableName}:`, mergedConfig)
+        setConfig(mergedConfig)
+
+        // Save the merged config back to database
+        await supabase
+          .from('user_table_configs')
+          .update({
+            config: mergedConfig,
+            updated_at: new Date().toISOString()
+          })
+          .eq('user_id', userId)
+          .eq('table_name', tableName)
       } else {
         console.log(`[useTableConfig] No saved config for ${tableName}, using defaults`)
+        setConfig(defaultConfig)
       }
     } catch (err) {
       console.error('Failed to load table config:', err)
+      setConfig(defaultConfig)
     } finally {
       setLoading(false)
     }

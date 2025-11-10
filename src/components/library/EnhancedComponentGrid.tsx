@@ -46,11 +46,11 @@ export function EnhancedComponentGrid({
   const gridRef = useRef<AgGridReact>(null)
   const [showColumnManager, setShowColumnManager] = useState(false)
 
-  // Use table configuration hook - RTL order
+  // Use table configuration hook - RTL order (reversed because AG Grid reverses it back)
   const { config, saveConfig, loading } = useTableConfig('component_library', {
-    columnOrder: ['actions', 'manufacturerPN', 'name', 'manufacturer', 'supplier', 'unitCostNIS', 'unitCostUSD', 'quoteDate'],
+    columnOrder: ['description', 'notes', 'quoteDate', 'currency', 'unitCostEUR', 'unitCostUSD', 'unitCostNIS', 'category', 'supplier', 'manufacturer', 'name', 'manufacturerPN', 'actions'],
     columnWidths: {},
-    visibleColumns: ['actions', 'manufacturerPN', 'name', 'manufacturer', 'supplier', 'unitCostNIS', 'unitCostUSD', 'quoteDate'],
+    visibleColumns: ['actions', 'manufacturerPN', 'name', 'manufacturer', 'supplier', 'category', 'unitCostNIS', 'unitCostUSD', 'quoteDate'],
     filterState: {}
   })
 
@@ -504,6 +504,7 @@ export function EnhancedComponentGrid({
     resizable: true,
     wrapText: true,
     autoHeight: false, // Disable auto-height for smaller rows
+    editable: false, // Disable inline editing - use the form modal instead
     headerClass: 'ag-header-cell-label-right',
     cellClass: 'ag-rtl',
     flex: 1, // Allow columns to flex and auto-size
@@ -530,21 +531,24 @@ export function EnhancedComponentGrid({
 
   const onGridReady = useCallback((params: any) => {
     // Apply saved column widths
-    if (Object.keys(config.columnWidths).length > 0) {
-      params.columnApi.getAllColumns()?.forEach((col: any) => {
+    if (Object.keys(config.columnWidths).length > 0 && params.api) {
+      const columns = params.api.getAllDisplayedColumns()
+      columns?.forEach((col: any) => {
         const fieldId = col.getColId()
         if (config.columnWidths[fieldId]) {
-          params.columnApi.setColumnWidth(col, config.columnWidths[fieldId])
+          params.api.setColumnWidth(fieldId, config.columnWidths[fieldId])
         }
       })
     }
-    
+
     // Apply saved filter state
-    if (Object.keys(config.filterState).length > 0) {
+    if (Object.keys(config.filterState).length > 0 && params.api) {
       params.api.setFilterModel(config.filterState)
     }
-    
-    params.api.sizeColumnsToFit()
+
+    if (params.api) {
+      params.api.sizeColumnsToFit()
+    }
   }, [config.columnWidths, config.filterState])
 
   const onFirstDataRendered = useCallback((params: any) => {
@@ -553,9 +557,10 @@ export function EnhancedComponentGrid({
 
   // Handle column resize
   const onColumnResized = useCallback((params: any) => {
-    if (params.finished) {
+    if (params.finished && params.api) {
       const widths: Record<string, number> = {}
-      params.columnApi.getAllColumns()?.forEach((col: any) => {
+      const columns = params.api.getAllDisplayedColumns()
+      columns?.forEach((col: any) => {
         widths[col.getColId()] = col.getActualWidth()
       })
       saveConfig({ columnWidths: widths })
@@ -564,8 +569,8 @@ export function EnhancedComponentGrid({
 
   // Handle column move
   const onColumnMoved = useCallback((params: any) => {
-    if (params.finished) {
-      const displayedOrder = params.columnApi.getAllDisplayedColumns()?.map((col: any) => col.getColId()) || []
+    if (params.finished && params.api) {
+      const displayedOrder = params.api.getAllDisplayedColumns()?.map((col: any) => col.getColId()) || []
       // Reverse the order because AG Grid shows it reversed in RTL mode
       const actualOrder = [...displayedOrder].reverse()
       saveConfig({ columnOrder: actualOrder })
@@ -577,8 +582,11 @@ export function EnhancedComponentGrid({
     saveConfig({ filterState: params.api.getFilterModel() })
   }, [saveConfig])
 
-  // Handle double-click to open component card
-  const onCellDoubleClicked = useCallback((params: any) => {
+  // Handle cell click to open component card (except for actions column)
+  const onCellClicked = useCallback((params: any) => {
+    // Don't open form if clicking on the actions column
+    if (params.colDef.field === 'actions') return
+
     if (params.data && onEdit) {
       onEdit(params.data)
     }
@@ -624,6 +632,16 @@ export function EnhancedComponentGrid({
                 <Button
                   size="sm"
                   variant="outline"
+                  onClick={() => saveConfig({
+                    visibleColumns: ['actions', 'manufacturerPN', 'name', 'manufacturer', 'supplier', 'category', 'unitCostNIS', 'unitCostUSD', 'quoteDate'],
+                    columnOrder: ['description', 'notes', 'quoteDate', 'currency', 'unitCostEUR', 'unitCostUSD', 'unitCostNIS', 'category', 'supplier', 'manufacturer', 'name', 'manufacturerPN', 'actions']
+                  })}
+                >
+                  אפס להגדרות ברירת מחדל
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
                   onClick={() => saveConfig({ visibleColumns: allColumns.map(col => col.field) })}
                 >
                   הצג הכל
@@ -654,7 +672,7 @@ export function EnhancedComponentGrid({
           onColumnResized={onColumnResized}
           onColumnMoved={onColumnMoved}
           onFilterChanged={onFilterChanged}
-          onCellDoubleClicked={onCellDoubleClicked}
+          onCellClicked={onCellClicked}
           rowSelection="single"
           animateRows={true}
           pagination={true}

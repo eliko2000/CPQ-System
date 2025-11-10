@@ -500,21 +500,24 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
   // Grid ready handler
   const onGridReady = useCallback((params: any) => {
     // Apply saved column widths
-    if (Object.keys(config.columnWidths).length > 0) {
-      params.columnApi?.getAllColumns()?.forEach((col: any) => {
+    if (Object.keys(config.columnWidths).length > 0 && params.api) {
+      const columns = params.api.getAllDisplayedColumns()
+      columns?.forEach((col: any) => {
         const fieldId = col.getColId()
         if (config.columnWidths[fieldId]) {
-          params.columnApi.setColumnWidth(col, config.columnWidths[fieldId])
+          params.api.setColumnWidth(fieldId, config.columnWidths[fieldId])
         }
       })
     }
 
     // Apply saved filter state
-    if (Object.keys(config.filterState).length > 0) {
+    if (Object.keys(config.filterState).length > 0 && params.api) {
       params.api.setFilterModel(config.filterState)
     }
 
-    params.api.sizeColumnsToFit()
+    if (params.api) {
+      params.api.sizeColumnsToFit()
+    }
 
     // Mark initial mount as complete after a short delay
     setTimeout(() => {
@@ -528,9 +531,10 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
 
   // Handle column resize
   const onColumnResized = useCallback((params: any) => {
-    if (params.finished && !isInitialMount.current) {
+    if (params.finished && !isInitialMount.current && params.api) {
       const widths: Record<string, number> = {}
-      params.columnApi?.getAllColumns()?.forEach((col: any) => {
+      const columns = params.api.getAllDisplayedColumns()
+      columns?.forEach((col: any) => {
         widths[col.getColId()] = col.getActualWidth()
       })
       console.log('Column resized, saving widths:', widths)
@@ -540,8 +544,8 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
 
   // Handle column move
   const onColumnMoved = useCallback((params: any) => {
-    if (params.finished && !isInitialMount.current) {
-      const displayedOrder = params.columnApi?.getAllDisplayedColumns()?.map((col: any) => col.getColId()) || []
+    if (params.finished && !isInitialMount.current && params.api) {
+      const displayedOrder = params.api.getAllDisplayedColumns()?.map((col: any) => col.getColId()) || []
       // Reverse because AG Grid gives us reversed order in RTL
       const actualOrder = [...displayedOrder].reverse()
       console.log('Column moved - displayed:', displayedOrder, 'saving:', actualOrder)

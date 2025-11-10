@@ -62,6 +62,7 @@ export function ComponentForm({ component, isOpen, onClose }: ComponentFormProps
       // Check if it's a full Component (has id) or ComponentFormData (no id)
       if ('id' in component) {
         // Full Component - editing existing
+        const componentCurrency = component.currency || 'NIS'
         setFormData({
           name: component.name,
           description: component.description || '',
@@ -73,14 +74,18 @@ export function ComponentForm({ component, isOpen, onClose }: ComponentFormProps
           unitCostNIS: component.unitCostNIS,
           unitCostUSD: component.unitCostUSD || 0,
           unitCostEUR: component.unitCostEUR || 0,
-          currency: component.currency || 'NIS',
+          currency: componentCurrency,
           originalCost: component.originalCost || component.unitCostNIS,
           quoteDate: component.quoteDate || new Date().toISOString().split('T')[0],
           notes: component.notes || ''
         })
+        // Set the price input field to match the original currency (green field)
+        setPriceInputField(componentCurrency)
       } else {
         // ComponentFormData - duplicating or new with pre-filled data
+        const formDataCurrency = (component as ComponentFormData).currency || 'NIS'
         setFormData(component as ComponentFormData)
+        setPriceInputField(formDataCurrency)
       }
     } else {
       setFormData({
@@ -99,6 +104,7 @@ export function ComponentForm({ component, isOpen, onClose }: ComponentFormProps
         quoteDate: new Date().toISOString().split('T')[0],
         notes: ''
       })
+      setPriceInputField('NIS')
     }
   }, [component])
 

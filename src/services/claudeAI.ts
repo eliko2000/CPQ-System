@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import * as XLSX from 'xlsx';
 import type { Component, ExtractedItem } from '../types';
 
 // Get API key from environment
@@ -88,6 +89,70 @@ function getMediaType(file: File): 'image/jpeg' | 'image/png' | 'image/gif' | 'i
 
   // Default to png for unknown image types
   return 'image/png';
+}
+
+/**
+ * Check if file is an Excel/CSV file
+ */
+function isExcelFile(file: File): boolean {
+  const fileType = file.type;
+  const fileName = file.name.toLowerCase();
+
+  return (
+    fileType.includes('excel') ||
+    fileType.includes('spreadsheet') ||
+    fileName.endsWith('.xlsx') ||
+    fileName.endsWith('.xls') ||
+    fileName.endsWith('.csv') ||
+    fileType === 'text/csv' ||
+    fileType === 'application/csv'
+  );
+}
+
+/**
+ * Convert Excel file to text representation for Claude
+ */
+async function excelToText(file: File): Promise<string> {
+  try {
+    // Read file as array buffer
+    const arrayBuffer = await file.arrayBuffer();
+
+    // Parse workbook
+    const workbook = XLSX.read(arrayBuffer, {
+      type: 'array',
+      cellDates: true,
+      cellNF: false,
+      cellText: false
+    });
+
+    if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+      throw new Error('No sheets found in the Excel file');
+    }
+
+    let textRepresentation = `Excel File: ${file.name}\n`;
+    textRepresentation += `Total Sheets: ${workbook.SheetNames.length}\n\n`;
+
+    // Process first sheet (or all sheets if needed)
+    for (let i = 0; i < Math.min(3, workbook.SheetNames.length); i++) {
+      const sheetName = workbook.SheetNames[i];
+      const worksheet = workbook.Sheets[sheetName];
+
+      textRepresentation += `=== Sheet ${i + 1}: ${sheetName} ===\n`;
+
+      // Convert sheet to CSV format (preserves table structure)
+      const csv = XLSX.utils.sheet_to_csv(worksheet, {
+        forceQuotes: false,
+        blankrows: false
+      });
+
+      textRepresentation += csv + '\n\n';
+    }
+
+    return textRepresentation;
+  } catch (error) {
+    console.error('Error converting Excel to text:', error);
+    throw new Error(`Failed to read Excel file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
 }
 
 // Valid categories - must match exactly (exported for future use in Settings)
@@ -239,7 +304,84 @@ function parseClaudeResponse(responseText: string): AIExtractionResult {
 }
 
 /**
- * Extract component data from a document using Claude Vision API
+ * Extract component data from Excel file using Claude AI text analysis
+ */
+async function extractFromExcelFile(file: File): Promise<AIExtractionResult> {
+  try {
+    if (!anthropic) {
+      throw new Error('Anthropic client not initialized');
+    }
+
+    // Convert Excel to text representation
+    const excelText = await excelToText(file);
+
+    // Call Claude AI with text content
+    const message = await anthropic.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 8192,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: `${createExtractionPrompt()}\n\n=== EXCEL DATA ===\n\n${excelText}`,
+            },
+          ],
+        },
+      ],
+    });
+
+    // Extract text from response
+    const responseText = message.content
+      .filter((block) => block.type === 'text')
+      .map((block) => (block as { type: 'text'; text: string }).text)
+      .join('\n');
+
+    // Check if response was truncated
+    if (message.stop_reason === 'max_tokens') {
+      console.warn('Claude response was truncated due to max_tokens limit');
+      return {
+        success: false,
+        components: [],
+        metadata: { documentType: 'excel', totalItems: 0 },
+        confidence: 0,
+        error: 'Excel file has too many rows. The response was truncated.\n\nTry one of these options:\n1. Split the Excel file into smaller files\n2. Remove unnecessary rows/columns\n3. Process only specific sheets',
+        rawResponse: responseText,
+      };
+    }
+
+    // Parse and return result
+    const result = parseClaudeResponse(responseText);
+
+    // Ensure document type is set to excel
+    if (result.metadata) {
+      result.metadata.documentType = 'excel';
+    }
+
+    return result;
+  } catch (error) {
+    console.error('Excel extraction error:', error);
+
+    return {
+      success: false,
+      components: [],
+      metadata: { documentType: 'excel', totalItems: 0 },
+      confidence: 0,
+      error: error instanceof Error
+        ? `Failed to extract from Excel: ${error.message}`
+        : 'Unknown error occurred during Excel extraction',
+    };
+  }
+}
+
+/**
+ * Extract component data from a document using Claude AI
+ *
+ * Supports:
+ * - Excel files (.xlsx, .xls, .csv) - Text-based extraction
+ * - PDF files (.pdf) - Vision API
+ * - Image files (JPEG, PNG, GIF, WebP) - Vision API
  */
 export async function extractComponentsFromDocument(file: File): Promise<AIExtractionResult> {
   try {
@@ -254,7 +396,12 @@ export async function extractComponentsFromDocument(file: File): Promise<AIExtra
       };
     }
 
-    // Validate file - now includes PDF support via Claude Vision API
+    // Check if it's an Excel file - handle with text-based extraction
+    if (isExcelFile(file)) {
+      return await extractFromExcelFile(file);
+    }
+
+    // Validate file - for vision-based extraction (images and PDFs)
     const validTypes = [
       'image/jpeg',
       'image/jpg',
@@ -270,7 +417,7 @@ export async function extractComponentsFromDocument(file: File): Promise<AIExtra
         components: [],
         metadata: { documentType: 'unknown', totalItems: 0 },
         confidence: 0,
-        error: `Unsupported file type: ${file.type}. Supported types: JPEG, PNG, GIF, WebP, PDF`,
+        error: `Unsupported file type: ${file.type}. Supported types: Excel (.xlsx, .xls, .csv), PDF, JPEG, PNG, GIF, WebP`,
       };
     }
 

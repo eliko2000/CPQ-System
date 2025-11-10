@@ -1,7 +1,8 @@
-// pdf-parse is a CommonJS module, use require for compatibility
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const pdfParse = require('pdf-parse');
+import * as pdfjsLib from 'pdfjs-dist';
 import type { AIExtractionResult, AIExtractedComponent } from './claudeAI';
+
+// Set up PDF.js worker - use local worker file to avoid CORS issues
+pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
 /**
  * Metadata specific to PDF file parsing
@@ -467,17 +468,32 @@ export async function parsePDFFile(file: File): Promise<AIExtractionResult> {
     // Read file as array buffer
     const arrayBuffer = await file.arrayBuffer();
 
-    // Parse PDF
-    const pdfData = await pdfParse(Buffer.from(arrayBuffer));
+    // Parse PDF using pdfjs-dist (browser-compatible)
+    const uint8Array = new Uint8Array(arrayBuffer);
+    const loadingTask = pdfjsLib.getDocument({ data: uint8Array });
+    const pdfDoc = await loadingTask.promise;
 
-    if (!pdfData.text || pdfData.text.trim().length === 0) {
+    // Extract text from all pages
+    let fullText = '';
+    const numPages = pdfDoc.numPages;
+
+    for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+      const page = await pdfDoc.getPage(pageNum);
+      const textContent = await page.getTextContent();
+      const pageText = textContent.items
+        .map((item: any) => item.str)
+        .join(' ');
+      fullText += pageText + '\n';
+    }
+
+    if (!fullText || fullText.trim().length === 0) {
       return {
         success: false,
         components: [],
         metadata: {
           documentType: 'pdf',
           totalItems: 0,
-          pageCount: pdfData.numpages || 0,
+          pageCount: numPages,
           textLength: 0,
         },
         confidence: 0,
@@ -486,17 +502,17 @@ export async function parsePDFFile(file: File): Promise<AIExtractionResult> {
     }
 
     // Detect if the PDF has tabular structure
-    const hasTableStructure = hasTabularStructure(pdfData.text);
+    const hasTableStructure = hasTabularStructure(fullText);
 
     // Extract components based on structure
     let components: AIExtractedComponent[];
     let extractionMethod: 'text' | 'structured';
 
     if (hasTableStructure) {
-      components = extractFromTabularText(pdfData.text);
+      components = extractFromTabularText(fullText);
       extractionMethod = 'structured';
     } else {
-      components = extractFromFreeText(pdfData.text);
+      components = extractFromFreeText(fullText);
       extractionMethod = 'text';
     }
 
@@ -508,8 +524,8 @@ export async function parsePDFFile(file: File): Promise<AIExtractionResult> {
         metadata: {
           documentType: 'pdf',
           totalItems: 0,
-          pageCount: pdfData.numpages,
-          textLength: pdfData.text.length,
+          pageCount: numPages,
+          textLength: fullText.length,
           extractionMethod,
           hasTabularData: hasTableStructure,
         },
@@ -534,8 +550,8 @@ export async function parsePDFFile(file: File): Promise<AIExtractionResult> {
       metadata: {
         documentType: 'pdf',
         totalItems: components.length,
-        pageCount: pdfData.numpages,
-        textLength: pdfData.text.length,
+        pageCount: numPages,
+        textLength: fullText.length,
         extractionMethod,
         hasTabularData: hasTableStructure,
       },

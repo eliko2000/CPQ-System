@@ -40,9 +40,9 @@ export function getExtractionMethod(file: File): ExtractionMethod {
     return 'excel';
   }
 
-  // Check for PDF files
+  // Check for PDF files - use AI Vision for best quality (like Claude chat)
   if (fileType === 'application/pdf' || fileName.endsWith('.pdf')) {
-    return 'pdf';
+    return 'ai'; // Changed from 'pdf' to 'ai' for better extraction quality
   }
 
   // Check for image files
@@ -84,7 +84,7 @@ export function getExtractionMethodName(method: ExtractionMethod, language: 'en'
  * This is the main entry point for document parsing. It automatically
  * routes to the appropriate parser based on file type:
  * - Excel/CSV files use fast, reliable spreadsheet parsing
- * - PDF files use text extraction with pattern matching
+ * - PDF files use Claude AI Vision for maximum accuracy (like Claude chat)
  * - Image files use Claude AI Vision for maximum accuracy
  *
  * All methods return the same AIExtractionResult structure.
@@ -138,12 +138,13 @@ export async function parseDocument(file: File): Promise<AIExtractionResult> {
       }
 
       case 'ai': {
-        // Image files: Use Claude Vision API for best accuracy
+        // Image and PDF files: Use Claude Vision API for best accuracy
         const result = await extractComponentsFromDocument(file);
 
         // Add document type to metadata if not already set
         if (result.metadata && !result.metadata.documentType) {
-          result.metadata.documentType = 'image';
+          const isPDF = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+          result.metadata.documentType = isPDF ? 'pdf' : 'image';
         }
 
         return result;

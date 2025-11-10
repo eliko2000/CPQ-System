@@ -77,15 +77,16 @@ async function fileToBase64(file: File): Promise<string> {
 /**
  * Determine media type from file
  */
-function getMediaType(file: File): 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp' {
+function getMediaType(file: File): 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp' | 'application/pdf' {
   const type = file.type;
 
   if (type === 'image/jpeg' || type === 'image/jpg') return 'image/jpeg';
   if (type === 'image/png') return 'image/png';
   if (type === 'image/gif') return 'image/gif';
   if (type === 'image/webp') return 'image/webp';
+  if (type === 'application/pdf') return 'application/pdf';
 
-  // Default to png for unknown image types (PDF will be converted to image first)
+  // Default to png for unknown image types
   return 'image/png';
 }
 
@@ -220,6 +221,9 @@ function parseClaudeResponse(responseText: string): AIExtractionResult {
     };
   } catch (error) {
     console.error('Failed to parse Claude response:', error);
+    console.error('Raw response (first 500 chars):', responseText.substring(0, 500));
+    console.error('Raw response (last 500 chars):', responseText.substring(Math.max(0, responseText.length - 500)));
+
     return {
       success: false,
       components: [],
@@ -228,7 +232,7 @@ function parseClaudeResponse(responseText: string): AIExtractionResult {
         totalItems: 0,
       },
       confidence: 0,
-      error: error instanceof Error ? error.message : 'Failed to parse AI response',
+      error: `Failed to parse AI response: ${error instanceof Error ? error.message : 'Unknown error'}\n\nThe response was too large or malformed. Try with a smaller PDF or convert to an image first.`,
       rawResponse: responseText,
     };
   }
@@ -250,25 +254,15 @@ export async function extractComponentsFromDocument(file: File): Promise<AIExtra
       };
     }
 
-    // Validate file - PDF support depends on conversion
+    // Validate file - now includes PDF support via Claude Vision API
     const validTypes = [
       'image/jpeg',
       'image/jpg',
       'image/png',
       'image/gif',
-      'image/webp'
+      'image/webp',
+      'application/pdf'
     ];
-
-    // For PDFs, show a helpful error message
-    if (file.type === 'application/pdf') {
-      return {
-        success: false,
-        components: [],
-        metadata: { documentType: 'unknown', totalItems: 0 },
-        confidence: 0,
-        error: 'PDF support requires conversion to images first. Please convert your PDF pages to images (PNG/JPEG) or use a screenshot.',
-      };
-    }
 
     if (!validTypes.includes(file.type)) {
       return {
@@ -276,27 +270,36 @@ export async function extractComponentsFromDocument(file: File): Promise<AIExtra
         components: [],
         metadata: { documentType: 'unknown', totalItems: 0 },
         confidence: 0,
-        error: `Unsupported file type: ${file.type}. Supported types: JPEG, PNG, GIF, WebP`,
+        error: `Unsupported file type: ${file.type}. Supported types: JPEG, PNG, GIF, WebP, PDF`,
       };
     }
 
     // Convert file to base64
     const base64Data = await fileToBase64(file);
     const mediaType = getMediaType(file);
+    const isPDF = file.type === 'application/pdf';
 
     // Call Claude Vision API
     const message = await anthropic.messages.create({
-      model: 'claude-3-7-sonnet-latest', // Using Claude 3.7 Sonnet (current stable vision model)
-      max_tokens: 4096,
+      model: 'claude-sonnet-4-20250514', // Using Claude Sonnet 4 (latest stable model)
+      max_tokens: 8192, // Increased for large PDFs
       messages: [
         {
           role: 'user',
           content: [
-            {
+            // PDFs use 'document' type, images use 'image' type
+            isPDF ? {
+              type: 'document',
+              source: {
+                type: 'base64',
+                media_type: 'application/pdf',
+                data: base64Data,
+              },
+            } : {
               type: 'image',
               source: {
                 type: 'base64',
-                media_type: mediaType,
+                media_type: mediaType as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp',
                 data: base64Data,
               },
             },
@@ -314,6 +317,19 @@ export async function extractComponentsFromDocument(file: File): Promise<AIExtra
       .filter((block) => block.type === 'text')
       .map((block) => (block as { type: 'text'; text: string }).text)
       .join('\n');
+
+    // Check if response was truncated
+    if (message.stop_reason === 'max_tokens') {
+      console.warn('Claude response was truncated due to max_tokens limit');
+      return {
+        success: false,
+        components: [],
+        metadata: { documentType: 'pdf', totalItems: 0 },
+        confidence: 0,
+        error: 'PDF has too many components. The response was truncated.\n\nTry one of these options:\n1. Split the PDF into smaller files\n2. Convert specific pages to images\n3. Use Excel/CSV format instead',
+        rawResponse: responseText,
+      };
+    }
 
     // Parse and return result
     return parseClaudeResponse(responseText);

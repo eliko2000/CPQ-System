@@ -21,7 +21,8 @@ import {
   Palette,
   List,
   Grid3x3,
-  Trash2
+  Trash2,
+  Edit2
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { DEFAULT_COMPONENT_CATEGORIES, TABLE_COLUMN_DEFINITIONS, getDefaultVisibleColumns, notifyCategoriesUpdated } from '@/constants/settings'
@@ -1049,6 +1050,11 @@ function ComponentCategoriesSettings({ onSettingsChange }: { onSettingsChange: (
     return [...DEFAULT_COMPONENT_CATEGORIES]
   })
   const [newCategory, setNewCategory] = useState('')
+  const [editingCategory, setEditingCategory] = useState<{
+    index: number
+    oldName: string
+    newName: string
+  } | null>(null)
   const [migrationDialog, setMigrationDialog] = useState<{
     isOpen: boolean
     categoryToDelete: string
@@ -1076,6 +1082,50 @@ function ComponentCategoriesSettings({ onSettingsChange }: { onSettingsChange: (
       setCategories(updatedCategories)
       setNewCategory('')
       updateCategoriesInStorage(updatedCategories)
+    }
+  }
+
+  const handleStartEdit = (index: number, categoryName: string) => {
+    setEditingCategory({
+      index,
+      oldName: categoryName,
+      newName: categoryName
+    })
+  }
+
+  const handleCancelEdit = () => {
+    setEditingCategory(null)
+  }
+
+  const handleSaveEdit = async () => {
+    if (!editingCategory || !editingCategory.newName.trim()) return
+
+    const newName = editingCategory.newName.trim()
+    const oldName = editingCategory.oldName
+
+    // Check if name already exists (and it's not the same category)
+    if (newName !== oldName && categories.includes(newName)) {
+      alert('קטגוריה בשם זה כבר קיימת')
+      return
+    }
+
+    try {
+      // Update all components with the old category to the new category name
+      const componentsToUpdate = components.filter(c => c.category === oldName)
+      for (const component of componentsToUpdate) {
+        await updateComponent(component.id, { category: newName })
+      }
+
+      // Update the category in the list
+      const updatedCategories = [...categories]
+      updatedCategories[editingCategory.index] = newName
+      setCategories(updatedCategories)
+      updateCategoriesInStorage(updatedCategories)
+
+      setEditingCategory(null)
+    } catch (error) {
+      console.error('Error renaming category:', error)
+      alert('שגיאה בשינוי שם הקטגוריה. אנא נסה שוב.')
     }
   }
 
@@ -1178,35 +1228,70 @@ function ComponentCategoriesSettings({ onSettingsChange }: { onSettingsChange: (
             <div className="space-y-2">
               {categories.map((category, index) => (
                 <div
-                  key={category}
+                  key={`${category}-${index}`}
                   className="flex items-center justify-between p-3 bg-muted rounded-lg"
                 >
-                  <span className="font-medium">{category}</span>
-                  <div className="flex gap-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleMoveUp(index)}
-                      disabled={index === 0}
-                    >
-                      ↑
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleMoveDown(index)}
-                      disabled={index === categories.length - 1}
-                    >
-                      ↓
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDeleteCategoryClick(category)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
+                  {editingCategory?.index === index ? (
+                    <div className="flex-1 flex gap-2 items-center">
+                      <Input
+                        value={editingCategory.newName}
+                        onChange={(e) => setEditingCategory({
+                          ...editingCategory,
+                          newName: e.target.value
+                        })}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleSaveEdit()
+                          if (e.key === 'Escape') handleCancelEdit()
+                        }}
+                        className="flex-1"
+                        autoFocus
+                      />
+                      <Button size="sm" onClick={handleSaveEdit}>
+                        שמור
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={handleCancelEdit}>
+                        ביטול
+                      </Button>
+                    </div>
+                  ) : (
+                    <>
+                      <span className="font-medium">{category}</span>
+                      <div className="flex gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleMoveUp(index)}
+                          disabled={index === 0}
+                        >
+                          ↑
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleMoveDown(index)}
+                          disabled={index === categories.length - 1}
+                        >
+                          ↓
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleStartEdit(index, category)}
+                          title="שנה שם"
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteCategoryClick(category)}
+                          title="מחק"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </>
+                  )}
                 </div>
               ))}
             </div>
@@ -1238,7 +1323,7 @@ function TableColumnsSettings({ onSettingsChange }: { onSettingsChange: () => vo
 
   const tableNames = {
     component_library: 'ספריית רכיבים',
-    bom_grid: 'BOM Grid',
+    bom_grid: 'טבלת תמחור',
     quotation_data_grid: 'טבלת הצעות מחיר'
   }
 

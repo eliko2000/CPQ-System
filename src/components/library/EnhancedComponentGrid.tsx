@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, useCallback } from 'react'
+import { useMemo, useRef, useState, useCallback, useEffect } from 'react'
 import { AgGridReact } from 'ag-grid-react'
 import { ColDef, ICellRendererParams, ValueSetterParams } from 'ag-grid-community'
 import 'ag-grid-community/styles/ag-grid.css'
@@ -10,7 +10,7 @@ import { Component } from '../../types'
 import { useClickOutside } from '../../hooks/useClickOutside'
 import { useTableConfig } from '../../hooks/useTableConfig'
 import { CustomHeader } from '../grid/CustomHeader'
-import { getComponentCategories, getTableColumnSettings } from '../../constants/settings'
+import { getComponentCategories, getTableColumnSettings, CATEGORIES_UPDATED_EVENT } from '../../constants/settings'
 
 interface EnhancedComponentGridProps {
   components: Component[]
@@ -31,6 +31,23 @@ export function EnhancedComponentGrid({
 }: EnhancedComponentGridProps) {
   const gridRef = useRef<AgGridReact>(null)
   const [showColumnManager, setShowColumnManager] = useState(false)
+  const [categories, setCategories] = useState<string[]>(() => getComponentCategories())
+
+  // Listen for category updates from settings
+  useEffect(() => {
+    const handleCategoriesUpdate = () => {
+      setCategories(getComponentCategories())
+      // Force grid to refresh column definitions
+      if (gridRef.current) {
+        gridRef.current.api.refreshCells({ force: true })
+      }
+    }
+
+    window.addEventListener(CATEGORIES_UPDATED_EVENT, handleCategoriesUpdate)
+    return () => {
+      window.removeEventListener(CATEGORIES_UPDATED_EVENT, handleCategoriesUpdate)
+    }
+  }, [])
 
   // Use table configuration hook - RTL order (reversed because AG Grid reverses it back)
   const { config, saveConfig, loading } = useTableConfig('component_library', {
@@ -331,7 +348,7 @@ export function EnhancedComponentGrid({
       editable: true,
       cellEditor: 'agSelectCellEditor',
       cellEditorParams: {
-        values: getComponentCategories()
+        values: categories
       },
       onCellValueChanged: handleCellEdit,
       headerComponent: CustomHeader,
@@ -350,7 +367,7 @@ export function EnhancedComponentGrid({
         </Badge>
       ),
       filterParams: {
-        values: getComponentCategories()
+        values: categories
       }
     },
     {
@@ -468,7 +485,7 @@ export function EnhancedComponentGrid({
         values: (_params: any) => getUniqueValues('notes')
       }
     }
-  ], [getUniqueValues, handleCellEdit, onEdit, onDelete, onView, onDuplicate])
+  ], [categories, getUniqueValues, handleCellEdit, onEdit, onDelete, onView, onDuplicate])
 
   // Filter and reorder columns based on config
   const visibleColumnDefs = useMemo(() => {

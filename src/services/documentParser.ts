@@ -1,12 +1,12 @@
 /**
  * Unified Document Parser
  *
- * Routes files to the appropriate parser based on file type:
- * - Excel files (.xlsx, .xls, .csv) → parseExcelFile()
- * - PDF files (.pdf) → parsePDFFile()
- * - Image files (JPEG, PNG, etc.) → extractComponentsFromDocument() [AI]
+ * Routes files to Claude AI for intelligent extraction:
+ * - Excel files (.xlsx, .xls, .csv) → Claude AI with spreadsheet parsing
+ * - PDF files (.pdf) → Claude AI Vision
+ * - Image files (JPEG, PNG, etc.) → Claude AI Vision
  *
- * All parsers return the same AIExtractionResult structure for consistency.
+ * All files are processed through Claude AI for maximum accuracy and consistency.
  */
 
 import { extractComponentsFromDocument, type AIExtractionResult } from './claudeAI';
@@ -28,7 +28,7 @@ export function getExtractionMethod(file: File): ExtractionMethod {
   const fileType = file.type;
   const fileName = file.name.toLowerCase();
 
-  // Check for Excel/spreadsheet files
+  // Check for Excel/spreadsheet files - use AI for intelligent extraction
   if (
     fileType.includes('excel') ||
     fileType.includes('spreadsheet') ||
@@ -37,7 +37,7 @@ export function getExtractionMethod(file: File): ExtractionMethod {
     fileName.endsWith('.csv') ||
     fileType === 'text/csv'
   ) {
-    return 'excel';
+    return 'ai'; // Changed to use Claude AI for better extraction quality
   }
 
   // Check for PDF files - use AI Vision for best quality (like Claude chat)
@@ -69,9 +69,9 @@ export function getExtractionMethod(file: File): ExtractionMethod {
  */
 export function getExtractionMethodName(method: ExtractionMethod, language: 'en' | 'he' = 'he'): string {
   const names = {
-    excel: { en: 'Excel Parser', he: 'מנתח Excel' },
-    pdf: { en: 'PDF Parser', he: 'מנתח PDF' },
-    ai: { en: 'AI Vision', he: 'AI Vision' },
+    excel: { en: 'Claude AI (Excel)', he: 'Claude AI (Excel)' },
+    pdf: { en: 'Claude AI (PDF)', he: 'Claude AI (PDF)' },
+    ai: { en: 'Claude AI Vision', he: 'Claude AI Vision' },
     unknown: { en: 'Unknown', he: 'לא ידוע' }
   };
 
@@ -81,11 +81,11 @@ export function getExtractionMethodName(method: ExtractionMethod, language: 'en'
 /**
  * Parse any supported document type and extract component data
  *
- * This is the main entry point for document parsing. It automatically
- * routes to the appropriate parser based on file type:
- * - Excel/CSV files use fast, reliable spreadsheet parsing
- * - PDF files use Claude AI Vision for maximum accuracy (like Claude chat)
- * - Image files use Claude AI Vision for maximum accuracy
+ * This is the main entry point for document parsing. All files are processed
+ * through Claude AI for intelligent extraction:
+ * - Excel/CSV files: Claude AI reads and understands spreadsheet structure
+ * - PDF files: Claude AI Vision for accurate document analysis
+ * - Image files: Claude AI Vision for maximum accuracy
  *
  * All methods return the same AIExtractionResult structure.
  *
@@ -108,43 +108,26 @@ export async function parseDocument(file: File): Promise<AIExtractionResult> {
 
   try {
     switch (method) {
-      case 'excel': {
-        // Excel files: Fast, reliable, no AI cost
-        const result = await parseExcelFile(file);
-
-        // Add document type to metadata if not already set
-        if (result.metadata && !result.metadata.documentType) {
-          result.metadata.documentType = 'excel';
-        }
-
-        return result;
-      }
-
-      case 'pdf': {
-        // PDF files: Text extraction with pattern matching
-        const result = await parsePDFFile(file);
-
-        // If confidence is very low, suggest using AI
-        if (result.confidence < 0.3) {
-          return {
-            ...result,
-            error: result.error
-              ? `${result.error}\n\n💡 Tip: For better results with complex PDFs, convert to image and use AI extraction.`
-              : '⚠️ Low confidence extraction. For better results, convert PDF to image and use AI extraction.'
-          };
-        }
-
-        return result;
-      }
-
+      case 'excel':
+      case 'pdf':
       case 'ai': {
-        // Image and PDF files: Use Claude Vision API for best accuracy
+        // All files now use Claude AI for best accuracy
         const result = await extractComponentsFromDocument(file);
 
         // Add document type to metadata if not already set
         if (result.metadata && !result.metadata.documentType) {
-          const isPDF = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
-          result.metadata.documentType = isPDF ? 'pdf' : 'image';
+          const fileName = file.name.toLowerCase();
+          let documentType: string;
+
+          if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls') || fileName.endsWith('.csv')) {
+            documentType = 'excel';
+          } else if (fileName.endsWith('.pdf')) {
+            documentType = 'pdf';
+          } else {
+            documentType = 'image';
+          }
+
+          result.metadata.documentType = documentType;
         }
 
         return result;
@@ -161,7 +144,7 @@ export async function parseDocument(file: File): Promise<AIExtractionResult> {
             totalItems: 0,
           },
           confidence: 0,
-          error: `Unsupported file type: ${file.type}\n\nSupported formats:\n• Excel: .xlsx, .xls, .csv\n• PDF: .pdf (text-based)\n• Images: .jpg, .png, .gif, .webp`
+          error: `Unsupported file type: ${file.type}\n\nSupported formats:\n• Excel: .xlsx, .xls, .csv\n• PDF: .pdf\n• Images: .jpg, .png, .gif, .webp`
         };
       }
     }
@@ -195,16 +178,11 @@ export function getEstimatedProcessingTime(file: File): number {
 
   switch (method) {
     case 'excel':
-      // Excel parsing is very fast
-      return Math.min(500, 100 + fileSizeMB * 50);
-
     case 'pdf':
-      // PDF parsing depends on page count (estimate based on size)
-      return Math.min(2000, 300 + fileSizeMB * 100);
-
     case 'ai':
-      // AI extraction takes 5-15 seconds
-      return 10000; // 10 seconds average
+      // All files use Claude AI - typically 5-15 seconds
+      // Larger files may take longer
+      return Math.max(8000, Math.min(20000, 8000 + fileSizeMB * 1000));
 
     default:
       return 0;

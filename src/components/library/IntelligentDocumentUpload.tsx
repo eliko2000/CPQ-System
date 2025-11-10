@@ -146,11 +146,11 @@ export const IntelligentDocumentUpload: React.FC<IntelligentDocumentUploadProps>
   const getProcessingMessage = (method: ExtractionMethod): string => {
     switch (method) {
       case 'excel':
-        return 'מנתח קובץ Excel... (מהיר)';
+        return 'מנתח קובץ Excel עם Claude AI... (8-15 שניות)';
       case 'pdf':
-        return 'מחלץ טקסט מ-PDF...';
+        return 'מנתח PDF עם Claude AI Vision...';
       case 'ai':
-        return 'מנתח תמונה עם AI... (עשוי לקחת 10-15 שניות)';
+        return 'מנתח תמונה עם Claude AI Vision...';
       default:
         return 'מנתח מסמך...';
     }
@@ -159,11 +159,11 @@ export const IntelligentDocumentUpload: React.FC<IntelligentDocumentUploadProps>
   const getProcessingTimeEstimate = (method: ExtractionMethod): string => {
     switch (method) {
       case 'excel':
-        return 'תהליך זה אמור להיות מהיר מאוד';
+        return 'זה עשוי לקחת 8-15 שניות - Claude AI מנתח את המבנה והנתונים';
       case 'pdf':
-        return 'זה עשוי לקחת מספר שניות בהתאם לגודל ה-PDF';
+        return 'זה עשוי לקחת 10-20 שניות - Claude AI Vision מנתח את המסמך';
       case 'ai':
-        return 'זה עשוי לקחת 5-15 שניות בהתאם למורכבות המסמך';
+        return 'זה עשוי לקחת 8-15 שניות בהתאם למורכבות התמונה';
       default:
         return 'זה עשוי לקחת מספר שניות';
     }
@@ -214,17 +214,17 @@ export const IntelligentDocumentUpload: React.FC<IntelligentDocumentUploadProps>
             <div className="space-y-1">
               <FileSpreadsheet className="w-8 h-8 mx-auto text-green-500" />
               <div className="font-medium">Excel/CSV</div>
-              <div className="text-muted-foreground">מהיר ומדויק</div>
+              <div className="text-muted-foreground">Claude AI</div>
             </div>
             <div className="space-y-1">
               <FileText className="w-8 h-8 mx-auto text-red-500" />
               <div className="font-medium">PDF</div>
-              <div className="text-muted-foreground">חילוץ טקסט</div>
+              <div className="text-muted-foreground">Claude AI Vision</div>
             </div>
             <div className="space-y-1">
               <Image className="w-8 h-8 mx-auto text-blue-500" />
               <div className="font-medium">תמונות</div>
-              <div className="text-muted-foreground">AI Vision</div>
+              <div className="text-muted-foreground">Claude AI Vision</div>
             </div>
           </div>
         </div>
@@ -275,13 +275,13 @@ export const IntelligentDocumentUpload: React.FC<IntelligentDocumentUploadProps>
               {/* Show extraction method info */}
               <div className="bg-blue-50 border border-blue-200 rounded p-3 text-sm">
                 <div className="font-medium text-blue-900 mb-1">
-                  {extractionMethod === 'excel' && '⚡ חילוץ מהיר ומדויק'}
-                  {extractionMethod === 'pdf' && '📄 חילוץ טקסט מ-PDF'}
-                  {extractionMethod === 'ai' && '🤖 ניתוח מבוסס AI Vision'}
+                  {extractionMethod === 'excel' && '🤖 ניתוח חכם עם Claude AI'}
+                  {extractionMethod === 'pdf' && '🤖 ניתוח מבוסס Claude AI Vision'}
+                  {extractionMethod === 'ai' && '🤖 ניתוח מבוסס Claude AI Vision'}
                 </div>
                 <div className="text-blue-700">
-                  {extractionMethod === 'excel' && 'קובץ זה ינותח באמצעות מנתח Excel מובנה - תהליך מהיר וללא עלות API'}
-                  {extractionMethod === 'pdf' && 'חילוץ טקסט מ-PDF. אם התוצאות לא טובות, המר ל-תמונה לניתוח AI'}
+                  {extractionMethod === 'excel' && 'קובץ Excel זה ינותח באמצעות Claude AI לחילוץ חכם ומדויק של רכיבים (משתמש ב-API credits)'}
+                  {extractionMethod === 'pdf' && 'PDF זה ינותח באמצעות Claude AI Vision למיצוי מיטבי (משתמש ב-API credits)'}
                   {extractionMethod === 'ai' && 'תמונה זו תנותח באמצעות Claude AI Vision למיצוי מיטבי (משתמש ב-API credits)'}
                 </div>
               </div>
@@ -360,7 +360,7 @@ export const IntelligentDocumentUpload: React.FC<IntelligentDocumentUploadProps>
         {status === 'idle' && !file && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Sparkles className="w-4 h-4" />
-            <span>Excel/PDF מובנה • AI Vision עבור תמונות</span>
+            <span>מופעל על ידי Claude AI • תמיכה בכל הפורמטים</span>
           </div>
         )}
       </div>

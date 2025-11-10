@@ -2,7 +2,10 @@
   "permissions": {
     "allow": [
       "WebFetch(domain:github.com)",
-      "WebFetch(domain:maximechampoux.medium.com)"
+      "WebFetch(domain:maximechampoux.medium.com)",
+      "mcp__supabase__postgrestRequest",
+      "mcp__supabase__sqlToRest",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []

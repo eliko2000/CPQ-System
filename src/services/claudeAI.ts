@@ -40,6 +40,17 @@ export interface AIExtractionResult {
     quoteDate?: string;
     currency?: string;
     totalItems: number;
+    // Excel-specific metadata
+    sheetName?: string;
+    rowCount?: number;
+    columnHeaders?: string[];
+    detectedColumns?: Record<string, number>;
+    sheetsProcessed?: number;
+    // PDF-specific metadata
+    pageCount?: number;
+    textLength?: number;
+    extractionMethod?: 'text' | 'structured';
+    hasTabularData?: boolean;
   };
   confidence: number;
   rawResponse?: string;

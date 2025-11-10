@@ -1,25 +1,24 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Badge } from '../ui/badge'
-import { 
-  Settings, 
-  User, 
-  Building, 
-  DollarSign, 
-  FileText, 
-  Database, 
-  Shield, 
-  Bell,
-  Globe,
-  Palette,
+import {
+  Settings,
+  User,
   Save,
   RotateCcw,
   Download,
   Upload,
   Check,
-  AlertCircle
+  AlertCircle,
+  Building,
+  DollarSign,
+  FileText,
+  Database,
+  Shield,
+  Bell,
+  Palette
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 

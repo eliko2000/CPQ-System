@@ -20,7 +20,7 @@ export function useTableConfig(tableName: string, defaultConfig: TableConfig) {
   const loadConfig = async () => {
     try {
       const userId = 'default-user' // Replace with actual user ID when auth is added
-      const { data, error } = await supabase
+      const { data, error: _error } = await supabase
         .from('user_table_configs')
         .select('config')
         .eq('user_id', userId)

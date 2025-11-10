@@ -19,29 +19,6 @@ function componentToDb(component: Partial<Component>): Partial<DbComponent> {
   }
 }
 
-// Transform DB format to UI Component
-function dbToComponent(dbComp: DbComponent): Component {
-  return {
-    id: dbComp.id,
-    name: dbComp.name,
-    manufacturer: dbComp.manufacturer || '',
-    manufacturerPN: dbComp.manufacturer_part_number || '',
-    category: dbComp.category || 'אחר',
-    description: dbComp.description || '',
-    unitCostNIS: dbComp.unit_cost_ils || 0,
-    unitCostUSD: dbComp.unit_cost_usd || 0,
-    unitCostEUR: dbComp.unit_cost_eur || 0,
-    supplier: dbComp.supplier || '',
-    currency: 'NIS',
-    originalCost: dbComp.unit_cost_ils || 0,
-    quoteDate: new Date().toISOString().split('T')[0],
-    quoteFileUrl: '',
-    notes: dbComp.notes || '',
-    createdAt: dbComp.created_at,
-    updatedAt: dbComp.updated_at
-  }
-}
-
 export function useComponents() {
   const [components, setComponents] = useState<DbComponent[]>([])
   const [loading, setLoading] = useState(true)

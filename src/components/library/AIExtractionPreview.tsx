@@ -6,6 +6,30 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import type { AIExtractionResult, AIExtractedComponent } from '../../services/claudeAI';
 import type { Component } from '../../types';
 
+// Type guards for metadata
+interface ExcelMetadata {
+  sheetName?: string;
+  rowCount?: number;
+  columnHeaders?: string[];
+  detectedColumns?: Record<string, number>;
+  sheetsProcessed?: number;
+}
+
+interface PDFMetadata {
+  pageCount?: number;
+  textLength?: number;
+  extractionMethod?: 'text' | 'structured';
+  hasTabularData?: boolean;
+}
+
+function hasExcelMetadata(metadata: unknown): metadata is ExcelMetadata {
+  return typeof metadata === 'object' && metadata !== null && 'sheetName' in metadata;
+}
+
+function hasPDFMetadata(metadata: unknown): metadata is PDFMetadata {
+  return typeof metadata === 'object' && metadata !== null && 'pageCount' in metadata;
+}
+
 interface AIExtractionPreviewProps {
   extractionResult: AIExtractionResult;
   onConfirm: (components: Partial<Component>[]) => void;
@@ -156,35 +180,99 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
         </div>
 
         {/* Document Metadata */}
-        {extractionResult.metadata.supplier && (
-          <div className="bg-gray-50 border rounded-lg p-4">
-            <h3 className="text-sm font-medium mb-2">מידע על המסמך</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-              {extractionResult.metadata.supplier && (
-                <div>
-                  <span className="text-muted-foreground">ספק:</span>
-                  <p className="font-medium">{extractionResult.metadata.supplier}</p>
-                </div>
-              )}
-              {extractionResult.metadata.quoteDate && (
-                <div>
-                  <span className="text-muted-foreground">תאריך:</span>
-                  <p className="font-medium">{extractionResult.metadata.quoteDate}</p>
-                </div>
-              )}
-              {extractionResult.metadata.currency && (
-                <div>
-                  <span className="text-muted-foreground">מטבע:</span>
-                  <p className="font-medium">{extractionResult.metadata.currency}</p>
-                </div>
-              )}
+        <div className="bg-gray-50 border rounded-lg p-4">
+          <h3 className="text-sm font-medium mb-3">מידע על המסמך</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div>
+              <span className="text-muted-foreground">שיטת חילוץ:</span>
+              <p className="font-medium capitalize">
+                {extractionResult.metadata.documentType === 'excel' && '⚡ Excel Parser'}
+                {extractionResult.metadata.documentType === 'pdf' && '📄 PDF Parser'}
+                {extractionResult.metadata.documentType === 'image' && '🤖 AI Vision'}
+                {!['excel', 'pdf', 'image'].includes(extractionResult.metadata.documentType) && extractionResult.metadata.documentType}
+              </p>
+            </div>
+
+            {extractionResult.metadata.supplier && (
               <div>
-                <span className="text-muted-foreground">סוג:</span>
-                <p className="font-medium capitalize">{extractionResult.metadata.documentType}</p>
+                <span className="text-muted-foreground">ספק:</span>
+                <p className="font-medium">{extractionResult.metadata.supplier}</p>
+              </div>
+            )}
+
+            {extractionResult.metadata.quoteDate && (
+              <div>
+                <span className="text-muted-foreground">תאריך:</span>
+                <p className="font-medium">{extractionResult.metadata.quoteDate}</p>
+              </div>
+            )}
+
+            {extractionResult.metadata.currency && (
+              <div>
+                <span className="text-muted-foreground">מטבע:</span>
+                <p className="font-medium">{extractionResult.metadata.currency}</p>
+              </div>
+            )}
+
+            {/* Excel-specific metadata */}
+            {hasExcelMetadata(extractionResult.metadata) && extractionResult.metadata.sheetName && (
+              <div>
+                <span className="text-muted-foreground">גיליון:</span>
+                <p className="font-medium">{extractionResult.metadata.sheetName}</p>
+              </div>
+            )}
+
+            {hasExcelMetadata(extractionResult.metadata) && extractionResult.metadata.rowCount !== undefined && (
+              <div>
+                <span className="text-muted-foreground">שורות:</span>
+                <p className="font-medium">{extractionResult.metadata.rowCount}</p>
+              </div>
+            )}
+
+            {/* PDF-specific metadata */}
+            {hasPDFMetadata(extractionResult.metadata) && extractionResult.metadata.pageCount && (
+              <div>
+                <span className="text-muted-foreground">עמודים:</span>
+                <p className="font-medium">{extractionResult.metadata.pageCount}</p>
+              </div>
+            )}
+
+            {hasPDFMetadata(extractionResult.metadata) && extractionResult.metadata.extractionMethod && (
+              <div>
+                <span className="text-muted-foreground">סוג חילוץ:</span>
+                <p className="font-medium capitalize">
+                  {extractionResult.metadata.extractionMethod === 'structured' ? 'טבלאי' : 'טקסט חופשי'}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Excel detected columns info */}
+          {hasExcelMetadata(extractionResult.metadata) &&
+           extractionResult.metadata.detectedColumns &&
+           Object.keys(extractionResult.metadata.detectedColumns).length > 0 && (
+            <div className="mt-3 pt-3 border-t">
+              <span className="text-xs text-muted-foreground">עמודות שזוהו:</span>
+              <div className="flex flex-wrap gap-1 mt-1">
+                {Object.keys(extractionResult.metadata.detectedColumns).map((col) => (
+                  <span key={col} className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded">
+                    {col}
+                  </span>
+                ))}
               </div>
             </div>
-          </div>
-        )}
+          )}
+
+          {/* PDF quality warning */}
+          {extractionResult.metadata.documentType === 'pdf' &&
+           extractionResult.confidence < 0.5 && (
+            <div className="mt-3 pt-3 border-t bg-yellow-50 -mx-4 -mb-4 px-4 py-3 rounded-b-lg">
+              <p className="text-xs text-yellow-800">
+                💡 <strong>טיפ:</strong> איכות החילוץ מ-PDF נמוכה. לתוצאות טובות יותר, המר את ה-PDF לתמונה והשתמש בניתוח AI Vision.
+              </p>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Components List */}

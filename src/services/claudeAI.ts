@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import * as XLSX from 'xlsx';
 import type { Component, ExtractedItem } from '../types';
+import { getComponentCategories } from '../constants/settings';
 
 // Get API key from environment
 const ANTHROPIC_API_KEY = import.meta.env.VITE_ANTHROPIC_API_KEY;
@@ -155,24 +156,13 @@ async function excelToText(file: File): Promise<string> {
   }
 }
 
-// Valid categories - must match exactly (exported for future use in Settings)
-export const VALID_CATEGORIES = [
-  'בקרים',
-  'חיישנים',
-  'אקטואטורים',
-  'מנועים',
-  'ספקי כוח',
-  'תקשורת',
-  'בטיחות',
-  'מכני',
-  'כבלים ומחברים',
-  'אחר'
-] as const;
-
 /**
  * Create the extraction prompt for Claude
  */
 function createExtractionPrompt(): string {
+  const categories = getComponentCategories();
+  const categoryList = categories.map(cat => `   - "${cat}"`).join('\n');
+
   return `You are an expert at extracting structured component data from supplier quotations, price lists, and technical documents.
 
 Analyze this document and extract ALL component/product information. The document may be in English, Hebrew (עברית), or mixed languages.
@@ -182,16 +172,8 @@ Extract the following information for each component:
 2. **manufacturer** - Manufacturer name (e.g., Siemens, Festo, SMC)
 3. **manufacturerPN** - Manufacturer part number (may appear as: P/N, PN, Part#, קטלוגי, מק"ט, Catalog#)
 4. **category** - Component category - MUST be one of these EXACT Hebrew values:
-   - "בקרים" (PLCs/Controllers)
-   - "חיישנים" (Sensors)
-   - "אקטואטורים" (Actuators)
-   - "מנועים" (Motors)
-   - "ספקי כוח" (Power Supplies)
-   - "תקשורת" (Communication)
-   - "בטיחות" (Safety)
-   - "מכני" (Mechanical)
-   - "כבלים ומחברים" (Cables & Connectors)
-   - "אחר" (Other - use this if none of the above fit)
+${categoryList}
+   Use the most appropriate category, or use "${categories[categories.length - 1]}" if none fit
 5. **supplier** - Supplier/vendor name (if mentioned)
 6. **quantity** - Quantity (if specified)
 7. **unitPriceNIS** - Unit price in Israeli Shekels (₪, NIS, ILS, שקלים)

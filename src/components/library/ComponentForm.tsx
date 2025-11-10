@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { useCPQ } from '../../contexts/CPQContext'
 import { Component, ComponentFormData } from '../../types'
 import { useClickOutside } from '../../hooks/useClickOutside'
+import { getComponentCategories } from '../../constants/settings'
 
 // Exchange rates (can be moved to a config file or fetched from API)
 const EXCHANGE_RATES = {
@@ -12,21 +13,6 @@ const EXCHANGE_RATES = {
   EUR_TO_NIS: 4.0,
   USD_TO_EUR: 0.92
 }
-
-// Unified categories for both form and grid
-const UNIFIED_CATEGORIES = [
-  'בקרים (PLCs)',
-  'חיישנים',
-  'אקטואטורים',
-  'מנועים',
-  'בקרים',
-  'ספקי כוח',
-  'תקשורת',
-  'בטיחות',
-  'מכני',
-  'כבלים ומחברים',
-  'אחר'
-]
 
 interface ComponentFormProps {
   component?: Component | null
@@ -231,7 +217,7 @@ export function ComponentForm({ component, isOpen, onClose }: ComponentFormProps
                     onChange={(e) => handleInputChange('category', e.target.value)}
                     className="w-full px-3 py-2 border border-input bg-background rounded-md text-sm"
                   >
-                    {UNIFIED_CATEGORIES.map(category => (
+                    {getComponentCategories().map(category => (
                       <option key={category} value={category}>{category}</option>
                     ))}
                   </select>

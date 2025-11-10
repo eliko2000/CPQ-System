@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
 import type { AIExtractionResult, AIExtractedComponent } from './claudeAI';
+import { getComponentCategories } from '../constants/settings';
 
 /**
  * Metadata specific to Excel file parsing
@@ -69,20 +70,10 @@ const COLUMN_PATTERNS: ColumnMapping = {
 };
 
 /**
- * Valid categories - must match the categories defined in claudeAI.ts
+ * Get valid categories from settings
+ * Falls back to hardcoded defaults if settings are not available
  */
-const VALID_CATEGORIES = [
-  'בקרים',
-  'חיישנים',
-  'אקטואטורים',
-  'מנועים',
-  'ספקי כוח',
-  'תקשורת',
-  'בטיחות',
-  'מכני',
-  'כבלים ומחברים',
-  'אחר'
-] as const;
+const getValidCategories = () => getComponentCategories();
 
 /**
  * Detect column indices based on header row using pattern matching
@@ -218,7 +209,8 @@ function normalizeCategory(category: string | null | undefined): string {
   const normalized = category.trim();
 
   // Check if it's already a valid category
-  if (VALID_CATEGORIES.includes(normalized as any)) {
+  const validCategories = getValidCategories();
+  if (validCategories.includes(normalized)) {
     return normalized;
   }
 

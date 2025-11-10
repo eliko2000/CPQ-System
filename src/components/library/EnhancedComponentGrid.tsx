@@ -10,21 +10,7 @@ import { Component } from '../../types'
 import { useClickOutside } from '../../hooks/useClickOutside'
 import { useTableConfig } from '../../hooks/useTableConfig'
 import { CustomHeader } from '../grid/CustomHeader'
-
-// Unified categories for both form and grid
-const UNIFIED_CATEGORIES = [
-  'בקרים (PLCs)',
-  'חיישנים',
-  'אקטואטורים',
-  'מנועים',
-  'בקרים',
-  'ספקי כוח',
-  'תקשורת',
-  'בטיחות',
-  'מכני',
-  'כבלים ומחברים',
-  'אחר'
-]
+import { getComponentCategories, getTableColumnSettings } from '../../constants/settings'
 
 interface EnhancedComponentGridProps {
   components: Component[]
@@ -50,7 +36,7 @@ export function EnhancedComponentGrid({
   const { config, saveConfig, loading } = useTableConfig('component_library', {
     columnOrder: ['description', 'notes', 'quoteDate', 'currency', 'unitCostEUR', 'unitCostUSD', 'unitCostNIS', 'category', 'supplier', 'manufacturer', 'name', 'manufacturerPN', 'actions'],
     columnWidths: {},
-    visibleColumns: ['actions', 'manufacturerPN', 'name', 'manufacturer', 'supplier', 'category', 'unitCostNIS', 'unitCostUSD', 'quoteDate'],
+    visibleColumns: getTableColumnSettings('component_library'),
     filterState: {}
   })
 
@@ -345,7 +331,7 @@ export function EnhancedComponentGrid({
       editable: true,
       cellEditor: 'agSelectCellEditor',
       cellEditorParams: {
-        values: UNIFIED_CATEGORIES
+        values: getComponentCategories()
       },
       onCellValueChanged: handleCellEdit,
       headerComponent: CustomHeader,
@@ -364,7 +350,7 @@ export function EnhancedComponentGrid({
         </Badge>
       ),
       filterParams: {
-        values: UNIFIED_CATEGORIES
+        values: getComponentCategories()
       }
     },
     {

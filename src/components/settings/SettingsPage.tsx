@@ -18,9 +18,12 @@ import {
   Database,
   Shield,
   Bell,
-  Palette
+  Palette,
+  List,
+  Grid3x3
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { DEFAULT_COMPONENT_CATEGORIES, TABLE_COLUMN_DEFINITIONS, getDefaultVisibleColumns } from '@/constants/settings'
 
 interface SettingsData {
   general: {
@@ -83,6 +86,14 @@ interface SettingsData {
     autoSave: boolean
     confirmActions: boolean
     itemsPerPage: string
+  }
+  componentCategories: {
+    categories: string[]
+  }
+  tableColumns: {
+    component_library: string[]
+    bom_grid: string[]
+    quotation_data_grid: string[]
   }
 }
 
@@ -157,6 +168,14 @@ function getDefaultSettings(): SettingsData {
       autoSave: true,
       confirmActions: true,
       itemsPerPage: '25'
+    },
+    componentCategories: {
+      categories: [...DEFAULT_COMPONENT_CATEGORIES]
+    },
+    tableColumns: {
+      component_library: getDefaultVisibleColumns('component_library'),
+      bom_grid: getDefaultVisibleColumns('bom_grid'),
+      quotation_data_grid: getDefaultVisibleColumns('quotation_data_grid')
     }
   }
 }
@@ -289,6 +308,20 @@ export function SettingsPage() {
       description: 'עיצוב, שפה והגדרות ממשק',
       icon: Palette,
       component: AppearanceSettings
+    },
+    {
+      id: 'componentCategories',
+      title: 'קטגוריות רכיבים',
+      description: 'ניהול קטגוריות רכיבים במערכת',
+      icon: List,
+      component: ComponentCategoriesSettings
+    },
+    {
+      id: 'tableColumns',
+      title: 'עמודות טבלאות',
+      description: 'הגדרות עמודות ברירת מחדל לטבלאות',
+      icon: Grid3x3,
+      component: TableColumnsSettings
     }
   ]
 
@@ -995,6 +1028,309 @@ function AppearanceSettings({ onSettingsChange }: { onSettingsChange: () => void
               <option value="50">50</option>
               <option value="100">100</option>
             </select>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+function ComponentCategoriesSettings({ onSettingsChange }: { onSettingsChange: () => void }) {
+  const [categories, setCategories] = useState<string[]>(() => {
+    const savedSettings = localStorage.getItem('cpq-settings')
+    if (savedSettings) {
+      const parsed = JSON.parse(savedSettings)
+      return parsed.componentCategories?.categories || [...DEFAULT_COMPONENT_CATEGORIES]
+    }
+    return [...DEFAULT_COMPONENT_CATEGORIES]
+  })
+  const [newCategory, setNewCategory] = useState('')
+
+  const handleAddCategory = () => {
+    if (newCategory.trim() && !categories.includes(newCategory.trim())) {
+      const updatedCategories = [...categories, newCategory.trim()]
+      setCategories(updatedCategories)
+      setNewCategory('')
+
+      // Update settings in localStorage
+      const savedSettings = localStorage.getItem('cpq-settings')
+      if (savedSettings) {
+        const parsed = JSON.parse(savedSettings)
+        parsed.componentCategories = { categories: updatedCategories }
+        localStorage.setItem('cpq-settings', JSON.stringify(parsed))
+      }
+      onSettingsChange()
+    }
+  }
+
+  const handleDeleteCategory = (category: string) => {
+    const updatedCategories = categories.filter(c => c !== category)
+    setCategories(updatedCategories)
+
+    // Update settings in localStorage
+    const savedSettings = localStorage.getItem('cpq-settings')
+    if (savedSettings) {
+      const parsed = JSON.parse(savedSettings)
+      parsed.componentCategories = { categories: updatedCategories }
+      localStorage.setItem('cpq-settings', JSON.stringify(parsed))
+    }
+    onSettingsChange()
+  }
+
+  const handleMoveUp = (index: number) => {
+    if (index > 0) {
+      const updatedCategories = [...categories]
+      ;[updatedCategories[index - 1], updatedCategories[index]] =
+        [updatedCategories[index], updatedCategories[index - 1]]
+      setCategories(updatedCategories)
+
+      // Update settings in localStorage
+      const savedSettings = localStorage.getItem('cpq-settings')
+      if (savedSettings) {
+        const parsed = JSON.parse(savedSettings)
+        parsed.componentCategories = { categories: updatedCategories }
+        localStorage.setItem('cpq-settings', JSON.stringify(parsed))
+      }
+      onSettingsChange()
+    }
+  }
+
+  const handleMoveDown = (index: number) => {
+    if (index < categories.length - 1) {
+      const updatedCategories = [...categories]
+      ;[updatedCategories[index], updatedCategories[index + 1]] =
+        [updatedCategories[index + 1], updatedCategories[index]]
+      setCategories(updatedCategories)
+
+      // Update settings in localStorage
+      const savedSettings = localStorage.getItem('cpq-settings')
+      if (savedSettings) {
+        const parsed = JSON.parse(savedSettings)
+        parsed.componentCategories = { categories: updatedCategories }
+        localStorage.setItem('cpq-settings', JSON.stringify(parsed))
+      }
+      onSettingsChange()
+    }
+  }
+
+  const handleResetToDefaults = () => {
+    setCategories([...DEFAULT_COMPONENT_CATEGORIES])
+
+    // Update settings in localStorage
+    const savedSettings = localStorage.getItem('cpq-settings')
+    if (savedSettings) {
+      const parsed = JSON.parse(savedSettings)
+      parsed.componentCategories = { categories: [...DEFAULT_COMPONENT_CATEGORIES] }
+      localStorage.setItem('cpq-settings', JSON.stringify(parsed))
+    }
+    onSettingsChange()
+  }
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>קטגוריות רכיבים</CardTitle>
+          <CardDescription>ניהול רשימת הקטגוריות לרכיבים במערכת</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex gap-2">
+            <Input
+              placeholder="הוסף קטגוריה חדשה"
+              value={newCategory}
+              onChange={(e) => setNewCategory(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleAddCategory()
+                }
+              }}
+            />
+            <Button onClick={handleAddCategory}>הוסף</Button>
+          </div>
+
+          <div className="space-y-2">
+            {categories.map((category, index) => (
+              <div
+                key={category}
+                className="flex items-center justify-between p-3 bg-muted rounded-lg"
+              >
+                <span className="font-medium">{category}</span>
+                <div className="flex gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleMoveUp(index)}
+                    disabled={index === 0}
+                  >
+                    ↑
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleMoveDown(index)}
+                    disabled={index === categories.length - 1}
+                  >
+                    ↓
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDeleteCategory(category)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="pt-4 border-t">
+            <Button variant="outline" onClick={handleResetToDefaults} className="w-full">
+              <RotateCcw className="h-4 w-4 ml-2" />
+              אפס לברירת מחדל
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+function TableColumnsSettings({ onSettingsChange }: { onSettingsChange: () => void }) {
+  const [activeTable, setActiveTable] = useState<'component_library' | 'bom_grid' | 'quotation_data_grid'>('component_library')
+  const [tableSettings, setTableSettings] = useState(() => {
+    const savedSettings = localStorage.getItem('cpq-settings')
+    if (savedSettings) {
+      const parsed = JSON.parse(savedSettings)
+      return parsed.tableColumns || {
+        component_library: getDefaultVisibleColumns('component_library'),
+        bom_grid: getDefaultVisibleColumns('bom_grid'),
+        quotation_data_grid: getDefaultVisibleColumns('quotation_data_grid')
+      }
+    }
+    return {
+      component_library: getDefaultVisibleColumns('component_library'),
+      bom_grid: getDefaultVisibleColumns('bom_grid'),
+      quotation_data_grid: getDefaultVisibleColumns('quotation_data_grid')
+    }
+  })
+
+  const tableNames = {
+    component_library: 'ספריית רכיבים',
+    bom_grid: 'BOM Grid',
+    quotation_data_grid: 'טבלת הצעות מחיר'
+  }
+
+  const handleToggleColumn = (tableType: typeof activeTable, columnId: string) => {
+    const currentColumns = tableSettings[tableType] || []
+    const updatedColumns = currentColumns.includes(columnId)
+      ? currentColumns.filter(id => id !== columnId)
+      : [...currentColumns, columnId]
+
+    const updatedSettings = {
+      ...tableSettings,
+      [tableType]: updatedColumns
+    }
+
+    setTableSettings(updatedSettings)
+
+    // Update settings in localStorage
+    const savedSettings = localStorage.getItem('cpq-settings')
+    if (savedSettings) {
+      const parsed = JSON.parse(savedSettings)
+      parsed.tableColumns = updatedSettings
+      localStorage.setItem('cpq-settings', JSON.stringify(parsed))
+    }
+    onSettingsChange()
+  }
+
+  const handleResetTable = (tableType: typeof activeTable) => {
+    const defaultColumns = getDefaultVisibleColumns(tableType)
+    const updatedSettings = {
+      ...tableSettings,
+      [tableType]: defaultColumns
+    }
+
+    setTableSettings(updatedSettings)
+
+    // Update settings in localStorage
+    const savedSettings = localStorage.getItem('cpq-settings')
+    if (savedSettings) {
+      const parsed = JSON.parse(savedSettings)
+      parsed.tableColumns = updatedSettings
+      localStorage.setItem('cpq-settings', JSON.stringify(parsed))
+    }
+    onSettingsChange()
+  }
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>עמודות ברירת מחדל לטבלאות</CardTitle>
+          <CardDescription>בחר אילו עמודות יוצגו כברירת מחדל בכל טבלה</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex gap-2 border-b pb-4">
+            {Object.entries(tableNames).map(([key, name]) => (
+              <Button
+                key={key}
+                variant={activeTable === key ? 'default' : 'outline'}
+                onClick={() => setActiveTable(key as typeof activeTable)}
+              >
+                {name}
+              </Button>
+            ))}
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-semibold">{tableNames[activeTable]}</h3>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleResetTable(activeTable)}
+              >
+                <RotateCcw className="h-4 w-4 ml-2" />
+                אפס לברירת מחדל
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              {TABLE_COLUMN_DEFINITIONS[activeTable].map((column) => {
+                const isVisible = tableSettings[activeTable]?.includes(column.id) ?? column.defaultVisible
+                return (
+                  <div
+                    key={column.id}
+                    className={cn(
+                      "flex items-center justify-between p-3 rounded-lg border",
+                      isVisible ? "bg-primary/5 border-primary" : "bg-muted"
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="checkbox"
+                        id={`${activeTable}-${column.id}`}
+                        checked={isVisible}
+                        onChange={() => handleToggleColumn(activeTable, column.id)}
+                        className="cursor-pointer"
+                      />
+                      <label
+                        htmlFor={`${activeTable}-${column.id}`}
+                        className="text-sm font-medium cursor-pointer"
+                      >
+                        {column.label}
+                      </label>
+                    </div>
+                    {isVisible && (
+                      <Badge variant="secondary" className="text-xs">
+                        מוצג
+                      </Badge>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
           </div>
         </CardContent>
       </Card>

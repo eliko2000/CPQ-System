@@ -20,7 +20,8 @@ import {
   Bell,
   Palette,
   List,
-  Grid3x3
+  Grid3x3,
+  Trash2
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { DEFAULT_COMPONENT_CATEGORIES, TABLE_COLUMN_DEFINITIONS, getDefaultVisibleColumns } from '@/constants/settings'

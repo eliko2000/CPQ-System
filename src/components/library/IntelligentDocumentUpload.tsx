@@ -1,7 +1,14 @@
 import React, { useState, useCallback } from 'react';
-import { Upload, FileText, Image, FileSpreadsheet, Loader2, AlertCircle, CheckCircle, Sparkles } from 'lucide-react';
+import { Upload, FileText, Image, FileSpreadsheet, Loader2, AlertCircle, CheckCircle, Sparkles, Zap } from 'lucide-react';
 import { Button } from '../ui/button';
-import { extractComponentsFromDocument, type AIExtractionResult } from '../../services/claudeAI';
+import { type AIExtractionResult } from '../../services/claudeAI';
+import {
+  parseDocument,
+  getExtractionMethod,
+  getExtractionMethodName,
+  getEstimatedProcessingTime,
+  type ExtractionMethod
+} from '../../services/documentParser';
 
 interface IntelligentDocumentUploadProps {
   onExtractionComplete: (result: AIExtractionResult) => void;
@@ -19,17 +26,21 @@ export const IntelligentDocumentUpload: React.FC<IntelligentDocumentUploadProps>
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string>('');
   const [isDragging, setIsDragging] = useState(false);
+  const [extractionMethod, setExtractionMethod] = useState<ExtractionMethod>('unknown');
 
   const acceptedTypes = [
+    // Excel formats
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+    'application/vnd.ms-excel', // .xls
+    'text/csv', // .csv
+    // PDF formats
     'application/pdf',
+    // Image formats
     'image/jpeg',
     'image/jpg',
     'image/png',
     'image/gif',
-    'image/webp',
-    'application/vnd.ms-excel',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    'text/csv'
+    'image/webp'
   ];
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -47,18 +58,24 @@ export const IntelligentDocumentUpload: React.FC<IntelligentDocumentUploadProps>
     setIsDragging(false);
 
     const droppedFile = e.dataTransfer.files[0];
-    if (droppedFile && acceptedTypes.includes(droppedFile.type)) {
-      setFile(droppedFile);
-      setError('');
-    } else {
-      setError('Invalid file type. Please upload PDF, image, or spreadsheet files.');
+    if (droppedFile) {
+      const method = getExtractionMethod(droppedFile);
+      if (method !== 'unknown') {
+        setFile(droppedFile);
+        setExtractionMethod(method);
+        setError('');
+      } else {
+        setError('סוג קובץ לא נתמך. פורמטים נתמכים: Excel (.xlsx, .xls, .csv), PDF, תמונות (JPEG, PNG, GIF, WebP)');
+      }
     }
   }, []);
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
+      const method = getExtractionMethod(selectedFile);
       setFile(selectedFile);
+      setExtractionMethod(method);
       setError('');
     }
   }, []);
@@ -71,7 +88,11 @@ export const IntelligentDocumentUpload: React.FC<IntelligentDocumentUploadProps>
       setProgress(10);
       setError('');
 
-      // Simulate progress updates
+      // Get estimated processing time for better UX
+      const estimatedTime = getEstimatedProcessingTime(file);
+      const progressSpeed = estimatedTime > 0 ? estimatedTime / 80 : 500; // Reach 90% in estimated time
+
+      // Simulate progress updates based on file type
       const progressInterval = setInterval(() => {
         setProgress((prev) => {
           if (prev >= 90) {
@@ -80,10 +101,10 @@ export const IntelligentDocumentUpload: React.FC<IntelligentDocumentUploadProps>
           }
           return prev + 10;
         });
-      }, 500);
+      }, progressSpeed);
 
-      // Call Claude AI to extract components
-      const result = await extractComponentsFromDocument(file);
+      // Use unified document parser (automatically routes to correct parser)
+      const result = await parseDocument(file);
 
       clearInterval(progressInterval);
       setProgress(100);
@@ -109,13 +130,43 @@ export const IntelligentDocumentUpload: React.FC<IntelligentDocumentUploadProps>
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
   };
 
-  const getFileIcon = (fileType: string) => {
-    if (fileType.startsWith('image/')) return <Image className="w-12 h-12 text-blue-500" />;
-    if (fileType === 'application/pdf') return <FileText className="w-12 h-12 text-red-500" />;
-    if (fileType.includes('spreadsheet') || fileType.includes('excel') || fileType === 'text/csv') {
-      return <FileSpreadsheet className="w-12 h-12 text-green-500" />;
+  const getFileIcon = (method: ExtractionMethod) => {
+    switch (method) {
+      case 'excel':
+        return <FileSpreadsheet className="w-12 h-12 text-green-500" />;
+      case 'pdf':
+        return <FileText className="w-12 h-12 text-red-500" />;
+      case 'ai':
+        return <Image className="w-12 h-12 text-blue-500" />;
+      default:
+        return <FileText className="w-12 h-12 text-gray-500" />;
     }
-    return <FileText className="w-12 h-12 text-gray-500" />;
+  };
+
+  const getProcessingMessage = (method: ExtractionMethod): string => {
+    switch (method) {
+      case 'excel':
+        return 'מנתח קובץ Excel... (מהיר)';
+      case 'pdf':
+        return 'מחלץ טקסט מ-PDF...';
+      case 'ai':
+        return 'מנתח תמונה עם AI... (עשוי לקחת 10-15 שניות)';
+      default:
+        return 'מנתח מסמך...';
+    }
+  };
+
+  const getProcessingTimeEstimate = (method: ExtractionMethod): string => {
+    switch (method) {
+      case 'excel':
+        return 'תהליך זה אמור להיות מהיר מאוד';
+      case 'pdf':
+        return 'זה עשוי לקחת מספר שניות בהתאם לגודל ה-PDF';
+      case 'ai':
+        return 'זה עשוי לקחת 5-15 שניות בהתאם למורכבות המסמך';
+      default:
+        return 'זה עשוי לקחת מספר שניות';
+    }
   };
 
   return (
@@ -124,9 +175,9 @@ export const IntelligentDocumentUpload: React.FC<IntelligentDocumentUploadProps>
       <div className="flex items-center gap-2">
         <Sparkles className="w-6 h-6 text-purple-500" />
         <div>
-          <h2 className="text-xl font-semibold">ייבוא מסמכים חכם עם AI</h2>
+          <h2 className="text-xl font-semibold">ייבוא מסמכים חכם</h2>
           <p className="text-sm text-muted-foreground">
-            העלה הצעת מחיר, מחירון או קטלוג ותן ל-AI לחלץ את נתוני הרכיבים
+            העלה Excel, PDF, או תמונה של הצעת מחיר/מחירון לחילוץ אוטומטי של רכיבים
           </p>
         </div>
       </div>
@@ -145,7 +196,7 @@ export const IntelligentDocumentUpload: React.FC<IntelligentDocumentUploadProps>
           <Upload className={`w-16 h-16 mx-auto mb-4 ${isDragging ? 'text-primary' : 'text-gray-400'}`} />
           <h3 className="text-lg font-medium mb-2">גרור ושחרר את הקובץ כאן</h3>
           <p className="text-sm text-muted-foreground mb-4">
-            או לחץ לבחירת קובץ
+            או לחץ לבחירת קובץ - Excel, PDF, או תמונה
           </p>
           <input
             type="file"
@@ -159,9 +210,23 @@ export const IntelligentDocumentUpload: React.FC<IntelligentDocumentUploadProps>
               <span>בחר קובץ</span>
             </Button>
           </label>
-          <p className="text-xs text-muted-foreground mt-4">
-            פורמטים נתמכים: JPEG, PNG, GIF, WebP (עד 10MB)
-          </p>
+          <div className="mt-6 grid grid-cols-3 gap-4 text-xs text-center">
+            <div className="space-y-1">
+              <FileSpreadsheet className="w-8 h-8 mx-auto text-green-500" />
+              <div className="font-medium">Excel/CSV</div>
+              <div className="text-muted-foreground">מהיר ומדויק</div>
+            </div>
+            <div className="space-y-1">
+              <FileText className="w-8 h-8 mx-auto text-red-500" />
+              <div className="font-medium">PDF</div>
+              <div className="text-muted-foreground">חילוץ טקסט</div>
+            </div>
+            <div className="space-y-1">
+              <Image className="w-8 h-8 mx-auto text-blue-500" />
+              <div className="font-medium">תמונות</div>
+              <div className="text-muted-foreground">AI Vision</div>
+            </div>
+          </div>
         </div>
       )}
 
@@ -170,19 +235,26 @@ export const IntelligentDocumentUpload: React.FC<IntelligentDocumentUploadProps>
         <div className="border rounded-lg p-6">
           <div className="flex items-start gap-4">
             <div className="flex-shrink-0">
-              {getFileIcon(file.type)}
+              {getFileIcon(extractionMethod)}
             </div>
             <div className="flex-1 min-w-0">
-              <h3 className="font-medium truncate">{file.name}</h3>
+              <div className="flex items-center gap-2 mb-1">
+                <h3 className="font-medium truncate">{file.name}</h3>
+                <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 flex items-center gap-1">
+                  {extractionMethod === 'ai' && <Sparkles className="w-3 h-3" />}
+                  {extractionMethod === 'excel' && <Zap className="w-3 h-3" />}
+                  {getExtractionMethodName(extractionMethod, 'he')}
+                </span>
+              </div>
               <p className="text-sm text-muted-foreground">
-                {formatFileSize(file.size)} • {file.type}
+                {formatFileSize(file.size)}
               </p>
 
               {status === 'analyzing' && (
                 <div className="mt-4 space-y-2">
                   <div className="flex items-center gap-2 text-sm text-blue-600">
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>AI מנתח את המסמך שלך...</span>
+                    <span>{getProcessingMessage(extractionMethod)}</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
                     <div
@@ -191,7 +263,7 @@ export const IntelligentDocumentUpload: React.FC<IntelligentDocumentUploadProps>
                     />
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    זה עשוי לקחת 5-15 שניות בהתאם למורכבות המסמך
+                    {getProcessingTimeEstimate(extractionMethod)}
                   </p>
                 </div>
               )}
@@ -199,14 +271,32 @@ export const IntelligentDocumentUpload: React.FC<IntelligentDocumentUploadProps>
           </div>
 
           {status === 'idle' && (
-            <div className="mt-6 flex gap-2">
-              <Button onClick={handleAnalyze} className="flex-1">
-                <Sparkles className="w-4 h-4 mr-2" />
-                נתח עם AI
-              </Button>
-              <Button variant="outline" onClick={() => setFile(null)}>
-                הסר
-              </Button>
+            <div className="mt-6 space-y-3">
+              {/* Show extraction method info */}
+              <div className="bg-blue-50 border border-blue-200 rounded p-3 text-sm">
+                <div className="font-medium text-blue-900 mb-1">
+                  {extractionMethod === 'excel' && '⚡ חילוץ מהיר ומדויק'}
+                  {extractionMethod === 'pdf' && '📄 חילוץ טקסט מ-PDF'}
+                  {extractionMethod === 'ai' && '🤖 ניתוח מבוסס AI Vision'}
+                </div>
+                <div className="text-blue-700">
+                  {extractionMethod === 'excel' && 'קובץ זה ינותח באמצעות מנתח Excel מובנה - תהליך מהיר וללא עלות API'}
+                  {extractionMethod === 'pdf' && 'חילוץ טקסט מ-PDF. אם התוצאות לא טובות, המר ל-תמונה לניתוח AI'}
+                  {extractionMethod === 'ai' && 'תמונה זו תנותח באמצעות Claude AI Vision למיצוי מיטבי (משתמש ב-API credits)'}
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <Button onClick={handleAnalyze} className="flex-1">
+                  {extractionMethod === 'excel' && <Zap className="w-4 h-4 mr-2" />}
+                  {extractionMethod === 'pdf' && <FileText className="w-4 h-4 mr-2" />}
+                  {extractionMethod === 'ai' && <Sparkles className="w-4 h-4 mr-2" />}
+                  נתח מסמך
+                </Button>
+                <Button variant="outline" onClick={() => setFile(null)}>
+                  הסר
+                </Button>
+              </div>
             </div>
           )}
         </div>
@@ -270,7 +360,7 @@ export const IntelligentDocumentUpload: React.FC<IntelligentDocumentUploadProps>
         {status === 'idle' && !file && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Sparkles className="w-4 h-4" />
-            <span>מופעל על ידי Claude AI</span>
+            <span>Excel/PDF מובנה • AI Vision עבור תמונות</span>
           </div>
         )}
       </div>

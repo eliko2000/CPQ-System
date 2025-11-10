@@ -107,7 +107,8 @@ type CPQAction =
   | { type: 'CLOSE_MODAL' }
 
 // ============ Demo Data ============
-const demoQuotations: QuotationProject[] = [
+// Preserved for future reference - uncomment if needed
+/* const demoQuotations: QuotationProject[] = [
   {
     id: 'quote_demo_1',
     name: 'הצעת מחיר - מערכת בקרה תעשייתית',
@@ -311,9 +312,9 @@ const demoQuotations: QuotationProject[] = [
           profitMarginPercent: 0
         }
   }
-]
+] */
 
-const demoComponents: Component[] = [
+/* const demoComponents: Component[] = [
   {
     id: 'comp_1',
     name: 'שסתום סולנואידי 2 דרכי',
@@ -884,7 +885,7 @@ const demoComponents: Component[] = [
     createdAt: '2024-03-30T11:20:00Z',
     updatedAt: '2024-03-30T11:20:00Z'
   }
-]
+] */
 
 // ============ Reducer ============
 const initialState: CPQState = {

@@ -202,7 +202,7 @@ export function EnhancedComponentGrid({
         uniqueValues: getUniqueValues('supplier')
       }),
       filterParams: {
-        values: (params: any) => getUniqueValues('supplier')
+        values: (_params: any) => getUniqueValues('supplier')
       }
     },
     {
@@ -226,7 +226,7 @@ export function EnhancedComponentGrid({
         uniqueValues: getUniqueValues('manufacturer')
       }),
       filterParams: {
-        values: (params: any) => getUniqueValues('manufacturer')
+        values: (_params: any) => getUniqueValues('manufacturer')
       }
     },
     {
@@ -255,7 +255,7 @@ export function EnhancedComponentGrid({
         </div>
       ),
       filterParams: {
-        values: (params: any) => getUniqueValues('name')
+        values: (_params: any) => getUniqueValues('name')
       }
     },
     {
@@ -280,7 +280,7 @@ export function EnhancedComponentGrid({
       }),
       cellClass: 'font-mono text-sm',
       filterParams: {
-        values: (params: any) => getUniqueValues('manufacturerPN')
+        values: (_params: any) => getUniqueValues('manufacturerPN')
       }
     },
     {
@@ -454,7 +454,7 @@ export function EnhancedComponentGrid({
         uniqueValues: getUniqueValues('description')
       }),
       filterParams: {
-        values: (params: any) => getUniqueValues('description')
+        values: (_params: any) => getUniqueValues('description')
       }
     },
     {
@@ -479,7 +479,7 @@ export function EnhancedComponentGrid({
         uniqueValues: getUniqueValues('notes')
       }),
       filterParams: {
-        values: (params: any) => getUniqueValues('notes')
+        values: (_params: any) => getUniqueValues('notes')
       }
     }
   ], [getUniqueValues, handleCellEdit, onEdit, onDelete, onView, onDuplicate])

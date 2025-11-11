@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
@@ -22,12 +22,14 @@ import {
   List,
   Grid3x3,
   Trash2,
-  Edit2
+  Edit2,
+  Loader2
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { DEFAULT_COMPONENT_CATEGORIES, TABLE_COLUMN_DEFINITIONS, getDefaultVisibleColumns, notifyCategoriesUpdated } from '@/constants/settings'
 import { CategoryMigrationDialog } from '../ui/CategoryMigrationDialog'
 import { useCPQ } from '@/contexts/CPQContext'
+import { loadSetting, saveSetting, migrateLocalStorageToSupabase } from '@/services/settingsService'
 
 interface SettingsData {
   general: {
@@ -950,14 +952,8 @@ function AppearanceSettings() {
 
 function ComponentCategoriesSettings() {
   const { components, updateComponent } = useCPQ()
-  const [categories, setCategories] = useState<string[]>(() => {
-    const savedSettings = localStorage.getItem('cpq-settings')
-    if (savedSettings) {
-      const parsed = JSON.parse(savedSettings)
-      return parsed.componentCategories?.categories || [...DEFAULT_COMPONENT_CATEGORIES]
-    }
-    return [...DEFAULT_COMPONENT_CATEGORIES]
-  })
+  const [categories, setCategories] = useState<string[]>([...DEFAULT_COMPONENT_CATEGORIES])
+  const [isLoading, setIsLoading] = useState(true)
   const [newCategory, setNewCategory] = useState('')
   const [editingCategory, setEditingCategory] = useState<{
     index: number
@@ -975,14 +971,40 @@ function ComponentCategoriesSettings() {
     componentCount: 0
   })
 
-  const updateCategoriesInStorage = (updatedCategories: string[]) => {
-    const savedSettings = localStorage.getItem('cpq-settings')
-    if (savedSettings) {
-      const parsed = JSON.parse(savedSettings)
-      parsed.componentCategories = { categories: updatedCategories }
-      localStorage.setItem('cpq-settings', JSON.stringify(parsed))
+  // Load categories from Supabase on mount
+  useEffect(() => {
+    async function loadCategories() {
+      setIsLoading(true)
+      try {
+        // First, migrate any old localStorage settings
+        await migrateLocalStorageToSupabase()
+
+        // Load from Supabase
+        const result = await loadSetting<{ categories: string[] }>('componentCategories')
+        if (result.success && result.data?.categories) {
+          setCategories(result.data.categories)
+        } else {
+          // No settings found, use defaults
+          setCategories([...DEFAULT_COMPONENT_CATEGORIES])
+        }
+      } catch (error) {
+        console.error('Error loading categories:', error)
+        setCategories([...DEFAULT_COMPONENT_CATEGORIES])
+      } finally {
+        setIsLoading(false)
+      }
     }
-    notifyCategoriesUpdated()
+    loadCategories()
+  }, [])
+
+  const updateCategoriesInStorage = async (updatedCategories: string[]) => {
+    try {
+      // Save to Supabase (also caches in localStorage)
+      await saveSetting('componentCategories', { categories: updatedCategories })
+      notifyCategoriesUpdated()
+    } catch (error) {
+      console.error('Error saving categories:', error)
+    }
   }
 
   const handleAddCategory = () => {
@@ -1108,6 +1130,25 @@ function ComponentCategoriesSettings() {
     c => c !== migrationDialog.categoryToDelete
   )
 
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>קטגוריות רכיבים</CardTitle>
+            <CardDescription>ניהול רשימת הקטגוריות לרכיבים במערכת</CardDescription>
+          </CardHeader>
+          <CardContent className="flex items-center justify-center py-8">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              <span>טוען הגדרות מהענן...</span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   return (
     <>
       <CategoryMigrationDialog
@@ -1219,22 +1260,42 @@ function ComponentCategoriesSettings() {
 
 function TableColumnsSettings() {
   const [activeTable, setActiveTable] = useState<'component_library' | 'bom_grid' | 'quotation_data_grid'>('component_library')
-  const [tableSettings, setTableSettings] = useState(() => {
-    const savedSettings = localStorage.getItem('cpq-settings')
-    if (savedSettings) {
-      const parsed = JSON.parse(savedSettings)
-      return parsed.tableColumns || {
-        component_library: getDefaultVisibleColumns('component_library'),
-        bom_grid: getDefaultVisibleColumns('bom_grid'),
-        quotation_data_grid: getDefaultVisibleColumns('quotation_data_grid')
+  const [isLoading, setIsLoading] = useState(true)
+  const [tableSettings, setTableSettings] = useState({
+    component_library: getDefaultVisibleColumns('component_library'),
+    bom_grid: getDefaultVisibleColumns('bom_grid'),
+    quotation_data_grid: getDefaultVisibleColumns('quotation_data_grid')
+  })
+
+  // Load table settings from Supabase on mount
+  useEffect(() => {
+    async function loadTableSettings() {
+      setIsLoading(true)
+      try {
+        const result = await loadSetting<{
+          component_library: string[]
+          bom_grid: string[]
+          quotation_data_grid: string[]
+        }>('tableColumns')
+
+        if (result.success && result.data) {
+          setTableSettings(result.data)
+        } else {
+          // Use defaults
+          setTableSettings({
+            component_library: getDefaultVisibleColumns('component_library'),
+            bom_grid: getDefaultVisibleColumns('bom_grid'),
+            quotation_data_grid: getDefaultVisibleColumns('quotation_data_grid')
+          })
+        }
+      } catch (error) {
+        console.error('Error loading table settings:', error)
+      } finally {
+        setIsLoading(false)
       }
     }
-    return {
-      component_library: getDefaultVisibleColumns('component_library'),
-      bom_grid: getDefaultVisibleColumns('bom_grid'),
-      quotation_data_grid: getDefaultVisibleColumns('quotation_data_grid')
-    }
-  })
+    loadTableSettings()
+  }, [])
 
   const tableNames = {
     component_library: 'ספריית רכיבים',
@@ -1242,7 +1303,7 @@ function TableColumnsSettings() {
     quotation_data_grid: 'טבלת הצעות מחיר'
   }
 
-  const handleToggleColumn = (tableType: typeof activeTable, columnId: string) => {
+  const handleToggleColumn = async (tableType: typeof activeTable, columnId: string) => {
     const currentColumns = tableSettings[tableType] || []
     const updatedColumns = currentColumns.includes(columnId)
       ? currentColumns.filter(id => id !== columnId)
@@ -1255,16 +1316,17 @@ function TableColumnsSettings() {
 
     setTableSettings(updatedSettings)
 
-    // Update settings in localStorage
-    const savedSettings = localStorage.getItem('cpq-settings')
-    if (savedSettings) {
-      const parsed = JSON.parse(savedSettings)
-      parsed.tableColumns = updatedSettings
-      localStorage.setItem('cpq-settings', JSON.stringify(parsed))
+    // Save to Supabase
+    try {
+      await saveSetting('tableColumns', updatedSettings)
+      // Notify grids that table column settings have changed
+      window.dispatchEvent(new CustomEvent('cpq-settings-updated'))
+    } catch (error) {
+      console.error('Error saving table column settings:', error)
     }
   }
 
-  const handleResetTable = (tableType: typeof activeTable) => {
+  const handleResetTable = async (tableType: typeof activeTable) => {
     const defaultColumns = getDefaultVisibleColumns(tableType)
     const updatedSettings = {
       ...tableSettings,
@@ -1273,13 +1335,33 @@ function TableColumnsSettings() {
 
     setTableSettings(updatedSettings)
 
-    // Update settings in localStorage
-    const savedSettings = localStorage.getItem('cpq-settings')
-    if (savedSettings) {
-      const parsed = JSON.parse(savedSettings)
-      parsed.tableColumns = updatedSettings
-      localStorage.setItem('cpq-settings', JSON.stringify(parsed))
+    // Save to Supabase
+    try {
+      await saveSetting('tableColumns', updatedSettings)
+      // Notify grids that table column settings have changed
+      window.dispatchEvent(new CustomEvent('cpq-settings-updated'))
+    } catch (error) {
+      console.error('Error saving table column settings:', error)
     }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>עמודות ברירת מחדל לטבלאות</CardTitle>
+            <CardDescription>בחר אילו עמודות יוצגו כברירת מחדל בכל טבלה</CardDescription>
+          </CardHeader>
+          <CardContent className="flex items-center justify-center py-8">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              <span>טוען הגדרות מהענן...</span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (

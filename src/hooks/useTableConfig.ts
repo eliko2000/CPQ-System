@@ -1,11 +1,19 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../supabaseClient'
+import { getTableColumnSettings, TableType } from '../constants/settings'
 
 export interface TableConfig {
   columnOrder: string[]
   columnWidths: Record<string, number>
-  visibleColumns: string[]
+  visibleColumns: string[] // Read-only, loaded from settings
   filterState: any // AG Grid filter model
+}
+
+interface SavedTableConfig {
+  columnOrder: string[]
+  columnWidths: Record<string, number>
+  filterState: any
+  // visibleColumns is NOT saved - always loaded from user_settings
 }
 
 export function useTableConfig(tableName: string, defaultConfig: TableConfig) {
@@ -17,9 +25,34 @@ export function useTableConfig(tableName: string, defaultConfig: TableConfig) {
     loadConfig()
   }, [tableName])
 
+  // Listen for settings updates and reload visible columns
+  useEffect(() => {
+    const handleSettingsUpdate = () => {
+      console.log(`[useTableConfig] Settings updated, reloading visible columns for ${tableName}`)
+      const newVisibleColumns = getTableColumnSettings(tableName as TableType)
+      setConfig(prev => ({ ...prev, visibleColumns: newVisibleColumns }))
+    }
+
+    // Listen for storage events (settings changes)
+    window.addEventListener('storage', handleSettingsUpdate)
+
+    // Listen for custom settings update event
+    window.addEventListener('cpq-settings-updated', handleSettingsUpdate)
+
+    return () => {
+      window.removeEventListener('storage', handleSettingsUpdate)
+      window.removeEventListener('cpq-settings-updated', handleSettingsUpdate)
+    }
+  }, [tableName])
+
   const loadConfig = async () => {
     try {
       const userId = 'default-user' // Replace with actual user ID when auth is added
+
+      // Always load visible columns from settings (user_settings table)
+      const visibleColumnsFromSettings = getTableColumnSettings(tableName as TableType)
+      console.log(`[useTableConfig] Loaded visible columns from settings for ${tableName}:`, visibleColumnsFromSettings)
+
       const { data, error: _error } = await supabase
         .from('user_table_configs')
         .select('config')
@@ -28,10 +61,9 @@ export function useTableConfig(tableName: string, defaultConfig: TableConfig) {
         .single()
 
       if (data?.config) {
-        console.log(`[useTableConfig] Loaded config for ${tableName}:`, data.config)
+        console.log(`[useTableConfig] Loaded saved config for ${tableName}:`, data.config)
 
-        // Smart merge: Use default order and add any missing columns from saved config
-        const savedConfig = data.config as TableConfig
+        const savedConfig = data.config as SavedTableConfig
 
         // Build columnOrder: Start with default order, then append saved columns not in defaults
         const newColumnOrder = [
@@ -39,39 +71,30 @@ export function useTableConfig(tableName: string, defaultConfig: TableConfig) {
           ...savedConfig.columnOrder.filter(col => !defaultConfig.columnOrder.includes(col))
         ]
 
-        // Build visibleColumns: Include saved visible columns that are in the new order,
-        // plus any new default visible columns
-        const newVisibleColumns = [
-          ...savedConfig.visibleColumns.filter(col => newColumnOrder.includes(col)),
-          ...defaultConfig.visibleColumns.filter(col => !savedConfig.visibleColumns.includes(col))
-        ]
-
         const mergedConfig: TableConfig = {
           columnOrder: newColumnOrder,
           columnWidths: { ...savedConfig.columnWidths },
-          visibleColumns: newVisibleColumns,
+          visibleColumns: visibleColumnsFromSettings, // Always from settings
           filterState: savedConfig.filterState || {}
         }
 
         console.log(`[useTableConfig] Merged config for ${tableName}:`, mergedConfig)
         setConfig(mergedConfig)
-
-        // Save the merged config back to database
-        await supabase
-          .from('user_table_configs')
-          .update({
-            config: mergedConfig,
-            updated_at: new Date().toISOString()
-          })
-          .eq('user_id', userId)
-          .eq('table_name', tableName)
       } else {
-        console.log(`[useTableConfig] No saved config for ${tableName}, using defaults`)
-        setConfig(defaultConfig)
+        console.log(`[useTableConfig] No saved config for ${tableName}, using defaults with settings visible columns`)
+        setConfig({
+          ...defaultConfig,
+          visibleColumns: visibleColumnsFromSettings // Always from settings
+        })
       }
     } catch (err) {
       console.error('Failed to load table config:', err)
-      setConfig(defaultConfig)
+      // Even on error, use settings for visible columns
+      const visibleColumnsFromSettings = getTableColumnSettings(tableName as TableType)
+      setConfig({
+        ...defaultConfig,
+        visibleColumns: visibleColumnsFromSettings
+      })
     } finally {
       setLoading(false)
     }
@@ -83,14 +106,23 @@ export function useTableConfig(tableName: string, defaultConfig: TableConfig) {
 
     try {
       const userId = 'default-user'
-      console.log(`[useTableConfig] Saving config for ${tableName}:`, updatedConfig)
+
+      // Extract only the fields we want to save (NOT visibleColumns)
+      const configToSave: SavedTableConfig = {
+        columnOrder: updatedConfig.columnOrder,
+        columnWidths: updatedConfig.columnWidths,
+        filterState: updatedConfig.filterState
+        // visibleColumns is intentionally excluded - it's always loaded from user_settings
+      }
+
+      console.log(`[useTableConfig] Saving config for ${tableName}:`, configToSave)
 
       const { error } = await supabase
         .from('user_table_configs')
         .upsert({
           user_id: userId,
           table_name: tableName,
-          config: updatedConfig,
+          config: configToSave,
           updated_at: new Date().toISOString()
         }, {
           onConflict: 'user_id,table_name'

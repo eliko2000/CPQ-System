@@ -107,3 +107,35 @@ CREATE TABLE IF NOT EXISTS user_table_configs (
 
 ALTER TABLE user_table_configs ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Enable all operations for user_table_configs" ON user_table_configs FOR ALL USING (true) WITH CHECK (true);
+
+-- User settings persistence (categories, pricing defaults, company info, etc.)
+CREATE TABLE IF NOT EXISTS user_settings (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id TEXT NOT NULL DEFAULT 'default',
+  setting_key TEXT NOT NULL,
+  setting_value JSONB NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  CONSTRAINT unique_user_setting UNIQUE(user_id, setting_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_settings_lookup
+ON user_settings(user_id, setting_key);
+
+ALTER TABLE user_settings ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Enable all operations for user_settings" ON user_settings FOR ALL USING (true) WITH CHECK (true);
+
+-- Update trigger for user_settings
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS update_user_settings_updated_at ON user_settings;
+CREATE TRIGGER update_user_settings_updated_at
+BEFORE UPDATE ON user_settings
+FOR EACH ROW
+EXECUTE FUNCTION update_updated_at_column();

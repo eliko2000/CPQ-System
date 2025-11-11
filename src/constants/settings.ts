@@ -1,7 +1,12 @@
 /**
  * Settings Constants
  * Centralized constants for component categories and table configurations
+ *
+ * NOTE: These functions read from localStorage cache. Settings are persisted
+ * to Supabase by the settingsService and cached locally for fast access.
  */
+
+import { loadSetting } from '@/services/settingsService'
 
 // ============ Component Categories ============
 
@@ -93,19 +98,42 @@ export function notifyCategoriesUpdated(): void {
 }
 
 /**
- * Get component categories from localStorage or default
+ * Get component categories from cache (synced with Supabase)
+ * Reads from localStorage cache for fast synchronous access
  */
 export function getComponentCategories(): string[] {
   try {
-    const settings = localStorage.getItem('cpq-settings');
-    if (settings) {
-      const parsed = JSON.parse(settings);
+    // Try new cache format first
+    const cache = localStorage.getItem('cpq-settings-cache');
+    if (cache) {
+      const parsed = JSON.parse(cache);
+      if (parsed.componentCategories?.categories && Array.isArray(parsed.componentCategories.categories)) {
+        return parsed.componentCategories.categories;
+      }
+    }
+
+    // Fallback to old format for backward compatibility
+    const oldSettings = localStorage.getItem('cpq-settings');
+    if (oldSettings) {
+      const parsed = JSON.parse(oldSettings);
       if (parsed.componentCategories?.categories && Array.isArray(parsed.componentCategories.categories)) {
         return parsed.componentCategories.categories;
       }
     }
   } catch (error) {
-    console.error('Error loading component categories from settings:', error);
+    console.error('Error loading component categories from cache:', error);
+  }
+  return [...DEFAULT_COMPONENT_CATEGORIES];
+}
+
+/**
+ * Load component categories from Supabase asynchronously
+ * Use this on app initialization to sync cache with database
+ */
+export async function loadComponentCategoriesFromSupabase(): Promise<string[]> {
+  const result = await loadSetting<{ categories: string[] }>('componentCategories');
+  if (result.success && result.data?.categories) {
+    return result.data.categories;
   }
   return [...DEFAULT_COMPONENT_CATEGORIES];
 }
@@ -119,19 +147,30 @@ export function getDefaultVisibleColumns(tableType: TableType): string[] {
 }
 
 /**
- * Get table column configuration from settings
+ * Get table column configuration from cache (synced with Supabase)
+ * Reads from localStorage cache for fast synchronous access
  */
 export function getTableColumnSettings(tableType: TableType): string[] {
   try {
-    const settings = localStorage.getItem('cpq-settings');
-    if (settings) {
-      const parsed = JSON.parse(settings);
+    // Try new cache format first
+    const cache = localStorage.getItem('cpq-settings-cache');
+    if (cache) {
+      const parsed = JSON.parse(cache);
+      if (parsed.tableColumns && parsed.tableColumns[tableType]) {
+        return parsed.tableColumns[tableType];
+      }
+    }
+
+    // Fallback to old format for backward compatibility
+    const oldSettings = localStorage.getItem('cpq-settings');
+    if (oldSettings) {
+      const parsed = JSON.parse(oldSettings);
       if (parsed.tableColumns && parsed.tableColumns[tableType]) {
         return parsed.tableColumns[tableType];
       }
     }
   } catch (error) {
-    console.error('Error loading table column settings:', error);
+    console.error('Error loading table column settings from cache:', error);
   }
   return getDefaultVisibleColumns(tableType);
 }

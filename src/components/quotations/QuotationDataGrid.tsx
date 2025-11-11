@@ -13,6 +13,7 @@ import { Edit, Trash2, Copy, Plus, Settings, ChevronDown } from 'lucide-react'
 import { useClickOutside } from '../../hooks/useClickOutside'
 import { useTableConfig } from '../../hooks/useTableConfig'
 import { CustomHeader } from '../grid/CustomHeader'
+import { getTableColumnSettings } from '../../constants/settings'
 
 import 'ag-grid-community/styles/ag-grid.css'
 import 'ag-grid-community/styles/ag-theme-alpine.css'
@@ -123,10 +124,10 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
   const isInitialMount = useRef(true)
 
   // Use table configuration hook - RTL order (stored order matches desired display order)
-  const { config, saveConfig } = useTableConfig('quotation_grid', {
+  const { config, saveConfig } = useTableConfig('quotation_data_grid', {
     columnOrder: ['actions', 'customer_name', 'project_name', 'version', 'status', 'displayTotalPrice', 'created_at', 'updated_at'],
     columnWidths: {},
-    visibleColumns: ['actions', 'customer_name', 'project_name', 'version', 'status', 'displayTotalPrice', 'created_at', 'updated_at'],
+    visibleColumns: getTableColumnSettings('quotation_data_grid'),
     filterState: {}
   })
 

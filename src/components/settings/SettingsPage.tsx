@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
@@ -18,9 +18,18 @@ import {
   Database,
   Shield,
   Bell,
-  Palette
+  Palette,
+  List,
+  Grid3x3,
+  Trash2,
+  Edit2,
+  Loader2
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { DEFAULT_COMPONENT_CATEGORIES, TABLE_COLUMN_DEFINITIONS, getDefaultVisibleColumns, notifyCategoriesUpdated } from '@/constants/settings'
+import { CategoryMigrationDialog } from '../ui/CategoryMigrationDialog'
+import { useCPQ } from '@/contexts/CPQContext'
+import { loadSetting, saveSetting, migrateLocalStorageToSupabase } from '@/services/settingsService'
 
 interface SettingsData {
   general: {
@@ -83,6 +92,14 @@ interface SettingsData {
     autoSave: boolean
     confirmActions: boolean
     itemsPerPage: string
+  }
+  componentCategories: {
+    categories: string[]
+  }
+  tableColumns: {
+    component_library: string[]
+    bom_grid: string[]
+    quotation_data_grid: string[]
   }
 }
 
@@ -157,6 +174,14 @@ function getDefaultSettings(): SettingsData {
       autoSave: true,
       confirmActions: true,
       itemsPerPage: '25'
+    },
+    componentCategories: {
+      categories: [...DEFAULT_COMPONENT_CATEGORIES]
+    },
+    tableColumns: {
+      component_library: getDefaultVisibleColumns('component_library'),
+      bom_grid: getDefaultVisibleColumns('bom_grid'),
+      quotation_data_grid: getDefaultVisibleColumns('quotation_data_grid')
     }
   }
 }
@@ -223,15 +248,6 @@ function applySettings(settings: SettingsData): void {
 
 export function SettingsPage() {
   const [activeSection, setActiveSection] = useState('general')
-  const [hasChanges, setHasChanges] = useState(false)
-  const [isSaving, setIsSaving] = useState(false)
-  const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
-
-  // Load settings from localStorage on mount
-  const [settings, setSettings] = useState<SettingsData>(() => {
-    const savedSettings = localStorage.getItem('cpq-settings')
-    return savedSettings ? JSON.parse(savedSettings) : getDefaultSettings()
-  })
 
   const settingsSections: SettingsSection[] = [
     {
@@ -289,53 +305,22 @@ export function SettingsPage() {
       description: 'עיצוב, שפה והגדרות ממשק',
       icon: Palette,
       component: AppearanceSettings
+    },
+    {
+      id: 'componentCategories',
+      title: 'קטגוריות רכיבים',
+      description: 'ניהול קטגוריות רכיבים במערכת',
+      icon: List,
+      component: ComponentCategoriesSettings
+    },
+    {
+      id: 'tableColumns',
+      title: 'עמודות טבלאות',
+      description: 'הגדרות עמודות ברירת מחדל לטבלאות',
+      icon: Grid3x3,
+      component: TableColumnsSettings
     }
   ]
-
-  // Save settings to localStorage
-  const saveSettings = async () => {
-    setIsSaving(true)
-    setSaveMessage(null)
-    
-    try {
-      // Validate settings
-      const validationErrors = validateSettings(settings)
-      if (validationErrors.length > 0) {
-        setSaveMessage({
-          type: 'error',
-          message: `שגיאות באימות: ${validationErrors.join(', ')}`
-        })
-        return
-      }
-
-      // Save to localStorage
-      localStorage.setItem('cpq-settings', JSON.stringify(settings))
-      
-      // Apply settings to application
-      applySettings(settings)
-      
-      setHasChanges(false)
-      setSaveMessage({
-        type: 'success',
-        message: 'ההגדרות נשמרו בהצלחה'
-      })
-    } catch (error) {
-      setSaveMessage({
-        type: 'error',
-        message: 'שגיאה בשמירת ההגדרות'
-      })
-    } finally {
-      setIsSaving(false)
-      setTimeout(() => setSaveMessage(null), 3000)
-    }
-  }
-
-  // Reset settings to defaults
-  const resetSettings = () => {
-    const defaultSettings = getDefaultSettings()
-    setSettings(defaultSettings)
-    setHasChanges(true)
-  }
 
   const ActiveComponent = settingsSections.find(section => section.id === activeSection)?.component || GeneralSettings
 
@@ -385,43 +370,6 @@ export function SettingsPage() {
             })}
           </nav>
         </div>
-
-        {/* Action Buttons */}
-        <div className="p-6 border-t border-border space-y-3">
-          {/* Save Message */}
-          {saveMessage && (
-            <div className={cn(
-              "p-3 rounded-lg mb-3 flex items-center space-x-reverse space-x-2",
-              saveMessage.type === 'success' 
-                ? "bg-green-50 text-green-800 border border-green-200" 
-                : "bg-red-50 text-red-800 border border-red-200"
-            )}>
-              {saveMessage.type === 'success' ? (
-                <Check className="h-4 w-4" />
-              ) : (
-                <AlertCircle className="h-4 w-4" />
-              )}
-              <span className="text-sm font-medium">{saveMessage.message}</span>
-            </div>
-          )}
-          
-          <Button 
-            className="w-full" 
-            onClick={saveSettings}
-            disabled={!hasChanges || isSaving}
-          >
-            <Save className="h-4 w-4 ml-2" />
-            {isSaving ? 'שומר...' : 'שמור שינויים'}
-          </Button>
-          <Button 
-            variant="outline" 
-            className="w-full"
-            onClick={resetSettings}
-          >
-            <RotateCcw className="h-4 w-4 ml-2" />
-            אפס לברירת מחדל
-          </Button>
-        </div>
       </div>
 
       {/* Main Content */}
@@ -437,7 +385,7 @@ export function SettingsPage() {
               </p>
             </div>
 
-            <ActiveComponent onSettingsChange={() => setHasChanges(true)} />
+            <ActiveComponent />
           </div>
         </div>
       </div>
@@ -447,7 +395,7 @@ export function SettingsPage() {
 
 // ============ Individual Settings Sections ============
 
-function GeneralSettings({ onSettingsChange }: { onSettingsChange: () => void }) {
+function GeneralSettings() {
   return (
     <div className="space-y-6">
       <Card>
@@ -461,7 +409,7 @@ function GeneralSettings({ onSettingsChange }: { onSettingsChange: () => void })
               <label className="block text-sm font-medium mb-2">שם המערכת</label>
               <Input 
                 defaultValue="מערכת CPQ חכמה" 
-                onChange={onSettingsChange}
+                
               />
             </div>
             <div>
@@ -473,7 +421,7 @@ function GeneralSettings({ onSettingsChange }: { onSettingsChange: () => void })
             <label className="block text-sm font-medium mb-2">תיאור מערכת</label>
             <Input 
               defaultValue="מערכת לניהול הצעות מחיר לפרויקטי רובוטיקה" 
-              onChange={onSettingsChange}
+              
             />
           </div>
         </CardContent>
@@ -488,7 +436,7 @@ function GeneralSettings({ onSettingsChange }: { onSettingsChange: () => void })
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-2">אזור זמן</label>
-              <select className="w-full p-2 border rounded-md" onChange={onSettingsChange}>
+              <select className="w-full p-2 border rounded-md" >
                 <option value="Asia/Jerusalem">ישראל (GMT+2)</option>
                 <option value="UTC">UTC (GMT+0)</option>
                 <option value="America/New_York">ניו יורק (GMT-5)</option>
@@ -496,7 +444,7 @@ function GeneralSettings({ onSettingsChange }: { onSettingsChange: () => void })
             </div>
             <div>
               <label className="block text-sm font-medium mb-2">פורמט תאריך</label>
-              <select className="w-full p-2 border rounded-md" onChange={onSettingsChange}>
+              <select className="w-full p-2 border rounded-md" >
                 <option value="DD/MM/YYYY">DD/MM/YYYY</option>
                 <option value="MM/DD/YYYY">MM/DD/YYYY</option>
                 <option value="YYYY-MM-DD">YYYY-MM-DD</option>
@@ -509,7 +457,7 @@ function GeneralSettings({ onSettingsChange }: { onSettingsChange: () => void })
   )
 }
 
-function CompanySettings({ onSettingsChange }: { onSettingsChange: () => void }) {
+function CompanySettings() {
   return (
     <div className="space-y-6">
       <Card>
@@ -521,30 +469,30 @@ function CompanySettings({ onSettingsChange }: { onSettingsChange: () => void })
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-2">שם חברה</label>
-              <Input placeholder="שם החברה" onChange={onSettingsChange} />
+              <Input placeholder="שם החברה"  />
             </div>
             <div>
               <label className="block text-sm font-medium mb-2">ח.פ./ע.מ.</label>
-              <Input placeholder="ח.פ. או ע.מ." onChange={onSettingsChange} />
+              <Input placeholder="ח.פ. או ע.מ."  />
             </div>
           </div>
           <div>
             <label className="block text-sm font-medium mb-2">כתובת</label>
-            <Input placeholder="רחוב, מספר, עיר" onChange={onSettingsChange} />
+            <Input placeholder="רחוב, מספר, עיר"  />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-2">טלפון</label>
-              <Input placeholder="טלפון ראשי" onChange={onSettingsChange} />
+              <Input placeholder="טלפון ראשי"  />
             </div>
             <div>
               <label className="block text-sm font-medium mb-2">פקס</label>
-              <Input placeholder="מספר פקס" onChange={onSettingsChange} />
+              <Input placeholder="מספר פקס"  />
             </div>
           </div>
           <div>
             <label className="block text-sm font-medium mb-2">אתר אינטרנט</label>
-            <Input placeholder="www.example.com" onChange={onSettingsChange} />
+            <Input placeholder="www.example.com"  />
           </div>
         </CardContent>
       </Card>
@@ -558,21 +506,21 @@ function CompanySettings({ onSettingsChange }: { onSettingsChange: () => void })
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-2">שם איש קשר</label>
-              <Input placeholder="שם מלא" onChange={onSettingsChange} />
+              <Input placeholder="שם מלא"  />
             </div>
             <div>
               <label className="block text-sm font-medium mb-2">תפקיד</label>
-              <Input placeholder="תפקיד בחברה" onChange={onSettingsChange} />
+              <Input placeholder="תפקיד בחברה"  />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-2">אימייל</label>
-              <Input type="email" placeholder="email@company.com" onChange={onSettingsChange} />
+              <Input type="email" placeholder="email@company.com"  />
             </div>
             <div>
               <label className="block text-sm font-medium mb-2">טלפון נייד</label>
-              <Input placeholder="טלפון נייד" onChange={onSettingsChange} />
+              <Input placeholder="טלפון נייד"  />
             </div>
           </div>
         </CardContent>
@@ -581,7 +529,7 @@ function CompanySettings({ onSettingsChange }: { onSettingsChange: () => void })
   )
 }
 
-function PricingSettings({ onSettingsChange }: { onSettingsChange: () => void }) {
+function PricingSettings() {
   return (
     <div className="space-y-6">
       <Card>
@@ -597,7 +545,7 @@ function PricingSettings({ onSettingsChange }: { onSettingsChange: () => void })
                 type="number" 
                 step="0.01" 
                 defaultValue="3.70" 
-                onChange={onSettingsChange}
+                
               />
             </div>
             <div>
@@ -606,12 +554,12 @@ function PricingSettings({ onSettingsChange }: { onSettingsChange: () => void })
                 type="number" 
                 step="0.01" 
                 defaultValue="4.00" 
-                onChange={onSettingsChange}
+                
               />
             </div>
           </div>
           <div className="flex items-center space-x-reverse space-x-2">
-            <input type="checkbox" id="autoUpdate" onChange={onSettingsChange} />
+            <input type="checkbox" id="autoUpdate"  />
             <label htmlFor="autoUpdate" className="text-sm">עדכון אוטומטי מדי יום</label>
           </div>
           <Button variant="outline" className="w-full">
@@ -634,7 +582,7 @@ function PricingSettings({ onSettingsChange }: { onSettingsChange: () => void })
                 type="number" 
                 step="0.1" 
                 defaultValue="25" 
-                onChange={onSettingsChange}
+                
               />
             </div>
             <div>
@@ -643,7 +591,7 @@ function PricingSettings({ onSettingsChange }: { onSettingsChange: () => void })
                 type="number" 
                 step="0.1" 
                 defaultValue="5" 
-                onChange={onSettingsChange}
+                
               />
             </div>
           </div>
@@ -653,7 +601,7 @@ function PricingSettings({ onSettingsChange }: { onSettingsChange: () => void })
               type="number" 
               step="10" 
               defaultValue="1200" 
-              onChange={onSettingsChange}
+              
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -663,14 +611,14 @@ function PricingSettings({ onSettingsChange }: { onSettingsChange: () => void })
                 type="number" 
                 step="0.1" 
                 defaultValue="17" 
-                onChange={onSettingsChange}
+                
               />
             </div>
             <div>
               <label className="block text-sm font-medium mb-2">זמן אספקה ברירת מחדל</label>
               <Input 
                 defaultValue="4-6 שבועות" 
-                onChange={onSettingsChange}
+                
               />
             </div>
           </div>
@@ -680,7 +628,7 @@ function PricingSettings({ onSettingsChange }: { onSettingsChange: () => void })
   )
 }
 
-function QuotationSettings({ onSettingsChange }: { onSettingsChange: () => void }) {
+function QuotationSettings() {
   return (
     <div className="space-y-6">
       <Card>
@@ -693,7 +641,7 @@ function QuotationSettings({ onSettingsChange }: { onSettingsChange: () => void 
             <label className="block text-sm font-medium mb-2">כותרת הצעת מחיר</label>
             <Input 
               defaultValue="הצעת מחיר - {{project_name}}" 
-              onChange={onSettingsChange}
+              
             />
           </div>
           <div>
@@ -711,14 +659,14 @@ function QuotationSettings({ onSettingsChange }: { onSettingsChange: () => void 
               <label className="block text-sm font-medium mb-2">כותרת תחתונה</label>
               <Input 
                 placeholder="תודה על אמונכם" 
-                onChange={onSettingsChange}
+                
               />
             </div>
             <div>
               <label className="block text-sm font-medium mb-2">חתימה</label>
               <Input 
                 placeholder="שם החותם" 
-                onChange={onSettingsChange}
+                
               />
             </div>
           </div>
@@ -733,7 +681,7 @@ function QuotationSettings({ onSettingsChange }: { onSettingsChange: () => void 
         <CardContent className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-2">תנאי תשלום</label>
-            <select className="w-full p-2 border rounded-md" onChange={onSettingsChange}>
+            <select className="w-full p-2 border rounded-md" >
               <option value="net30">30 יום מקבלת חשבונית</option>
               <option value="net45">45 יום מקבלת חשבונית</option>
               <option value="net60">60 יום מקבלת חשבונית</option>
@@ -744,7 +692,7 @@ function QuotationSettings({ onSettingsChange }: { onSettingsChange: () => void 
             <label className="block text-sm font-medium mb-2">תנאי אחריות</label>
             <Input 
               defaultValue="שנת אחריות על חלקים ועבודה" 
-              onChange={onSettingsChange}
+              
             />
           </div>
         </CardContent>
@@ -753,7 +701,7 @@ function QuotationSettings({ onSettingsChange }: { onSettingsChange: () => void 
   )
 }
 
-function DatabaseSettings({ onSettingsChange }: { onSettingsChange: () => void }) {
+function DatabaseSettings() {
   return (
     <div className="space-y-6">
       <Card>
@@ -789,7 +737,7 @@ function DatabaseSettings({ onSettingsChange }: { onSettingsChange: () => void }
             </div>
           </div>
           <div className="flex items-center space-x-reverse space-x-2">
-            <input type="checkbox" id="autoBackup" onChange={onSettingsChange} />
+            <input type="checkbox" id="autoBackup"  />
             <label htmlFor="autoBackup" className="text-sm">גיבוי אוטומטי יומי</label>
           </div>
         </CardContent>
@@ -830,7 +778,7 @@ function DatabaseSettings({ onSettingsChange }: { onSettingsChange: () => void }
   )
 }
 
-function SecuritySettings({ onSettingsChange }: { onSettingsChange: () => void }) {
+function SecuritySettings() {
   return (
     <div className="space-y-6">
       <Card>
@@ -860,16 +808,16 @@ function SecuritySettings({ onSettingsChange }: { onSettingsChange: () => void }
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center space-x-reverse space-x-2">
-            <input type="checkbox" id="requireLogin" defaultChecked onChange={onSettingsChange} />
+            <input type="checkbox" id="requireLogin" defaultChecked  />
             <label htmlFor="requireLogin" className="text-sm">דרוש התחברות</label>
           </div>
           <div className="flex items-center space-x-reverse space-x-2">
-            <input type="checkbox" id="sessionTimeout" defaultChecked onChange={onSettingsChange} />
+            <input type="checkbox" id="sessionTimeout" defaultChecked  />
             <label htmlFor="sessionTimeout" className="text-sm">ניתוק אוטומטי אחרי חוסר פעילות</label>
           </div>
           <div>
             <label className="block text-sm font-medium mb-2">זמן ניתוק (דקות)</label>
-            <Input type="number" defaultValue="30" onChange={onSettingsChange} />
+            <Input type="number" defaultValue="30"  />
           </div>
         </CardContent>
       </Card>
@@ -877,7 +825,7 @@ function SecuritySettings({ onSettingsChange }: { onSettingsChange: () => void }
   )
 }
 
-function NotificationSettings({ onSettingsChange }: { onSettingsChange: () => void }) {
+function NotificationSettings() {
   return (
     <div className="space-y-6">
       <Card>
@@ -892,28 +840,28 @@ function NotificationSettings({ onSettingsChange }: { onSettingsChange: () => vo
                 <div className="font-medium">התראות דוא"ל</div>
                 <div className="text-sm text-muted-foreground">קבל התראות בדוא"ל</div>
               </div>
-              <input type="checkbox" defaultChecked onChange={onSettingsChange} />
+              <input type="checkbox" defaultChecked  />
             </div>
             <div className="flex items-center justify-between">
               <div>
                 <div className="font-medium">התראות דפדפן</div>
                 <div className="text-sm text-muted-foreground">התראות בדפדפן</div>
               </div>
-              <input type="checkbox" defaultChecked onChange={onSettingsChange} />
+              <input type="checkbox" defaultChecked  />
             </div>
             <div className="flex items-center justify-between">
               <div>
                 <div className="font-medium">התראות הצעות</div>
                 <div className="text-sm text-muted-foreground">עדכונים על הצעות מחיר</div>
               </div>
-              <input type="checkbox" defaultChecked onChange={onSettingsChange} />
+              <input type="checkbox" defaultChecked  />
             </div>
             <div className="flex items-center justify-between">
               <div>
                 <div className="font-medium">התראות מערכת</div>
                 <div className="text-sm text-muted-foreground">עדכוני מערכת ותחזוקה</div>
               </div>
-              <input type="checkbox" onChange={onSettingsChange} />
+              <input type="checkbox"  />
             </div>
           </div>
         </CardContent>
@@ -927,11 +875,11 @@ function NotificationSettings({ onSettingsChange }: { onSettingsChange: () => vo
         <CardContent className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-2">כתובת דוא"ל ראשית</label>
-            <Input type="email" placeholder="admin@company.com" onChange={onSettingsChange} />
+            <Input type="email" placeholder="admin@company.com"  />
           </div>
           <div>
             <label className="block text-sm font-medium mb-2">כתובות נוספות</label>
-            <Input placeholder="email1@company.com, email2@company.com" onChange={onSettingsChange} />
+            <Input placeholder="email1@company.com, email2@company.com"  />
           </div>
         </CardContent>
       </Card>
@@ -939,7 +887,7 @@ function NotificationSettings({ onSettingsChange }: { onSettingsChange: () => vo
   )
 }
 
-function AppearanceSettings({ onSettingsChange }: { onSettingsChange: () => void }) {
+function AppearanceSettings() {
   return (
     <div className="space-y-6">
       <Card>
@@ -950,7 +898,7 @@ function AppearanceSettings({ onSettingsChange }: { onSettingsChange: () => void
         <CardContent className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-2">ערכת נושא</label>
-            <select className="w-full p-2 border rounded-md" onChange={onSettingsChange}>
+            <select className="w-full p-2 border rounded-md" >
               <option value="light">בהיר</option>
               <option value="dark">כהה</option>
               <option value="system">ברירת מחדל מערכת</option>
@@ -958,17 +906,17 @@ function AppearanceSettings({ onSettingsChange }: { onSettingsChange: () => void
           </div>
           <div>
             <label className="block text-sm font-medium mb-2">שפה</label>
-            <select className="w-full p-2 border rounded-md" onChange={onSettingsChange}>
+            <select className="w-full p-2 border rounded-md" >
               <option value="he">עברית</option>
               <option value="en">English</option>
             </select>
           </div>
           <div className="flex items-center space-x-reverse space-x-2">
-            <input type="checkbox" id="compactMode" onChange={onSettingsChange} />
+            <input type="checkbox" id="compactMode"  />
             <label htmlFor="compactMode" className="text-sm">מצב קומפקטי</label>
           </div>
           <div className="flex items-center space-x-reverse space-x-2">
-            <input type="checkbox" id="showTooltips" defaultChecked onChange={onSettingsChange} />
+            <input type="checkbox" id="showTooltips" defaultChecked  />
             <label htmlFor="showTooltips" className="text-sm">הצג טיפים</label>
           </div>
         </CardContent>
@@ -981,20 +929,509 @@ function AppearanceSettings({ onSettingsChange }: { onSettingsChange: () => void
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center space-x-reverse space-x-2">
-            <input type="checkbox" id="autoSave" defaultChecked onChange={onSettingsChange} />
+            <input type="checkbox" id="autoSave" defaultChecked  />
             <label htmlFor="autoSave" className="text-sm">שמירה אוטומטית</label>
           </div>
           <div className="flex items-center space-x-reverse space-x-2">
-            <input type="checkbox" id="confirmActions" defaultChecked onChange={onSettingsChange} />
+            <input type="checkbox" id="confirmActions" defaultChecked  />
             <label htmlFor="confirmActions" className="text-sm">אישור פעולות מסוכנות</label>
           </div>
           <div>
             <label className="block text-sm font-medium mb-2">פריטים בעמוד</label>
-            <select className="w-full p-2 border rounded-md" onChange={onSettingsChange}>
+            <select className="w-full p-2 border rounded-md" >
               <option value="25">25</option>
               <option value="50">50</option>
               <option value="100">100</option>
             </select>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+function ComponentCategoriesSettings() {
+  const { components, updateComponent } = useCPQ()
+  const [categories, setCategories] = useState<string[]>([...DEFAULT_COMPONENT_CATEGORIES])
+  const [isLoading, setIsLoading] = useState(true)
+  const [newCategory, setNewCategory] = useState('')
+  const [editingCategory, setEditingCategory] = useState<{
+    index: number
+    oldName: string
+    newName: string
+  } | null>(null)
+  const [isSavingRename, setIsSavingRename] = useState(false)
+  const [migrationDialog, setMigrationDialog] = useState<{
+    isOpen: boolean
+    categoryToDelete: string
+    componentCount: number
+  }>({
+    isOpen: false,
+    categoryToDelete: '',
+    componentCount: 0
+  })
+
+  // Load categories from Supabase on mount
+  useEffect(() => {
+    async function loadCategories() {
+      setIsLoading(true)
+      try {
+        // First, migrate any old localStorage settings
+        await migrateLocalStorageToSupabase()
+
+        // Load from Supabase
+        const result = await loadSetting<{ categories: string[] }>('componentCategories')
+        if (result.success && result.data?.categories) {
+          setCategories(result.data.categories)
+        } else {
+          // No settings found, use defaults
+          setCategories([...DEFAULT_COMPONENT_CATEGORIES])
+        }
+      } catch (error) {
+        console.error('Error loading categories:', error)
+        setCategories([...DEFAULT_COMPONENT_CATEGORIES])
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    loadCategories()
+  }, [])
+
+  const updateCategoriesInStorage = async (updatedCategories: string[]) => {
+    try {
+      // Save to Supabase (also caches in localStorage)
+      await saveSetting('componentCategories', { categories: updatedCategories })
+      notifyCategoriesUpdated()
+    } catch (error) {
+      console.error('Error saving categories:', error)
+    }
+  }
+
+  const handleAddCategory = () => {
+    if (newCategory.trim() && !categories.includes(newCategory.trim())) {
+      const updatedCategories = [...categories, newCategory.trim()]
+      setCategories(updatedCategories)
+      setNewCategory('')
+      updateCategoriesInStorage(updatedCategories)
+    }
+  }
+
+  const handleStartEdit = (index: number, categoryName: string) => {
+    setEditingCategory({
+      index,
+      oldName: categoryName,
+      newName: categoryName
+    })
+  }
+
+  const handleCancelEdit = () => {
+    setEditingCategory(null)
+  }
+
+  const handleSaveEdit = async () => {
+    if (!editingCategory || !editingCategory.newName.trim()) return
+
+    const newName = editingCategory.newName.trim()
+    const oldName = editingCategory.oldName
+
+    // Check if name already exists (and it's not the same category)
+    if (newName !== oldName && categories.includes(newName)) {
+      alert('קטגוריה בשם זה כבר קיימת')
+      return
+    }
+
+    setIsSavingRename(true)
+    try {
+      // Update all components with the old category to the new category name
+      const componentsToUpdate = components.filter(c => c.category === oldName)
+
+      if (componentsToUpdate.length > 0) {
+        for (const component of componentsToUpdate) {
+          await updateComponent(component.id, { category: newName })
+        }
+      }
+
+      // Update the category in the list
+      const updatedCategories = [...categories]
+      updatedCategories[editingCategory.index] = newName
+      setCategories(updatedCategories)
+      updateCategoriesInStorage(updatedCategories)
+
+      setEditingCategory(null)
+    } catch (error) {
+      console.error('Error renaming category:', error)
+      alert('שגיאה בשינוי שם הקטגוריה. אנא נסה שוב.')
+    } finally {
+      setIsSavingRename(false)
+    }
+  }
+
+  const handleDeleteCategoryClick = (category: string) => {
+    // Count components with this category
+    const componentsInCategory = components.filter(c => c.category === category)
+
+    setMigrationDialog({
+      isOpen: true,
+      categoryToDelete: category,
+      componentCount: componentsInCategory.length
+    })
+  }
+
+  const handleConfirmDelete = async (targetCategory: string) => {
+    const categoryToDelete = migrationDialog.categoryToDelete
+
+    // Migrate all components from deleted category to target category
+    const componentsToMigrate = components.filter(c => c.category === categoryToDelete)
+
+    try {
+      // Update all components with the deleted category to the new category
+      for (const component of componentsToMigrate) {
+        await updateComponent(component.id, { category: targetCategory })
+      }
+
+      // Remove the category from the list
+      const updatedCategories = categories.filter(c => c !== categoryToDelete)
+      setCategories(updatedCategories)
+      updateCategoriesInStorage(updatedCategories)
+
+      // Close dialog
+      setMigrationDialog({ isOpen: false, categoryToDelete: '', componentCount: 0 })
+    } catch (error) {
+      console.error('Error migrating components:', error)
+      alert('שגיאה בהעברת הרכיבים. אנא נסה שוב.')
+    }
+  }
+
+  const handleCancelDelete = () => {
+    setMigrationDialog({ isOpen: false, categoryToDelete: '', componentCount: 0 })
+  }
+
+  const handleMoveUp = (index: number) => {
+    if (index > 0) {
+      const updatedCategories = [...categories]
+      ;[updatedCategories[index - 1], updatedCategories[index]] =
+        [updatedCategories[index], updatedCategories[index - 1]]
+      setCategories(updatedCategories)
+      updateCategoriesInStorage(updatedCategories)
+    }
+  }
+
+  const handleMoveDown = (index: number) => {
+    if (index < categories.length - 1) {
+      const updatedCategories = [...categories]
+      ;[updatedCategories[index], updatedCategories[index + 1]] =
+        [updatedCategories[index + 1], updatedCategories[index]]
+      setCategories(updatedCategories)
+      updateCategoriesInStorage(updatedCategories)
+    }
+  }
+
+  const availableCategoriesForMigration = categories.filter(
+    c => c !== migrationDialog.categoryToDelete
+  )
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>קטגוריות רכיבים</CardTitle>
+            <CardDescription>ניהול רשימת הקטגוריות לרכיבים במערכת</CardDescription>
+          </CardHeader>
+          <CardContent className="flex items-center justify-center py-8">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              <span>טוען הגדרות מהענן...</span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  return (
+    <>
+      <CategoryMigrationDialog
+        isOpen={migrationDialog.isOpen}
+        categoryToDelete={migrationDialog.categoryToDelete}
+        componentCount={migrationDialog.componentCount}
+        availableCategories={availableCategoriesForMigration}
+        onConfirm={handleConfirmDelete}
+        onCancel={handleCancelDelete}
+      />
+
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>קטגוריות רכיבים</CardTitle>
+            <CardDescription>ניהול רשימת הקטגוריות לרכיבים במערכת</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex gap-2">
+              <Input
+                placeholder="הוסף קטגוריה חדשה"
+                value={newCategory}
+                onChange={(e) => setNewCategory(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleAddCategory()
+                  }
+                }}
+              />
+              <Button onClick={handleAddCategory}>הוסף</Button>
+            </div>
+
+            <div className="space-y-2">
+              {categories.map((category, index) => (
+                <div
+                  key={`${category}-${index}`}
+                  className="flex items-center justify-between p-3 bg-muted rounded-lg"
+                >
+                  {editingCategory?.index === index ? (
+                    <div className="flex-1 flex gap-2 items-center">
+                      <Input
+                        value={editingCategory.newName}
+                        onChange={(e) => setEditingCategory({
+                          ...editingCategory,
+                          newName: e.target.value
+                        })}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleSaveEdit()
+                          if (e.key === 'Escape') handleCancelEdit()
+                        }}
+                        className="flex-1"
+                        autoFocus
+                      />
+                      <Button size="sm" onClick={handleSaveEdit} disabled={isSavingRename}>
+                        {isSavingRename ? 'שומר...' : 'שמור'}
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={handleCancelEdit}>
+                        ביטול
+                      </Button>
+                    </div>
+                  ) : (
+                    <>
+                      <span className="font-medium">{category}</span>
+                      <div className="flex gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleMoveUp(index)}
+                          disabled={index === 0}
+                        >
+                          ↑
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleMoveDown(index)}
+                          disabled={index === categories.length - 1}
+                        >
+                          ↓
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleStartEdit(index, category)}
+                          title="שנה שם"
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteCategoryClick(category)}
+                          title="מחק"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </>
+  )
+}
+
+function TableColumnsSettings() {
+  const [activeTable, setActiveTable] = useState<'component_library' | 'bom_grid' | 'quotation_data_grid'>('component_library')
+  const [isLoading, setIsLoading] = useState(true)
+  const [tableSettings, setTableSettings] = useState({
+    component_library: getDefaultVisibleColumns('component_library'),
+    bom_grid: getDefaultVisibleColumns('bom_grid'),
+    quotation_data_grid: getDefaultVisibleColumns('quotation_data_grid')
+  })
+
+  // Load table settings from Supabase on mount
+  useEffect(() => {
+    async function loadTableSettings() {
+      setIsLoading(true)
+      try {
+        const result = await loadSetting<{
+          component_library: string[]
+          bom_grid: string[]
+          quotation_data_grid: string[]
+        }>('tableColumns')
+
+        if (result.success && result.data) {
+          setTableSettings(result.data)
+        } else {
+          // Use defaults
+          setTableSettings({
+            component_library: getDefaultVisibleColumns('component_library'),
+            bom_grid: getDefaultVisibleColumns('bom_grid'),
+            quotation_data_grid: getDefaultVisibleColumns('quotation_data_grid')
+          })
+        }
+      } catch (error) {
+        console.error('Error loading table settings:', error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    loadTableSettings()
+  }, [])
+
+  const tableNames = {
+    component_library: 'ספריית רכיבים',
+    bom_grid: 'טבלת תמחור',
+    quotation_data_grid: 'טבלת הצעות מחיר'
+  }
+
+  const handleToggleColumn = async (tableType: typeof activeTable, columnId: string) => {
+    const currentColumns = tableSettings[tableType] || []
+    const updatedColumns = currentColumns.includes(columnId)
+      ? currentColumns.filter(id => id !== columnId)
+      : [...currentColumns, columnId]
+
+    const updatedSettings = {
+      ...tableSettings,
+      [tableType]: updatedColumns
+    }
+
+    setTableSettings(updatedSettings)
+
+    // Save to Supabase
+    try {
+      await saveSetting('tableColumns', updatedSettings)
+      // Notify grids that table column settings have changed
+      window.dispatchEvent(new CustomEvent('cpq-settings-updated'))
+    } catch (error) {
+      console.error('Error saving table column settings:', error)
+    }
+  }
+
+  const handleResetTable = async (tableType: typeof activeTable) => {
+    const defaultColumns = getDefaultVisibleColumns(tableType)
+    const updatedSettings = {
+      ...tableSettings,
+      [tableType]: defaultColumns
+    }
+
+    setTableSettings(updatedSettings)
+
+    // Save to Supabase
+    try {
+      await saveSetting('tableColumns', updatedSettings)
+      // Notify grids that table column settings have changed
+      window.dispatchEvent(new CustomEvent('cpq-settings-updated'))
+    } catch (error) {
+      console.error('Error saving table column settings:', error)
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>עמודות ברירת מחדל לטבלאות</CardTitle>
+            <CardDescription>בחר אילו עמודות יוצגו כברירת מחדל בכל טבלה</CardDescription>
+          </CardHeader>
+          <CardContent className="flex items-center justify-center py-8">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              <span>טוען הגדרות מהענן...</span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>עמודות ברירת מחדל לטבלאות</CardTitle>
+          <CardDescription>בחר אילו עמודות יוצגו כברירת מחדל בכל טבלה</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex gap-2 border-b pb-4">
+            {Object.entries(tableNames).map(([key, name]) => (
+              <Button
+                key={key}
+                variant={activeTable === key ? 'default' : 'outline'}
+                onClick={() => setActiveTable(key as typeof activeTable)}
+              >
+                {name}
+              </Button>
+            ))}
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-semibold">{tableNames[activeTable]}</h3>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleResetTable(activeTable)}
+              >
+                <RotateCcw className="h-4 w-4 ml-2" />
+                אפס לברירת מחדל
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              {TABLE_COLUMN_DEFINITIONS[activeTable].map((column) => {
+                const isVisible = tableSettings[activeTable]?.includes(column.id) ?? column.defaultVisible
+                return (
+                  <div
+                    key={column.id}
+                    className={cn(
+                      "flex items-center justify-between p-3 rounded-lg border",
+                      isVisible ? "bg-primary/5 border-primary" : "bg-muted"
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="checkbox"
+                        id={`${activeTable}-${column.id}`}
+                        checked={isVisible}
+                        onChange={() => handleToggleColumn(activeTable, column.id)}
+                        className="cursor-pointer"
+                      />
+                      <label
+                        htmlFor={`${activeTable}-${column.id}`}
+                        className="text-sm font-medium cursor-pointer"
+                      >
+                        {column.label}
+                      </label>
+                    </div>
+                    {isVisible && (
+                      <Badge variant="secondary" className="text-xs">
+                        מוצג
+                      </Badge>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
           </div>
         </CardContent>
       </Card>

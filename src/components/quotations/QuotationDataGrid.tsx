@@ -432,14 +432,30 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
     return ordered.length > 0 ? ordered : visible
   }, [columnDefs, config.visibleColumns, config.columnOrder])
 
-  // Toggle column visibility
-  const toggleColumn = useCallback((field: string) => {
-    const newVisibleColumns = config.visibleColumns.includes(field)
-      ? config.visibleColumns.filter(col => col !== field)
-      : [...config.visibleColumns, field]
+  // Toggle column visibility - Note: This updates settings, not table config
+  const toggleColumn = useCallback(async (field: string) => {
+    // Import settingsService dynamically
+    const { saveSetting, loadSetting } = await import('../../services/settingsService')
 
-    saveConfig({ visibleColumns: newVisibleColumns })
-  }, [config.visibleColumns, saveConfig])
+    // Load current table column settings
+    const result = await loadSetting<Record<string, string[]>>('tableColumns')
+    const currentSettings = result.data || {}
+
+    // Toggle the column for this table
+    const currentVisible = currentSettings['quotation_data_grid'] || config.visibleColumns
+    const newVisibleColumns = currentVisible.includes(field)
+      ? currentVisible.filter(col => col !== field)
+      : [...currentVisible, field]
+
+    // Save to settings
+    await saveSetting('tableColumns', {
+      ...currentSettings,
+      quotation_data_grid: newVisibleColumns
+    })
+
+    // Dispatch event to notify settings updated
+    window.dispatchEvent(new CustomEvent('cpq-settings-updated'))
+  }, [config.visibleColumns])
 
   // Get all available columns for management
   const allColumns = useMemo(() => {
@@ -568,13 +584,17 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
 
     setCreatingNew(true)
     try {
+      // Load pricing settings from Supabase/cache
+      const { loadDefaultQuotationParameters } = await import('../../utils/quotationCalculations')
+      const defaultParams = await loadDefaultQuotationParameters()
+
       const newQuotation = await addQuotation({
         quotation_number: `Q-${Date.now()}`,
         customer_name: 'לקוח חדש',
         project_name: 'פרויקט חדש',
         currency: 'ILS',
-        exchange_rate: 3.7,
-        margin_percentage: 25,
+        exchange_rate: defaultParams.usdToIlsRate,
+        margin_percentage: defaultParams.markupPercent,
         status: 'draft',
         total_cost: 0,
         total_price: 0
@@ -737,14 +757,32 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => saveConfig({ visibleColumns: allColumns.map(col => col.field) })}
+                      onClick={async () => {
+                        const { saveSetting, loadSetting } = await import('../../services/settingsService')
+                        const result = await loadSetting<Record<string, string[]>>('tableColumns')
+                        const currentSettings = result.data || {}
+                        await saveSetting('tableColumns', {
+                          ...currentSettings,
+                          quotation_data_grid: allColumns.map(col => col.field)
+                        })
+                        window.dispatchEvent(new CustomEvent('cpq-settings-updated'))
+                      }}
                     >
                       הצג הכל
                     </Button>
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => saveConfig({ visibleColumns: ['quotation_number', 'customer_name', 'actions'] })}
+                      onClick={async () => {
+                        const { saveSetting, loadSetting } = await import('../../services/settingsService')
+                        const result = await loadSetting<Record<string, string[]>>('tableColumns')
+                        const currentSettings = result.data || {}
+                        await saveSetting('tableColumns', {
+                          ...currentSettings,
+                          quotation_data_grid: ['actions', 'customer_name', 'status']
+                        })
+                        window.dispatchEvent(new CustomEvent('cpq-settings-updated'))
+                      }}
                     >
                       מינימלי
                     </Button>

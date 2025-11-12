@@ -1,6 +1,7 @@
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
 import { DbQuotation, QuotationProject, QuotationSystem, QuotationItem } from '../types'
+import { getDefaultQuotationParameters } from '../utils/quotationCalculations'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -89,6 +90,9 @@ export function convertDbQuotationToQuotationProject(dbQuotation: DbQuotation): 
     })
   })
 
+  // Get default parameters from settings (uses cached values)
+  const defaultParams = getDefaultQuotationParameters()
+
   // Create QuotationProject
   return {
     id: dbQuotation.id,
@@ -100,16 +104,16 @@ export function convertDbQuotationToQuotationProject(dbQuotation: DbQuotation): 
     updatedAt: dbQuotation.updated_at,
     systems,
     parameters: {
-      usdToIlsRate: dbQuotation.exchange_rate || 3.7,
-      eurToIlsRate: 4.0,
-      markupPercent: dbQuotation.margin_percentage || 25,
-      dayWorkCost: 1200,
-      profitPercent: 20,
-      riskPercent: 10,
-      includeVAT: true,
-      vatRate: 18,
-      paymentTerms: dbQuotation.terms,
-      deliveryTime: undefined
+      usdToIlsRate: dbQuotation.exchange_rate || defaultParams.usdToIlsRate,
+      eurToIlsRate: defaultParams.eurToIlsRate,
+      markupPercent: dbQuotation.margin_percentage || defaultParams.markupPercent,
+      dayWorkCost: defaultParams.dayWorkCost,
+      profitPercent: defaultParams.profitPercent,
+      riskPercent: defaultParams.riskPercent,
+      includeVAT: defaultParams.includeVAT,
+      vatRate: defaultParams.vatRate,
+      paymentTerms: dbQuotation.terms || defaultParams.paymentTerms,
+      deliveryTime: defaultParams.deliveryTime
     },
     items,
     calculations: {

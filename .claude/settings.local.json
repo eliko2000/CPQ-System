@@ -5,7 +5,13 @@
       "WebFetch(domain:maximechampoux.medium.com)",
       "mcp__supabase__postgrestRequest",
       "mcp__supabase__sqlToRest",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(git pull:*)",
+      "Bash(git merge:*)",
+      "Bash(git push:*)",
+      "Bash(npm run dev:*)",
+      "Bash(Get-Content \"C:\\Users\\Eli\\Desktop\\Claude Code\\CPQ-System\\.env.local\")",
+      "Bash(Select-String \"SUPABASE\")"
     ],
     "deny": [],
     "ask": []

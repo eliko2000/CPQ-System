@@ -227,19 +227,90 @@ export function convertEURtoILS(eurAmount: number, exchangeRate: number): number
 }
 
 // ============ Default Parameters ============
+
+/**
+ * Get default quotation parameters from cached settings (synchronous)
+ * Falls back to hard-coded defaults if settings not found
+ */
 export function getDefaultQuotationParameters(): QuotationParameters {
+  try {
+    // Try to load from localStorage cache (synced with Supabase)
+    const cache = localStorage.getItem('cpq-settings-cache');
+    if (cache) {
+      const parsed = JSON.parse(cache);
+      if (parsed.pricing) {
+        const pricing = parsed.pricing;
+        return {
+          usdToIlsRate: pricing.usdToIlsRate ?? 3.7,
+          eurToIlsRate: pricing.eurToIlsRate ?? 4.0,
+          markupPercent: pricing.defaultMarkup ?? 25,
+          dayWorkCost: pricing.dayWorkCost ?? 1200,
+          profitPercent: 20, // Not configurable yet
+          riskPercent: pricing.defaultRisk ?? 10,
+          paymentTerms: '30 יום מהחשבונית',
+          deliveryTime: pricing.deliveryTime ?? '4-6 שבועות',
+          includeVAT: true,
+          vatRate: pricing.vatRate ?? 17
+        };
+      }
+    }
+  } catch (error) {
+    console.error('Error loading pricing settings from cache:', error);
+  }
+
+  // Fallback to hard-coded defaults
   return {
-    usdToIlsRate: 3.7, // Default exchange rate
-    eurToIlsRate: 4.0, // Default exchange rate
-    markupPercent: 25, // Default markup
-    dayWorkCost: 800, // 800 ILS per day
-    profitPercent: 20, // Target profit percentage
-    riskPercent: 10, // 10% risk addition
+    usdToIlsRate: 3.7,
+    eurToIlsRate: 4.0,
+    markupPercent: 25,
+    dayWorkCost: 1200,
+    profitPercent: 20,
+    riskPercent: 10,
     paymentTerms: '30 יום מהחשבונית',
-    deliveryTime: '4-6 weeks',
+    deliveryTime: '4-6 שבועות',
     includeVAT: true,
-    vatRate: 18
+    vatRate: 17
   };
+}
+
+/**
+ * Load default quotation parameters from Supabase (async)
+ * Use this when initializing the app or creating new quotations
+ */
+export async function loadDefaultQuotationParameters(): Promise<QuotationParameters> {
+  try {
+    const { loadSetting } = await import('../services/settingsService');
+    const result = await loadSetting<{
+      usdToIlsRate: number;
+      eurToIlsRate: number;
+      defaultMarkup: number;
+      defaultRisk: number;
+      dayWorkCost: number;
+      vatRate: number;
+      deliveryTime: string;
+    }>('pricing');
+
+    if (result.success && result.data) {
+      const pricing = result.data;
+      return {
+        usdToIlsRate: pricing.usdToIlsRate,
+        eurToIlsRate: pricing.eurToIlsRate,
+        markupPercent: pricing.defaultMarkup,
+        dayWorkCost: pricing.dayWorkCost,
+        profitPercent: 20, // Not configurable yet
+        riskPercent: pricing.defaultRisk,
+        paymentTerms: '30 יום מהחשבונית',
+        deliveryTime: pricing.deliveryTime,
+        includeVAT: true,
+        vatRate: pricing.vatRate
+      };
+    }
+  } catch (error) {
+    console.error('Error loading pricing settings from Supabase:', error);
+  }
+
+  // Fallback to synchronous defaults
+  return getDefaultQuotationParameters();
 }
 
 // ============ Validation ============

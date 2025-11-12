@@ -1062,7 +1062,7 @@ export function QuotationEditor() {
 
   // Calculate totals
   const calculations = useMemo(() => {
-    if (!currentQuotation) return null
+    if (!currentQuotation || !currentQuotation.parameters) return null
     return calculateQuotationTotals(currentQuotation)
   }, [currentQuotation])
 
@@ -1072,6 +1072,11 @@ export function QuotationEditor() {
 
   if (!currentQuotation) {
     return <div className="flex items-center justify-center h-64">No quotation selected</div>
+  }
+
+  // Guard: Ensure parameters exists
+  if (!currentQuotation.parameters) {
+    return <div className="flex items-center justify-center h-64">Quotation data is incomplete (missing parameters)</div>
   }
 
   return (

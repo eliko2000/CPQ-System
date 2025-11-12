@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="he">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ניקוי מטמון הגדרות CPQ</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            direction: rtl;
+        }
+        .button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        .button:hover {
+            background: #2563eb;
+        }
+        .success {
+            background: #10b981;
+            padding: 12px;
+            border-radius: 6px;
+            color: white;
+            margin: 20px 0;
+            display: none;
+        }
+        .info {
+            background: #f3f4f6;
+            padding: 12px;
+            border-radius: 6px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>ניקוי מטמון הגדרות CPQ</h1>
+
+    <div class="info">
+        <p><strong>למה צריך לנקות מטמון?</strong></p>
+        <p>המערכת שומרת הגדרות בזיכרון המקומי (localStorage) לביצועים טובים יותר. כשמעדכנים את שמות השדות בבסיס הנתונים, צריך לנקות את המטמון כדי שהמערכת תטען מחדש את ההגדרות המעודכנות.</p>
+    </div>
+
+    <div id="cache-info"></div>
+
+    <button class="button" onclick="clearCache()">נקה מטמון הגדרות</button>
+    <button class="button" onclick="clearAllCache()">נקה את כל המטמון</button>
+    <button class="button" onclick="showCache()">הצג מטמון נוכחי</button>
+
+    <div id="success" class="success">המטמון נוקה בהצלחה! רענן את הדף של המערכת.</div>
+
+    <div id="cache-display" style="margin-top: 20px;"></div>
+
+    <script>
+        function clearCache() {
+            localStorage.removeItem('cpq-settings-cache');
+            localStorage.removeItem('cpq-settings-last-sync');
+            document.getElementById('success').style.display = 'block';
+            updateCacheInfo();
+            setTimeout(() => {
+                document.getElementById('success').style.display = 'none';
+            }, 3000);
+        }
+
+        function clearAllCache() {
+            const keys = Object.keys(localStorage);
+            const cpqKeys = keys.filter(k => k.startsWith('cpq-') || k.startsWith('table-config-'));
+            cpqKeys.forEach(key => localStorage.removeItem(key));
+            document.getElementById('success').style.display = 'block';
+            document.getElementById('success').textContent = `נוקו ${cpqKeys.length} מפתחות מטמון! רענן את הדף של המערכת.`;
+            updateCacheInfo();
+            setTimeout(() => {
+                document.getElementById('success').style.display = 'none';
+            }, 3000);
+        }
+
+        function showCache() {
+            const cache = localStorage.getItem('cpq-settings-cache');
+            const display = document.getElementById('cache-display');
+
+            if (cache) {
+                try {
+                    const parsed = JSON.parse(cache);
+                    display.innerHTML = '<h3>מטמון נוכחי:</h3><pre style="background: #f3f4f6; padding: 12px; border-radius: 6px; overflow-x: auto; direction: ltr;">' +
+                        JSON.stringify(parsed, null, 2) + '</pre>';
+                } catch (e) {
+                    display.innerHTML = '<p style="color: red;">שגיאה בפענוח המטמון</p>';
+                }
+            } else {
+                display.innerHTML = '<p>אין מטמון שמור</p>';
+            }
+        }
+
+        function updateCacheInfo() {
+            const keys = Object.keys(localStorage);
+            const cpqKeys = keys.filter(k => k.startsWith('cpq-') || k.startsWith('table-config-'));
+            const info = document.getElementById('cache-info');
+            info.innerHTML = `<div class="info"><p>נמצאו ${cpqKeys.length} מפתחות של CPQ במטמון</p></div>`;
+        }
+
+        // Show cache info on load
+        updateCacheInfo();
+    </script>
+</body>
+</html>

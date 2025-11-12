@@ -57,6 +57,23 @@ export function BOMEditor() {
       resizable: false,
     },
     {
+      headerName: 'פעולות',
+      width: 100,
+      suppressSizeToFit: true,
+      cellRenderer: (params: any) => {
+        return (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => deleteBOMItem(params.data?.id)}
+            className="text-red-600 hover:text-red-800"
+          >
+            מחק
+          </Button>
+        )
+      },
+    },
+    {
       headerName: 'שם פריט',
       field: 'name',
       editable: true,
@@ -166,23 +183,6 @@ export function BOMEditor() {
         return totalPrice > 0 ? ((customerPrice - totalPrice) / customerPrice * 100) : 0
       },
       editable: false,
-    },
-    {
-      headerName: 'פעולות',
-      width: 100,
-      suppressSizeToFit: true,
-      cellRenderer: (params: any) => {
-        return (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => deleteBOMItem(params.data?.id)}
-            className="text-red-600 hover:text-red-800"
-          >
-            מחק
-          </Button>
-        )
-      },
     },
   ], [deleteBOMItem])
 

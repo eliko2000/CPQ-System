@@ -119,25 +119,99 @@ export function CustomHeader(props: CustomHeaderProps) {
         // Set filter for text columns (SmartFilter) using agSetColumnFilter
         setCurrentFilterValues(filterModel)
 
-        props.api.getColumnFilterInstance(colId).then(async (filterInstance: any) => {
-          if (filterInstance) {
-            // AG-Grid agSetColumnFilter expects { values: ['a', 'b'] } format
-            // Values should be strings
-            const stringValues = filterModel.map(v => String(v))
-            const model = { values: stringValues }
+        // Use async/await properly to ensure filter is applied before triggering change
+        ;(async () => {
+          try {
+            const filterInstance = await props.api.getColumnFilterInstance(colId)
+            if (filterInstance) {
+              const filterTypeName = filterInstance.constructor?.name
+              console.log(`[CustomHeader] Filter instance type:`, filterTypeName)
 
-            // setModel returns a Promise, wait for it to complete
-            await filterInstance.setModel(model)
+              // CRITICAL VALIDATION: Ensure filter type matches expectations
+              // This prevents the bug where SetFilter format was used with TextFilter
+              if (filterTypeName !== 'SetFilter' && filterTypeName !== 'TextFilter' &&
+                  filterTypeName !== 'SetFloatingFilter') {
+                console.warn(
+                  `[CustomHeader] Unexpected filter type "${filterTypeName}" for column ${colId}. ` +
+                  `Expected TextFilter (Community) or SetFilter (Enterprise). ` +
+                  `Filter may not work correctly.`
+                )
+              }
 
-            // Then trigger filter changed
-            props.api.onFilterChanged()
+              let model: any
 
-            // Update filter active state
-            setIsFilterActive(true)
+              // Handle different filter types
+              if (filterTypeName === 'SetFilter' || filterTypeName === 'SetFloatingFilter') {
+                // Enterprise agSetColumnFilter format: { values: ['a', 'b'] }
+                const stringValues = filterModel.map(v => String(v))
+                model = { values: stringValues }
+
+                console.log(`[CustomHeader] Using SetFilter (Enterprise) format for ${colId}`)
+              } else {
+                // Community TextFilter format: Use 'equals' operator with multiple conditions
+                // For multiple values, we need to use OR conditions
+                const stringValues = filterModel.map(v => String(v))
+
+                console.log(`[CustomHeader] Using TextFilter (Community) format for ${colId}`)
+
+                if (stringValues.length === 1) {
+                  // Single value: simple equals filter
+                  model = {
+                    filterType: 'text',
+                    type: 'equals',
+                    filter: stringValues[0]
+                  }
+                } else {
+                  // Multiple values: use OR condition
+                  model = {
+                    filterType: 'text',
+                    operator: 'OR',
+                    conditions: stringValues.map(value => ({
+                      filterType: 'text',
+                      type: 'equals',
+                      filter: value
+                    }))
+                  }
+                }
+              }
+
+              console.log(`[CustomHeader] Setting filter for ${colId}:`, model)
+
+              // setModel returns a promise, await it
+              const result = filterInstance.setModel(model)
+              if (result && typeof result.then === 'function') {
+                await result
+              }
+
+              console.log(`[CustomHeader] Filter model set, triggering onFilterChanged for ${colId}`)
+
+              // Check if filterInstance has applyModel method (some AG Grid filters require this)
+              if (typeof filterInstance.applyModel === 'function') {
+                console.log(`[CustomHeader] Calling applyModel() for ${colId}`)
+                filterInstance.applyModel()
+              }
+
+              // Then trigger filter changed - this must happen AFTER setModel completes
+              props.api.onFilterChanged()
+
+              // Update filter active state
+              setIsFilterActive(true)
+
+              // Verify the filter was actually set
+              const verifyModel = filterInstance.getModel()
+              const isActive = filterInstance.isFilterActive()
+              console.log(`[CustomHeader] Filter verification for ${colId}:`, {
+                modelSet: verifyModel,
+                isActive: isActive,
+                fullFilterModel: props.api.getFilterModel()
+              })
+
+              console.log(`[CustomHeader] Filter applied successfully for ${colId}`)
+            }
+          } catch (error) {
+            console.error('[CustomHeader] Error setting filter:', error)
           }
-        }).catch((error: any) => {
-          console.error('Error setting filter:', error)
-        })
+        })()
       } else {
         // Set filter for date/number columns (custom filters)
         props.api.getColumnFilterInstance(colId).then((filterInstance: any) => {

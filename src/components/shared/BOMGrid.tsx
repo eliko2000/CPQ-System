@@ -49,98 +49,64 @@ export const BOMGrid: React.FC<BOMGridProps> = ({
   const [averageMargin, setAverageMargin] = useState(0);
 
   // Column definitions with CPQ-specific functionality
-  const columnDefs: ColDef<BOMItem>[] = useMemo(() => [
+  // NOTE: Columns are defined in REVERSE order because AG Grid with enableRtl will reverse them
+  // So we define them as: Actions, TotalPrice, TotalCost, ... Type, ID
+  // And AG Grid will display them as: ID, Type, ... TotalCost, TotalPrice, Actions
+  const columnDefs: ColDef<BOMItem>[] = useMemo(() => {
+    const cols: ColDef<BOMItem>[] = [
     {
-      headerName: '',
-      field: 'id' as keyof BOMItem,
-      width: 50,
-      rowDrag: allowEditing,
-      cellRenderer: () => <div className="drag-handle">⋮⋮</div>,
+      headerName: 'Actions',
+      field: 'actions' as keyof BOMItem,
+      width: 100,
       suppressMenu: true,
       sortable: false,
-    },
-    {
-      headerName: 'Type',
-      field: 'itemType' as keyof BOMItem,
-      width: 120,
       cellRenderer: (params: ValueFormatterParams) => (
-        <Badge variant={
-          params.value === 'component' ? 'default' :
-          params.value === 'assembly' ? 'secondary' :
-          params.value === 'labor' ? 'outline' : 'destructive'
-        }>
-          {params.value?.toUpperCase() || 'OTHER'}
-        </Badge>
-      ),
-      editable: allowEditing,
-      cellEditor: 'agSelectCellEditor',
-      cellEditorParams: {
-        values: ['component', 'assembly', 'labor', 'other']
-      }
+        <div className="flex gap-1">
+          {allowEditing && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => removeItem(params.data.id)}
+              className="text-red-600 hover:text-red-800 hover:bg-red-50"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+      )
     },
-    {
-      headerName: 'Description',
-      field: 'description' as keyof BOMItem,
-      flex: 2,
-      editable: allowEditing,
-      cellEditorPopup: true,
-      cellEditorPopupPosition: 'under',
-    },
-    {
-      headerName: 'Manufacturer',
-      field: 'manufacturer' as keyof BOMItem,
-      width: 150,
-      editable: allowEditing,
-    },
-    {
-      headerName: 'MFR P/N',
-      field: 'manufacturerPn' as keyof BOMItem,
+    ...(showCustomerPricing ? [{
+      headerName: 'Total Price',
+      field: 'totalPrice' as keyof BOMItem,
       width: 140,
-      editable: allowEditing,
-    },
-    {
-      headerName: 'Supplier',
-      field: 'supplier' as keyof BOMItem,
-      width: 120,
-      editable: allowEditing,
-    },
-    {
-      headerName: 'Qty',
-      field: 'quantity' as keyof BOMItem,
-      width: 80,
-      editable: allowEditing,
-      cellEditor: 'agNumberCellEditor',
-      cellEditorParams: {
-        min: 1,
-        precision: 0,
-      },
-      valueFormatter: (params: ValueFormatterParams) => params.value?.toLocaleString() || '0',
-      onCellValueChanged: (params: NewValueParams<BOMItem>) => {
-        const newValue = params.newValue;
-        if (newValue < 1 && params.node) {
-          params.node.setDataValue('quantity', 1);
-        }
-        calculateTotals();
-      }
-    },
-    {
-      headerName: 'Unit Cost',
-      field: 'unitCost' as keyof BOMItem,
-      width: 120,
-      editable: allowEditing && !readonly,
-      cellEditor: 'agNumberCellEditor',
-      cellEditorParams: {
-        min: 0,
-        precision: 2,
-      },
+      editable: false,
+      valueGetter: (params: ValueGetterParams) => (params.data.quantity || 0) * (params.data.customerPrice || 0),
       valueFormatter: (params: ValueFormatterParams) => formatCurrency(params.value || 0),
-      onCellValueChanged: (params: NewValueParams<BOMItem>) => {
-        const item = params.data;
-        if (item && params.node) {
-          const newMargin = calculateMargin(item.unitCost, item.customerPrice);
-          params.node.setDataValue('margin', newMargin);
-        }
-        calculateTotals();
+      cellRenderer: (params: ValueFormatterParams) => (
+        <span className="font-semibold text-blue-600">{formatCurrency(params.value || 0)}</span>
+      )
+    }] : []),
+    {
+      headerName: 'Total Cost',
+      field: 'totalCost' as keyof BOMItem,
+      width: 120,
+      editable: false,
+      valueGetter: (params: ValueGetterParams) => (params.data.quantity || 0) * (params.data.unitCost || 0),
+      valueFormatter: (params: ValueFormatterParams) => formatCurrency(params.value || 0),
+      cellRenderer: (params: ValueFormatterParams) => (
+        <span className="font-medium">{formatCurrency(params.value || 0)}</span>
+      )
+    },
+    {
+      headerName: 'Margin %',
+      field: 'margin' as keyof BOMItem,
+      width: 100,
+      editable: false,
+      valueFormatter: (params: ValueFormatterParams) => `${params.value?.toFixed(1)}%`,
+      cellRenderer: (params: ValueFormatterParams) => {
+        const margin = params.value || 0;
+        const color = margin >= 25 ? 'text-green-600' : margin >= 15 ? 'text-yellow-600' : 'text-red-600';
+        return <span className={color}>{margin.toFixed(1)}%</span>;
       }
     },
     ...(showCustomerPricing ? [{
@@ -164,60 +130,101 @@ export const BOMGrid: React.FC<BOMGridProps> = ({
       }
     }] : []),
     {
-      headerName: 'Margin %',
-      field: 'margin' as keyof BOMItem,
-      width: 100,
-      editable: false,
-      valueFormatter: (params: ValueFormatterParams) => `${params.value?.toFixed(1)}%`,
-      cellRenderer: (params: ValueFormatterParams) => {
-        const margin = params.value || 0;
-        const color = margin >= 25 ? 'text-green-600' : margin >= 15 ? 'text-yellow-600' : 'text-red-600';
-        return <span className={color}>{margin.toFixed(1)}%</span>;
+      headerName: 'Unit Cost',
+      field: 'unitCost' as keyof BOMItem,
+      width: 120,
+      editable: allowEditing && !readonly,
+      cellEditor: 'agNumberCellEditor',
+      cellEditorParams: {
+        min: 0,
+        precision: 2,
+      },
+      valueFormatter: (params: ValueFormatterParams) => formatCurrency(params.value || 0),
+      onCellValueChanged: (params: NewValueParams<BOMItem>) => {
+        const item = params.data;
+        if (item && params.node) {
+          const newMargin = calculateMargin(item.unitCost, item.customerPrice);
+          params.node.setDataValue('margin', newMargin);
+        }
+        calculateTotals();
       }
     },
     {
-      headerName: 'Total Cost',
-      field: 'totalCost' as keyof BOMItem,
-      width: 120,
-      editable: false,
-      valueGetter: (params: ValueGetterParams) => (params.data.quantity || 0) * (params.data.unitCost || 0),
-      valueFormatter: (params: ValueFormatterParams) => formatCurrency(params.value || 0),
-      cellRenderer: (params: ValueFormatterParams) => (
-        <span className="font-medium">{formatCurrency(params.value || 0)}</span>
-      )
+      headerName: 'Qty',
+      field: 'quantity' as keyof BOMItem,
+      width: 80,
+      editable: allowEditing,
+      cellEditor: 'agNumberCellEditor',
+      cellEditorParams: {
+        min: 1,
+        precision: 0,
+      },
+      valueFormatter: (params: ValueFormatterParams) => params.value?.toLocaleString() || '0',
+      onCellValueChanged: (params: NewValueParams<BOMItem>) => {
+        const newValue = params.newValue;
+        if (newValue < 1 && params.node) {
+          params.node.setDataValue('quantity', 1);
+        }
+        calculateTotals();
+      }
     },
-    ...(showCustomerPricing ? [{
-      headerName: 'Total Price',
-      field: 'totalPrice' as keyof BOMItem,
-      width: 140,
-      editable: false,
-      valueGetter: (params: ValueGetterParams) => (params.data.quantity || 0) * (params.data.customerPrice || 0),
-      valueFormatter: (params: ValueFormatterParams) => formatCurrency(params.value || 0),
-      cellRenderer: (params: ValueFormatterParams) => (
-        <span className="font-semibold text-blue-600">{formatCurrency(params.value || 0)}</span>
-      )
-    }] : []),
     {
-      headerName: 'Actions',
-      width: 100,
+      headerName: 'Supplier',
+      field: 'supplier' as keyof BOMItem,
+      width: 120,
+      editable: allowEditing,
+    },
+    {
+      headerName: 'MFR P/N',
+      field: 'manufacturerPn' as keyof BOMItem,
+      width: 140,
+      editable: allowEditing,
+    },
+    {
+      headerName: 'Manufacturer',
+      field: 'manufacturer' as keyof BOMItem,
+      width: 150,
+      editable: allowEditing,
+    },
+    {
+      headerName: 'Description',
+      field: 'description' as keyof BOMItem,
+      flex: 2,
+      editable: allowEditing,
+      cellEditorPopup: true,
+      cellEditorPopupPosition: 'under',
+    },
+    {
+      headerName: 'Type',
+      field: 'itemType' as keyof BOMItem,
+      width: 120,
+      cellRenderer: (params: ValueFormatterParams) => (
+        <Badge variant={
+          params.value === 'component' ? 'default' :
+          params.value === 'assembly' ? 'secondary' :
+          params.value === 'labor' ? 'outline' : 'destructive'
+        }>
+          {params.value?.toUpperCase() || 'OTHER'}
+        </Badge>
+      ),
+      editable: allowEditing,
+      cellEditor: 'agSelectCellEditor',
+      cellEditorParams: {
+        values: ['component', 'assembly', 'labor', 'other']
+      }
+    },
+    {
+      headerName: '',
+      field: 'id' as keyof BOMItem,
+      width: 50,
+      rowDrag: allowEditing,
+      cellRenderer: () => <div className="drag-handle">⋮⋮</div>,
       suppressMenu: true,
       sortable: false,
-      cellRenderer: (params: ValueFormatterParams) => (
-        <div className="flex gap-1">
-          {allowEditing && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => removeItem(params.data.id)}
-              className="text-red-600 hover:text-red-800 hover:bg-red-50"
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          )}
-        </div>
-      )
     }
-  ], [allowEditing, readonly, showCustomerPricing]);
+  ];
+  return cols;
+}, [allowEditing, readonly, showCustomerPricing]);
 
   // Calculate totals whenever BOM changes
   const calculateTotals = useCallback(() => {
@@ -334,11 +341,12 @@ export const BOMGrid: React.FC<BOMGridProps> = ({
       <CardContent>
         <div className="space-y-4">
           {/* AG Grid */}
-          <div className="ag-theme-alpine" style={{ height: '400px', width: '100%' }}>
+          <div className="ag-theme-alpine" style={{ height: '400px', width: '100%', direction: 'rtl' }}>
             <AgGridReact<BOMItem>
               ref={gridRef}
               rowData={bomItems}
               columnDefs={columnDefs}
+              enableRtl={true}
               defaultColDef={{
                 sortable: true,
                 filter: true,

@@ -48,39 +48,55 @@ export const COMPONENT_LIBRARY_COLUMNS: TableColumnDefinition[] = [
   { id: 'notes', label: 'הערות', field: 'notes', defaultVisible: false },
 ];
 
+// BOM grid columns are defined in REVERSE order to match the AG Grid RTL display
+// Actual display order will be: id, itemType, description, ... totalPrice, actions
 export const BOM_GRID_COLUMNS: TableColumnDefinition[] = [
   { id: 'actions', label: 'פעולות', field: 'actions', defaultVisible: true },
-  { id: 'number', label: 'מספר', field: 'number', defaultVisible: true },
-  { id: 'name', label: 'שם פריט', field: 'name', defaultVisible: true },
-  { id: 'type', label: 'סוג', field: 'type', defaultVisible: true },
-  { id: 'manufacturer', label: 'יצרן', field: 'manufacturer', defaultVisible: true },
-  { id: 'manufacturerPN', label: 'מק"ט יצרן', field: 'manufacturerPN', defaultVisible: true },
-  { id: 'quantity', label: 'כמות', field: 'quantity', defaultVisible: true },
+  { id: 'totalPrice', label: 'מחיר כולל', field: 'totalPrice', defaultVisible: true },
+  { id: 'totalCost', label: 'עלות כוללת', field: 'totalCost', defaultVisible: true },
+  { id: 'margin', label: 'מרווח %', field: 'margin', defaultVisible: true },
+  { id: 'customerPrice', label: 'מחיר ללקוח', field: 'customerPrice', defaultVisible: true },
   { id: 'unitCost', label: 'מחיר יחידה', field: 'unitCost', defaultVisible: true },
-  { id: 'totalCost', label: 'סה"כ', field: 'totalCost', defaultVisible: true },
-  { id: 'notes', label: 'הערות', field: 'notes', defaultVisible: false },
+  { id: 'quantity', label: 'כמות', field: 'quantity', defaultVisible: true },
+  { id: 'supplier', label: 'ספק', field: 'supplier', defaultVisible: true },
+  { id: 'manufacturerPn', label: 'מק"ט יצרן', field: 'manufacturerPn', defaultVisible: true },
+  { id: 'manufacturer', label: 'יצרן', field: 'manufacturer', defaultVisible: true },
+  { id: 'description', label: 'תיאור', field: 'description', defaultVisible: true },
+  { id: 'itemType', label: 'סוג', field: 'itemType', defaultVisible: true },
+  { id: 'id', label: 'סמן', field: 'id', defaultVisible: true },
 ];
 
 export const QUOTATION_DATA_GRID_COLUMNS: TableColumnDefinition[] = [
   { id: 'actions', label: 'פעולות', field: 'actions', defaultVisible: true },
-  { id: 'quotationNumber', label: 'מספר הצעה', field: 'quotationNumber', defaultVisible: true },
-  { id: 'customerName', label: 'לקוח', field: 'customerName', defaultVisible: true },
-  { id: 'projectName', label: 'שם פרויקט', field: 'projectName', defaultVisible: true },
+  { id: 'customer_name', label: 'לקוח', field: 'customer_name', defaultVisible: true },
+  { id: 'project_name', label: 'שם פרויקט', field: 'project_name', defaultVisible: true },
+  { id: 'version', label: 'גרסה', field: 'version', defaultVisible: true },
   { id: 'status', label: 'סטטוס', field: 'status', defaultVisible: true },
-  { id: 'totalPrice', label: 'סכום כולל', field: 'totalPrice', defaultVisible: true },
-  { id: 'validUntil', label: 'תוקף עד', field: 'validUntil', defaultVisible: true },
-  { id: 'createdAt', label: 'נוצר ב', field: 'createdAt', defaultVisible: true },
-  { id: 'updatedAt', label: 'עודכן ב', field: 'updatedAt', defaultVisible: false },
+  { id: 'displayTotalPrice', label: 'מחיר סופי', field: 'displayTotalPrice', defaultVisible: true },
+  { id: 'created_at', label: 'תאריך יצירה', field: 'created_at', defaultVisible: true },
+  { id: 'updated_at', label: 'תאריך עדכון', field: 'updated_at', defaultVisible: false },
+];
+
+export const QUOTATION_EDITOR_COLUMNS: TableColumnDefinition[] = [
+  { id: 'actions', label: 'פעולות', field: 'actions', defaultVisible: true },
+  { id: 'displayNumber', label: 'מס"ד', field: 'displayNumber', defaultVisible: true },
+  { id: 'componentName', label: 'שם פריט', field: 'componentName', defaultVisible: true },
+  { id: 'quantity', label: 'כמות', field: 'quantity', defaultVisible: true },
+  { id: 'unitPriceILS', label: 'מחיר יחידה', field: 'unitPriceILS', defaultVisible: true },
+  { id: 'totalPriceUSD', label: 'מחיר נטו דולר', field: 'totalPriceUSD', defaultVisible: true },
+  { id: 'totalPriceILS', label: 'מחיר נטו שקלים', field: 'totalPriceILS', defaultVisible: true },
+  { id: 'customerPriceILS', label: 'מחיר ללקוח', field: 'customerPriceILS', defaultVisible: true },
 ];
 
 // ============ Table Type Definition ============
 
-export type TableType = 'component_library' | 'bom_grid' | 'quotation_data_grid';
+export type TableType = 'component_library' | 'bom_grid' | 'quotation_data_grid' | 'quotation_editor';
 
 export const TABLE_COLUMN_DEFINITIONS: Record<TableType, TableColumnDefinition[]> = {
   component_library: COMPONENT_LIBRARY_COLUMNS,
   bom_grid: BOM_GRID_COLUMNS,
   quotation_data_grid: QUOTATION_DATA_GRID_COLUMNS,
+  quotation_editor: QUOTATION_EDITOR_COLUMNS,
 };
 
 // ============ Helper Functions ============
@@ -143,6 +159,13 @@ export async function loadComponentCategoriesFromSupabase(): Promise<string[]> {
  */
 export function getDefaultVisibleColumns(tableType: TableType): string[] {
   const columns = TABLE_COLUMN_DEFINITIONS[tableType];
+
+  // Guard against undefined columns (invalid table type)
+  if (!columns) {
+    console.warn(`Invalid table type: "${tableType}". Returning empty array.`);
+    return [];
+  }
+
   return columns.filter(col => col.defaultVisible).map(col => col.id);
 }
 
@@ -152,6 +175,12 @@ export function getDefaultVisibleColumns(tableType: TableType): string[] {
  */
 export function getTableColumnSettings(tableType: TableType): string[] {
   try {
+    // Guard against invalid table types
+    if (!TABLE_COLUMN_DEFINITIONS[tableType]) {
+      console.warn(`Invalid table type: "${tableType}". Returning empty array.`);
+      return [];
+    }
+
     // Try new cache format first
     const cache = localStorage.getItem('cpq-settings-cache');
     if (cache) {

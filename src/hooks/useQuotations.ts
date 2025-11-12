@@ -41,15 +41,24 @@ export function useQuotations() {
   const addQuotation = async (quotation: Omit<DbQuotation, 'id' | 'created_at' | 'updated_at'>) => {
     try {
       setError(null)
-      
+
       const { data, error } = await supabase
         .from('quotations')
         .insert([quotation])
-        .select()
+        .select(`
+          *,
+          quotation_systems (
+            *,
+            quotation_items (
+              *,
+              component:components (*)
+            )
+          )
+        `)
         .single()
 
       if (error) throw error
-      
+
       setQuotations(prev => [data, ...prev])
       return data
     } catch (err) {

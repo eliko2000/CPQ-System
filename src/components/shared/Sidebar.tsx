@@ -21,14 +21,14 @@ export function Sidebar() {
 
   const navigation = [
     {
-      name: 'לוח בקרה',
+      name: 'בית',
       icon: LayoutDashboard,
       view: 'dashboard' as const,
     },
     {
-      name: 'הצעות ספקים',
-      icon: FileText,
-      view: 'quotes' as const,
+      name: 'פרויקטים',
+      icon: FolderOpen,
+      view: 'projects' as const,
     },
     {
       name: 'הצעות מחיר',
@@ -36,14 +36,14 @@ export function Sidebar() {
       view: 'quotations' as const,
     },
     {
+      name: 'הצעות ספקים',
+      icon: FileText,
+      view: 'quotes' as const,
+    },
+    {
       name: 'ספרייה',
       icon: Package,
       view: 'components' as const,
-    },
-    {
-      name: 'פרויקטים',
-      icon: FolderOpen,
-      view: 'projects' as const,
     },
     {
       name: 'ניתוחים',

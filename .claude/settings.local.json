@@ -11,7 +11,10 @@
       "Bash(git push:*)",
       "Bash(npm run dev:*)",
       "Bash(Get-Content \"C:\\Users\\Eli\\Desktop\\Claude Code\\CPQ-System\\.env.local\")",
-      "Bash(Select-String \"SUPABASE\")"
+      "Bash(Select-String \"SUPABASE\")",
+      "mcp__playwright__browser_click",
+      "mcp__playwright__browser_console_messages",
+      "mcp__playwright__browser_snapshot"
     ],
     "deny": [],
     "ask": []

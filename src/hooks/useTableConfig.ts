@@ -53,12 +53,17 @@ export function useTableConfig(tableName: string, defaultConfig: TableConfig) {
       const visibleColumnsFromSettings = getTableColumnSettings(tableName as TableType)
       console.log(`[useTableConfig] Loaded visible columns from settings for ${tableName}:`, visibleColumnsFromSettings)
 
-      const { data, error: _error } = await supabase
+      const { data, error } = await supabase
         .from('user_table_configs')
         .select('config')
         .eq('user_id', userId)
         .eq('table_name', tableName)
-        .single()
+        .maybeSingle()
+
+      // Log but don't throw on expected errors (no record yet)
+      if (error && error.code !== 'PGRST116') {
+        console.warn(`[useTableConfig] Error loading config for ${tableName}:`, error)
+      }
 
       if (data?.config) {
         console.log(`[useTableConfig] Loaded saved config for ${tableName}:`, data.config)

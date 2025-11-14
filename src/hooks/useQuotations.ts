@@ -71,7 +71,8 @@ export function useQuotations() {
   const updateQuotation = async (id: string, updates: Partial<DbQuotation>) => {
     try {
       setError(null)
-      
+      console.log('useQuotations - updateQuotation called:', { id, updates })
+
       const { data, error } = await supabase
         .from('quotations')
         .update(updates)
@@ -80,10 +81,23 @@ export function useQuotations() {
         .single()
 
       if (error) throw error
-      
-      setQuotations(prev => 
-        prev.map(quot => quot.id === id ? { ...quot, ...data } : quot)
-      )
+
+      console.log('useQuotations - Database updated, returned data:', data)
+
+      // Only update the changed fields, preserve nested quotation_systems
+      setQuotations(prev => {
+        const updated = prev.map(quot => {
+          if (quot.id === id) {
+            // Merge only the updated fields, don't overwrite nested data
+            const merged = { ...quot, ...updates }
+            console.log('useQuotations - Merging quotation:', { old: quot, updates, merged })
+            return merged
+          }
+          return quot
+        })
+        console.log('useQuotations - State updated with new quotations array')
+        return updated
+      })
       return data
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update quotation')
@@ -412,6 +426,28 @@ export function useQuotations() {
   // Load quotations on mount
   useEffect(() => {
     fetchQuotations()
+  }, [])
+
+  // Refetch quotations when window/tab becomes visible
+  // This ensures data is fresh when navigating back to the list
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchQuotations()
+      }
+    }
+
+    const handleFocus = () => {
+      fetchQuotations()
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('focus', handleFocus)
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('focus', handleFocus)
+    }
   }, [])
 
   return {

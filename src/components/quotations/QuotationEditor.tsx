@@ -6,12 +6,13 @@ import { QuotationItem, QuotationSystem, Component } from '../../types'
 import { QuotationParameters } from './QuotationParameters'
 import { calculateQuotationTotals, renumberItems } from '../../utils/quotationCalculations'
 import { Button } from '../ui/button'
-import { Trash2, Plus, Settings, ChevronDown, X, Save, LogOut, Edit } from 'lucide-react'
+import { Trash2, Plus, Settings, ChevronDown, X, Save, LogOut, Edit, FolderOpen } from 'lucide-react'
 import { useClickOutside } from '../../hooks/useClickOutside'
 import { useTableConfig } from '../../hooks/useTableConfig'
 import { useQuotations } from '../../hooks/useQuotations'
 import { CustomHeader } from '../grid/CustomHeader'
 import { ComponentForm } from '../library/ComponentForm'
+import { ProjectPicker } from './ProjectPicker'
 import 'ag-grid-community/styles/ag-grid.css'
 import 'ag-grid-community/styles/ag-theme-alpine.css'
 
@@ -173,11 +174,13 @@ export function QuotationEditor() {
 
   // Use table configuration hook
   const { config, saveConfig, loading } = useTableConfig('quotation_editor', {
-    columnOrder: ['customerPriceILS', 'totalPriceILS', 'totalPriceUSD', 'unitPriceILS', 'quantity', 'componentName', 'displayNumber', 'actions'],
+    columnOrder: ['actions', 'displayNumber', 'componentName', 'quantity', 'unitPriceILS', 'totalPriceUSD', 'totalPriceILS', 'customerPriceILS'],
     columnWidths: {},
-    visibleColumns: ['customerPriceILS', 'totalPriceILS', 'totalPriceUSD', 'unitPriceILS', 'quantity', 'componentName', 'displayNumber', 'actions'],
+    visibleColumns: ['actions', 'displayNumber', 'componentName', 'quantity', 'unitPriceILS', 'totalPriceUSD', 'totalPriceILS', 'customerPriceILS'],
     filterState: {}
   })
+
+  console.log('🔍 QuotationEditor config loaded:', config)
 
   // Make components available globally for the LibrarySearchEditor
   useEffect(() => {
@@ -191,6 +194,7 @@ export function QuotationEditor() {
   const [componentSearchText, setComponentSearchText] = useState('')
   const [isDirty, setIsDirty] = useState(false)
   const [showExitConfirmation, setShowExitConfirmation] = useState(false)
+  const [showProjectPicker, setShowProjectPicker] = useState(false)
 
   // Close column manager when clicking outside
   const columnManagerRef = useClickOutside<HTMLDivElement>(() => {
@@ -442,6 +446,61 @@ export function QuotationEditor() {
   const cancelExit = useCallback(() => {
     setShowExitConfirmation(false)
   }, [])
+
+  // Handle project selection
+  const handleProjectSelect = useCallback(async (project: any) => {
+    console.log('🔵 handleProjectSelect called with project:', project)
+    console.log('🔵 Current quotation:', currentQuotation)
+
+    if (!currentQuotation) {
+      console.error('❌ No current quotation!')
+      return
+    }
+
+    try {
+      // Update quotation with selected project - save directly to Supabase
+      const updates = {
+        project_id: project.id,
+        project_name: project.projectName,
+        customer_name: project.companyName
+      }
+      console.log('🔵 Preparing database updates:', updates)
+
+      // Update in database using the Supabase hook directly
+      console.log('🔵 Calling quotationsHook.updateQuotation...')
+      await quotationsHook.updateQuotation(currentQuotation.id, updates)
+      console.log('✅ Database update completed successfully')
+
+      // Update local state after successful database update
+      console.log('🔵 Updating local CPQ context state...')
+      updateQuotation(currentQuotation.id, {
+        projectId: project.id,
+        projectName: project.projectName,
+        customerName: project.companyName
+      })
+
+      // Also update currentQuotation directly for immediate UI feedback
+      setCurrentQuotation({
+        ...currentQuotation,
+        projectId: project.id,
+        projectName: project.projectName,
+        customerName: project.companyName
+      })
+      console.log('✅ Local state updated')
+
+      setIsDirty(false) // Mark as saved since we just saved to DB
+      console.log('✅ Marked as clean (not dirty)')
+
+      // Show success message
+      const { toast } = await import('sonner')
+      toast.success('הפרויקט עודכן בהצלחה')
+      console.log('✅ Success toast shown')
+    } catch (error) {
+      console.error('❌ Failed to update project:', error)
+      const { toast } = await import('sonner')
+      toast.error('שגיאה בעדכון פרויקט')
+    }
+  }, [currentQuotation, setCurrentQuotation, updateQuotation, quotationsHook])
 
   // Handle column menu click
   const handleColumnMenuClick = useCallback((columnId: string) => {
@@ -886,17 +945,22 @@ export function QuotationEditor() {
     // Default column order if not configured
     const defaultOrder = ['actions', 'displayNumber', 'componentName', 'quantity', 'unitPriceILS', 'totalPriceUSD', 'totalPriceILS', 'customerPriceILS']
 
+    console.log('🔍 config.visibleColumns:', config.visibleColumns)
+    console.log('🔍 config.columnOrder:', config.columnOrder)
+
     // Use saved order if exists and not empty, otherwise use default
     const effectiveOrder = (config.columnOrder && config.columnOrder.length > 0)
       ? config.columnOrder
       : defaultOrder
 
-    // If no visible columns configured, show all columns
-    if (!config.visibleColumns || config.visibleColumns.length === 0) {
-      return columnDefs
-    }
+    // ALWAYS ensure 'actions' is in visibleColumns
+    const ensuredVisibleColumns = config.visibleColumns && config.visibleColumns.length > 0
+      ? (config.visibleColumns.includes('actions') ? config.visibleColumns : ['actions', ...config.visibleColumns])
+      : defaultOrder
 
-    const visible = columnDefs.filter(col => config.visibleColumns.includes(col.field!))
+    console.log('🔍 ensuredVisibleColumns:', ensuredVisibleColumns)
+
+    const visible = columnDefs.filter(col => ensuredVisibleColumns.includes(col.field!))
 
     // If filtering results in no columns, fall back to all columns
     if (visible.length === 0) {
@@ -907,7 +971,11 @@ export function QuotationEditor() {
       .filter(fieldId => visible.some(col => col.field === fieldId))
       .map(fieldId => visible.find(col => col.field === fieldId)!)
 
-    // Don't reverse! columnDefs is already in correct order and AG Grid RTL will handle it
+    console.log('🔍 effectiveOrder was:', effectiveOrder)
+    console.log('🔍 Final ordered columns:', ordered.map(c => c.field))
+
+    // AG Grid with enableRtl={true} does NOT reverse the array - just the visual layout
+    // So we use the column order as-is
     return ordered.length > 0 ? ordered : visible
   }, [columnDefs, config.visibleColumns, config.columnOrder])
 
@@ -1083,12 +1151,30 @@ export function QuotationEditor() {
     <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center">
-        <div>
+        <div className="flex-1">
           <h1 className="text-2xl font-bold text-gray-900">
             {currentQuotation.name}
             {isDirty && <span className="text-orange-500 text-sm mr-2">(שינויים שלא נשמרו)</span>}
           </h1>
-          <p className="text-gray-600">{currentQuotation.customerName}</p>
+          <div className="flex items-center gap-2 mt-1">
+            <p className="text-gray-600">{currentQuotation.customerName}</p>
+            {currentQuotation.projectName && (
+              <>
+                <span className="text-gray-400">|</span>
+                <p className="text-gray-600">{currentQuotation.projectName}</p>
+              </>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowProjectPicker(true)}
+              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 gap-1"
+              title="בחר פרויקט"
+            >
+              <FolderOpen className="h-4 w-4" />
+              <span className="text-xs">שנה פרויקט</span>
+            </Button>
+          </div>
         </div>
         <div className="flex gap-3">
           <Button
@@ -1392,6 +1478,14 @@ export function QuotationEditor() {
         component={modalState?.type === 'edit-component' ? modalState.data : null}
         isOpen={modalState?.type === 'edit-component'}
         onClose={closeModal}
+      />
+
+      {/* Project Picker Modal */}
+      <ProjectPicker
+        isOpen={showProjectPicker}
+        onClose={() => setShowProjectPicker(false)}
+        onSelect={handleProjectSelect}
+        currentProjectId={currentQuotation?.projectId}
       />
     </div>
   )

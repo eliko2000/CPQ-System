@@ -31,6 +31,9 @@ interface CPQState {
   currentProjectBOM: BOMLine[]
   currentProject: Project | null
 
+  // Viewing project detail
+  viewingProjectId: string | null
+
   // UI state
   uiState: UIState
   modalState: ModalState
@@ -73,6 +76,7 @@ type CPQAction =
   | { type: 'UPDATE_PROJECT'; payload: { id: string; updates: Partial<Project> } }
   | { type: 'DELETE_PROJECT'; payload: string }
   | { type: 'SET_CURRENT_PROJECT'; payload: Project | null }
+  | { type: 'SET_VIEWING_PROJECT_ID'; payload: string | null }
 
   // Supplier Quotes
   | { type: 'SET_SUPPLIER_QUOTES'; payload: SupplierQuote[] }
@@ -898,6 +902,7 @@ const initialState: CPQState = {
   currentQuotation: null,
   currentProjectBOM: [],
   currentProject: null,
+  viewingProjectId: null,
   uiState: {
     activeView: 'dashboard',
     sidebarCollapsed: false,
@@ -1037,6 +1042,12 @@ function cpqReducer(state: CPQState, action: CPQAction): CPQState {
         currentProjectBOM: action.payload ? [] : [],
       }
 
+    case 'SET_VIEWING_PROJECT_ID':
+      return {
+        ...state,
+        viewingProjectId: action.payload,
+      }
+
     case 'SET_CURRENT_QUOTATION':
       return {
         ...state,
@@ -1171,6 +1182,7 @@ interface CPQContextType extends CPQState {
   updateProject: (id: string, updates: Partial<Project>) => Promise<void>
   deleteProject: (id: string) => Promise<void>
   setCurrentProject: (project: Project | null) => void
+  setViewingProjectId: (projectId: string | null) => void
 
   // BOM actions
   addBOMItem: (item: Omit<BOMLine, 'id'>) => void
@@ -1342,6 +1354,10 @@ export function CPQProvider({ children }: { children: React.ReactNode }) {
     dispatch({ type: 'SET_CURRENT_PROJECT', payload: project })
   }, [])
 
+  const setViewingProjectId = useCallback((projectId: string | null) => {
+    dispatch({ type: 'SET_VIEWING_PROJECT_ID', payload: projectId })
+  }, [])
+
   // ============ BOM Actions ============
   const addBOMItem = useCallback((item: Omit<BOMLine, 'id'>) => {
     const bomItem: BOMLine = {
@@ -1379,6 +1395,10 @@ export function CPQProvider({ children }: { children: React.ReactNode }) {
   // ============ UI Actions ============
   const setActiveView = useCallback((view: UIState['activeView']) => {
     dispatch({ type: 'SET_ACTIVE_VIEW', payload: view })
+    // Clear project detail view when navigating away from projects
+    if (view !== 'projects') {
+      dispatch({ type: 'SET_VIEWING_PROJECT_ID', payload: null })
+    }
   }, [])
 
   const toggleSidebar = useCallback(() => {
@@ -1432,9 +1452,31 @@ export function CPQProvider({ children }: { children: React.ReactNode }) {
     dispatch({ type: 'ADD_QUOTATION', payload: quotation })
   }, [])
 
-  const updateQuotation = useCallback((id: string, updates: Partial<QuotationProject>) => {
+  const updateQuotation = useCallback(async (id: string, updates: Partial<QuotationProject>) => {
+    // Update local state immediately for responsive UI
     dispatch({ type: 'UPDATE_QUOTATION', payload: { id, updates } })
-  }, [])
+
+    // Convert QuotationProject fields to DbQuotation fields for Supabase
+    const dbUpdates: any = {}
+    if (updates.projectId !== undefined) dbUpdates.project_id = updates.projectId
+    if (updates.projectName !== undefined) dbUpdates.project_name = updates.projectName
+    if (updates.customerName !== undefined) dbUpdates.customer_name = updates.customerName
+    if (updates.name !== undefined) dbUpdates.quotation_number = updates.name
+    if (updates.parameters !== undefined) {
+      if (updates.parameters.usdToIlsRate !== undefined) dbUpdates.exchange_rate = updates.parameters.usdToIlsRate
+      if (updates.parameters.markupPercent !== undefined) dbUpdates.margin_percentage = updates.parameters.markupPercent
+    }
+
+    // Save to Supabase if there are database fields to update
+    if (Object.keys(dbUpdates).length > 0) {
+      try {
+        await quotationsHook.updateQuotation(id, dbUpdates)
+      } catch (error) {
+        console.error('Failed to save quotation updates to database:', error)
+        // Optionally revert local state or show error to user
+      }
+    }
+  }, [quotationsHook])
 
   const value: CPQContextType = {
     ...state,
@@ -1451,6 +1493,7 @@ export function CPQProvider({ children }: { children: React.ReactNode }) {
     updateProject,
     deleteProject,
     setCurrentProject,
+    setViewingProjectId,
     addBOMItem,
     updateBOMItem,
     deleteBOMItem,

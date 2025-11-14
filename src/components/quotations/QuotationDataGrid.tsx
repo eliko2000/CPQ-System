@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback, useMemo } from 'react'
+import React, { useRef, useState, useCallback, useMemo, useEffect } from 'react'
 import { AgGridReact } from 'ag-grid-react'
 import { ColDef, NewValueParams, ValueFormatterParams, ICellRendererParams } from 'ag-grid-community'
 import { useQuotations } from '../../hooks/useQuotations'
@@ -13,6 +13,7 @@ import { Edit, Trash2, Copy, Plus, Settings, ChevronDown } from 'lucide-react'
 import { useClickOutside } from '../../hooks/useClickOutside'
 import { useTableConfig } from '../../hooks/useTableConfig'
 import { CustomHeader } from '../grid/CustomHeader'
+import { StatusCellEditor, QUOTATION_STATUS_OPTIONS } from '../grid/StatusCellEditor'
 import { getTableColumnSettings } from '../../constants/settings'
 
 import 'ag-grid-community/styles/ag-grid.css'
@@ -113,15 +114,20 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
   onQuotationSelect,
   onQuotationEdit
 }) => {
-  const { quotations, loading, error, updateQuotation, deleteQuotation, addQuotation, duplicateQuotation } = useQuotations()
+  const { quotations, loading, error, updateQuotation, deleteQuotation, addQuotation, duplicateQuotation, fetchQuotations } = useQuotations()
   const { setCurrentQuotation } = useCPQ()
-  
+
   const gridRef = useRef<AgGridReact>(null)
   const [selectedQuotations, setSelectedQuotations] = useState<string[]>([])
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; quotation?: DbQuotation }>({ open: false })
   const [creatingNew, setCreatingNew] = useState(false)
   const [showColumnManager, setShowColumnManager] = useState(false)
   const isInitialMount = useRef(true)
+
+  // Refetch quotations when component mounts to ensure fresh data after navigation
+  useEffect(() => {
+    fetchQuotations()
+  }, [])
 
   // Use table configuration hook - RTL order (stored order matches desired display order)
   const { config, saveConfig } = useTableConfig('quotation_data_grid', {
@@ -303,9 +309,13 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
       field: 'status',
       width: 120,
       editable: true,
-      cellEditor: 'agSelectCellEditor',
+      cellEditor: StatusCellEditor,
       cellEditorParams: {
-        values: ['draft', 'sent', 'accepted', 'rejected', 'expired']
+        options: QUOTATION_STATUS_OPTIONS,
+        onStatusChange: async (id: string, newStatus: string) => {
+          console.log('QuotationDataGrid - onStatusChange called:', { id, newStatus })
+          await updateQuotation(id, { status: newStatus as any })
+        }
       },
       cellRenderer: StatusRenderer,
       filter: 'agSetColumnFilter',
@@ -349,8 +359,7 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
       headerName: 'שם פרוייקט',
       field: 'project_name',
       width: 200,
-      editable: true,
-      cellEditor: 'agTextCellEditor',
+      editable: false,
       filter: 'agSetColumnFilter',
       filterParams: {
         values: () => getUniqueValues('project_name')
@@ -370,8 +379,7 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
       headerName: 'לקוח',
       field: 'customer_name',
       width: 180,
-      editable: true,
-      cellEditor: 'agTextCellEditor',
+      editable: false,
       filter: 'agSetColumnFilter',
       filterParams: {
         values: () => getUniqueValues('customer_name')
@@ -469,15 +477,26 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
   // Handle cell value changes
   const handleCellValueChanged = useCallback(async (params: NewValueParams) => {
     const { data, colDef, newValue, oldValue } = params
-    
-    if (newValue === oldValue) return
+    console.log('🟢 QuotationDataGrid - onCellValueChanged fired:', {
+      field: colDef.field,
+      oldValue,
+      newValue,
+      data
+    })
+
+    if (newValue === oldValue) {
+      console.log('No change detected, skipping update')
+      return
+    }
 
     try {
+      console.log('Updating quotation field:', colDef.field)
       await updateQuotation(data.id, {
         [colDef.field!]: newValue
       })
+      console.log('✅ Quotation updated successfully')
     } catch (error) {
-      console.error('Failed to update quotation:', error)
+      console.error('❌ Failed to update quotation:', error)
       // Revert change in grid
       if (params.node) {
         params.node.setDataValue(colDef.field!, oldValue)
@@ -817,9 +836,7 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
               rowSelection="multiple"
               enableRangeSelection={false}
               animateRows={true}
-              editType="fullRow"
               stopEditingWhenCellsLoseFocus={true}
-              suppressClickEdit={true}
               singleClickEdit={true}
               pagination={true}
               paginationPageSize={50}

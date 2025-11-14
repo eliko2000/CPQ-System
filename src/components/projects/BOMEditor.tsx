@@ -37,6 +37,7 @@ const StatusRenderer = ({ value }: { value: string }) => {
 }
 
 export function BOMEditor() {
+  console.log('🔧 BOMEditor component rendered')
   const { currentProject, currentProjectBOM, updateBOMItem, deleteBOMItem, calculateBOMTotals } = useCPQ()
   const gridRef = useRef<AgGridReact>(null)
 
@@ -46,7 +47,9 @@ export function BOMEditor() {
   }, [currentProjectBOM, calculateBOMTotals])
 
   // Column definitions with Excel-like functionality
-  const columnDefs: ColDef<BOMLine>[] = useMemo(() => [
+  // Reversed order for RTL display
+  const columnDefs: ColDef<BOMLine>[] = useMemo(() => {
+    const cols: ColDef<BOMLine>[] = [
     {
       headerName: '',
       field: 'drag' as any,
@@ -184,7 +187,16 @@ export function BOMEditor() {
       },
       editable: false,
     },
-  ], [deleteBOMItem])
+  ]
+
+    console.log('BOMEditor columnDefs order:', cols.map(c => c.headerName || c.field))
+    return cols
+  }, [deleteBOMItem])
+
+  // Don't reverse - let dir="rtl" handle it naturally
+  // const reversedColumnDefs = useMemo(() => {
+  //   return [...columnDefs].reverse()
+  // }, [columnDefs])
 
   // Default column definitions
   const defaultColDef = useMemo<ColDef>(() => ({

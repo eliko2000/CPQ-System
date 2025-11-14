@@ -22,6 +22,47 @@ export interface Component {
   updatedAt: string;
 }
 
+// ============ Projects (פרויקטים) ============
+// Projects are organizational containers for quotations
+// One project can have multiple quotation versions
+
+export type ProjectStatus = 'active' | 'on-hold' | 'completed' | 'cancelled';
+
+export interface ProjectMetadata {
+  id: string;
+  companyName: string;
+  projectName: string;
+  description?: string;
+  status: ProjectStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Project with quotation count (used in list views)
+export interface ProjectSummary extends ProjectMetadata {
+  quotationCount: number;
+  lastQuotationUpdate?: string;
+}
+
+// Database schema type for projects
+export interface DbProject {
+  id: string;
+  company_name: string;
+  project_name: string;
+  description?: string;
+  status: ProjectStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+// Form data for creating/editing projects
+export interface ProjectFormData {
+  companyName: string;
+  projectName: string;
+  description?: string;
+  status: ProjectStatus;
+}
+
 // ============ Quotation Projects (פרויקטי הצעות מחיר) ============
 export interface QuotationProject {
   id: string;
@@ -310,12 +351,6 @@ export interface ComponentFormData {
   notes?: string;
 }
 
-export interface ProjectFormData {
-  name: string;
-  customerName: string;
-  description?: string;
-}
-
 export interface ProjectParametersFormData {
   currency: 'NIS' | 'USD' | 'both';
   exchangeRate: number;
@@ -402,6 +437,7 @@ export interface DbQuotation {
   customer_email?: string;
   project_name?: string;
   project_description?: string;
+  project_id?: string; // Link to projects table
   currency: string;
   exchange_rate: number;
   margin_percentage: number;
@@ -416,6 +452,7 @@ export interface DbQuotation {
 
   // Related data from joins
   quotation_systems?: DbQuotationSystem[];
+  project?: DbProject; // Optional joined project data
 }
 
 export interface DbQuotationSystem {

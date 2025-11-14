@@ -88,15 +88,25 @@ export const QUOTATION_EDITOR_COLUMNS: TableColumnDefinition[] = [
   { id: 'customerPriceILS', label: 'מחיר ללקוח', field: 'customerPriceILS', defaultVisible: true },
 ];
 
+export const PROJECTS_LIST_COLUMNS: TableColumnDefinition[] = [
+  { id: 'projectName', label: 'שם פרויקט', field: 'projectName', defaultVisible: true },
+  { id: 'companyName', label: 'שם חברה', field: 'companyName', defaultVisible: true },
+  { id: 'status', label: 'סטטוס', field: 'status', defaultVisible: true },
+  { id: 'quotationCount', label: 'מספר הצעות מחיר', field: 'quotationCount', defaultVisible: true },
+  { id: 'createdAt', label: 'תאריך יצירה', field: 'createdAt', defaultVisible: true },
+  { id: 'actions', label: 'פעולות', field: 'actions', defaultVisible: true },
+];
+
 // ============ Table Type Definition ============
 
-export type TableType = 'component_library' | 'bom_grid' | 'quotation_data_grid' | 'quotation_editor';
+export type TableType = 'component_library' | 'bom_grid' | 'quotation_data_grid' | 'quotation_editor' | 'projects_list';
 
 export const TABLE_COLUMN_DEFINITIONS: Record<TableType, TableColumnDefinition[]> = {
   component_library: COMPONENT_LIBRARY_COLUMNS,
   bom_grid: BOM_GRID_COLUMNS,
   quotation_data_grid: QUOTATION_DATA_GRID_COLUMNS,
   quotation_editor: QUOTATION_EDITOR_COLUMNS,
+  projects_list: PROJECTS_LIST_COLUMNS,
 };
 
 // ============ Helper Functions ============

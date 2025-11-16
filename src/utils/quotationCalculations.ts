@@ -18,8 +18,7 @@ export function calculateItemTotals(item: QuotationItem, parameters: QuotationPa
   const totalPriceILS = item.quantity * item.unitPriceILS;
   
   // Apply profit coefficient to customer price (divide by coefficient)
-  const markupPercent = parameters.markupPercent ?? 25;
-  const profitCoefficient = 1 / (1 + markupPercent / 100);
+  const profitCoefficient = parameters.markupPercent ?? 0.75;
   const customerPriceILS = totalPriceILS / profitCoefficient;
   
   return {
@@ -133,30 +132,34 @@ export function calculateQuotationTotals(project: QuotationProject): QuotationCa
     }
   );
   
-  
-  // Apply system quantities to customer prices
+
+  // Get total cost (all hardware/software costs)
+  const totalCostILS = costAggregates.subtotalILS;
+
+  // Calculate profit: (cost / profit_coefficient) - cost
+  const profitCoefficient = parameters.markupPercent || 0.75;
+  const totalProfitILS = profitCoefficient > 0 ? (totalCostILS / profitCoefficient) - totalCostILS : 0;
+
+  // Calculate risk addition: (cost + profit) × risk%
+  const baseForRisk = totalCostILS + totalProfitILS;
+  const riskAdditionILS = baseForRisk * ((parameters.riskPercent || 0) / 100);
+
+  // Calculate total before VAT: cost + profit + risk
+  const totalQuoteILS = totalCostILS + totalProfitILS + riskAdditionILS;
+
+  // Keep customer price calculation for backward compatibility
   const totalCustomerPriceILS = systems.reduce((total, system) => {
     const systemItems = calculatedItems.filter(item => item.systemId === system.id);
     const systemCustomerPrice = systemItems.reduce((sum, item) => sum + item.customerPriceILS, 0);
     return total + (systemCustomerPrice * (system.quantity || 1));
   }, 0);
-  
-  // Calculate risk addition using simple percentage
-  const riskAdditionILS = totalCustomerPriceILS * ((parameters.riskPercent || 0) / 100);
-  
-  // Calculate totals
-  const totalQuoteILS = totalCustomerPriceILS + riskAdditionILS;
-  const totalCostILS = costAggregates.subtotalILS; // Cost is before risk
-  
+
   // Calculate VAT
   const totalVATILS = parameters.includeVAT ? totalQuoteILS * (parameters.vatRate / 100) : 0;
   const finalTotalILS = totalQuoteILS + totalVATILS;
-  
-  // Calculate profit (customer price - cost - risk)
-  const totalProfitILS = totalQuoteILS - totalCostILS - riskAdditionILS;
-  
-  // Calculate profit margin based on final total
-  const profitMarginPercent = finalTotalILS > 0 ? (totalProfitILS / finalTotalILS) * 100 : 0;
+
+  // Calculate profit margin: (profit + risk) / total before VAT
+  const profitMarginPercent = totalQuoteILS > 0 ? ((totalProfitILS + riskAdditionILS) / totalQuoteILS) * 100 : 0;
   
   return {
     totalHardwareUSD: costAggregates.totalHardwareUSD,
@@ -243,7 +246,7 @@ export function getDefaultQuotationParameters(): QuotationParameters {
         return {
           usdToIlsRate: pricing.usdToIlsRate ?? 3.7,
           eurToIlsRate: pricing.eurToIlsRate ?? 4.0,
-          markupPercent: pricing.defaultMarkup ?? 25,
+          markupPercent: pricing.defaultMarkup ?? 0.75,
           dayWorkCost: pricing.dayWorkCost ?? 1200,
           profitPercent: 20, // Not configurable yet
           riskPercent: pricing.defaultRisk ?? 10,
@@ -262,7 +265,7 @@ export function getDefaultQuotationParameters(): QuotationParameters {
   return {
     usdToIlsRate: 3.7,
     eurToIlsRate: 4.0,
-    markupPercent: 25,
+    markupPercent: 0.75,
     dayWorkCost: 1200,
     profitPercent: 20,
     riskPercent: 10,

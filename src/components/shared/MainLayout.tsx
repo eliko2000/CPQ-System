@@ -1,6 +1,5 @@
 import React from 'react'
 import { Sidebar } from './Sidebar'
-import { Header } from './Header'
 import { useCPQ } from '@/contexts/CPQContext'
 
 interface MainLayoutProps {
@@ -14,7 +13,8 @@ export function MainLayout({ children }: MainLayoutProps) {
     <div className="flex h-screen bg-background" dir="rtl">
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
-        <Header />
+        {/* Blue top bar extends across entire width */}
+        <div className="h-16 bg-primary" />
         <main className="flex-1 overflow-auto p-6">
           {children}
         </main>

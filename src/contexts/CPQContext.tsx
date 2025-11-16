@@ -149,7 +149,7 @@ type CPQAction =
     parameters: {
       usdToIlsRate: 3.7,
       eurToIlsRate: 4.0,
-      markupPercent: 25,
+      markupPercent: 0.75,
       dayWorkCost: 1200,
       profitPercent: 20,
       riskPercent: 5,
@@ -1464,7 +1464,9 @@ export function CPQProvider({ children }: { children: React.ReactNode }) {
     if (updates.name !== undefined) dbUpdates.quotation_number = updates.name
     if (updates.parameters !== undefined) {
       if (updates.parameters.usdToIlsRate !== undefined) dbUpdates.exchange_rate = updates.parameters.usdToIlsRate
+      if (updates.parameters.eurToIlsRate !== undefined) dbUpdates.eur_to_ils_rate = updates.parameters.eurToIlsRate
       if (updates.parameters.markupPercent !== undefined) dbUpdates.margin_percentage = updates.parameters.markupPercent
+      if (updates.parameters.riskPercent !== undefined) dbUpdates.risk_percentage = updates.parameters.riskPercent
     }
 
     // Save to Supabase if there are database fields to update

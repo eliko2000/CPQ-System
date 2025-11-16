@@ -16,7 +16,7 @@ import { Component } from '../../types'
 import { ComponentForm } from './ComponentForm'
 import { ConfirmDialog } from '../ui/ConfirmDialog'
 import { EnhancedComponentGrid } from './EnhancedComponentGrid'
-import { ComponentAIImport } from './ComponentAIImport'
+import { SupplierQuoteImport } from '../supplier-quotes/SupplierQuoteImport'
 import { useComponents } from '../../hooks/useComponents'
 import { toast } from 'sonner'
 
@@ -104,28 +104,6 @@ export function ComponentLibrary() {
 
   const cancelDelete = () => {
     setDeleteConfirm({ isOpen: false, componentId: null, componentName: '' })
-  }
-
-  const handleAIImport = async (componentsToImport: Partial<Component>[]) => {
-    let successCount = 0
-    let failureCount = 0
-
-    for (const component of componentsToImport) {
-      try {
-        await addComponent(component as any)
-        successCount++
-      } catch (error) {
-        console.error('Failed to import component:', error)
-        failureCount++
-      }
-    }
-
-    if (successCount > 0) {
-      toast.success(`Successfully imported ${successCount} component${successCount > 1 ? 's' : ''}`)
-    }
-    if (failureCount > 0) {
-      toast.error(`Failed to import ${failureCount} component${failureCount > 1 ? 's' : ''}`)
-    }
   }
 
   const formatCurrency = (amount: number) => {
@@ -264,11 +242,14 @@ export function ComponentLibrary() {
         onClose={closeModal}
       />
 
-      {/* AI Import Modal */}
-      <ComponentAIImport
+      {/* AI Import Modal - Now uses enhanced SupplierQuoteImport */}
+      <SupplierQuoteImport
         isOpen={isAIImportOpen}
         onClose={() => setIsAIImportOpen(false)}
-        onImport={handleAIImport}
+        onSuccess={() => {
+          setIsAIImportOpen(false);
+          toast.success('רכיבים יובאו בהצלחה');
+        }}
       />
 
       {/* Delete Confirmation Dialog */}

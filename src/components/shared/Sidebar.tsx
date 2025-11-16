@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useCPQ } from '../../contexts/CPQContext'
+import { loadSetting } from '../../services/settingsService'
 import {
   LayoutDashboard,
   FileText,
@@ -18,6 +19,7 @@ export function Sidebar() {
   const { uiState, setActiveView, toggleSidebar, currentQuotation, setCurrentQuotation } = useCPQ()
   const [showNavigationConfirm, setShowNavigationConfirm] = useState(false)
   const [pendingView, setPendingView] = useState<string | null>(null)
+  const [logoUrl, setLogoUrl] = useState<string | null>(null)
 
   const navigation = [
     {
@@ -50,6 +52,11 @@ export function Sidebar() {
       icon: BarChart3,
       view: 'analytics' as const,
     },
+    {
+      name: 'הגדרות',
+      icon: Settings,
+      view: 'settings' as const,
+    },
   ]
 
   // Handle navigation with quotation check
@@ -79,78 +86,105 @@ export function Sidebar() {
     setPendingView(null)
   }
 
+  // Load company logo on mount
+  useEffect(() => {
+    async function loadLogo() {
+      try {
+        const result = await loadSetting<{ logoUrl: string }>('companyLogo')
+        if (result.success && result.data?.logoUrl) {
+          setLogoUrl(result.data.logoUrl)
+        }
+      } catch (error) {
+        console.error('Error loading logo:', error)
+      }
+    }
+    loadLogo()
+
+    // Listen for logo updates
+    const handleLogoUpdate = (event: any) => {
+      setLogoUrl(event.detail?.logoUrl || null)
+    }
+    window.addEventListener('cpq-logo-updated', handleLogoUpdate)
+
+    return () => {
+      window.removeEventListener('cpq-logo-updated', handleLogoUpdate)
+    }
+  }, [])
+
   return (
     <>
       <div className={cn(
         "flex flex-col bg-card border-l border-border transition-all duration-300",
         uiState.sidebarCollapsed ? "w-16" : "w-64"
       )}>
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-border">
-          {!uiState.sidebarCollapsed && (
-            <div className="flex items-center space-x-reverse space-x-2">
-              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                <span className="text-primary-foreground font-bold text-sm">CPQ</span>
-              </div>
-              <span className="font-semibold text-foreground">מערכת CPQ</span>
-            </div>
-          )}
-          <button
-            onClick={toggleSidebar}
-            className="p-2 rounded-md hover:bg-accent transition-colors"
-          >
-            {uiState.sidebarCollapsed ? (
-              <Menu className="h-4 w-4" />
-            ) : (
-              <X className="h-4 w-4" />
+        {/* Header - Blue Background with White Text */}
+        <div className="bg-primary p-4">
+          <div className="flex items-center justify-between">
+            {!uiState.sidebarCollapsed && (
+              <h1 className="text-lg font-bold text-primary-foreground w-full text-center">
+                RadiaQ AI
+              </h1>
             )}
-          </button>
+            <button
+              onClick={toggleSidebar}
+              className="p-2 rounded-md hover:bg-primary-foreground/10 transition-colors flex-shrink-0"
+            >
+              {uiState.sidebarCollapsed ? (
+                <Menu className="h-4 w-4 text-primary-foreground" />
+              ) : (
+                <X className="h-4 w-4 text-primary-foreground" />
+              )}
+            </button>
+          </div>
         </div>
 
         {/* Navigation */}
         <nav className="flex-1 p-4 space-y-2">
-          {navigation.map((item) => {
+          {navigation.map((item, index) => {
             const Icon = item.icon
             const isActive = uiState.activeView === item.view
+            const isSettings = item.view === 'settings'
+            const isLastBeforeSettings = index === navigation.length - 2
 
             return (
-              <button
-                key={item.name}
-                onClick={() => handleNavigation(item.view)}
-                className={cn(
-                  "w-full flex items-center space-x-reverse space-x-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
-                  isActive
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
+              <React.Fragment key={item.name}>
+                {/* Add spacing and border before Settings */}
+                {isSettings && !uiState.sidebarCollapsed && (
+                  <div className="pt-4 mt-2 border-t border-border" />
                 )}
-                title={uiState.sidebarCollapsed ? item.name : undefined}
-              >
-                <Icon className="h-5 w-5 flex-shrink-0" />
-                {!uiState.sidebarCollapsed && (
-                  <span className="truncate">{item.name}</span>
-                )}
-              </button>
+
+                <button
+                  onClick={() => handleNavigation(item.view)}
+                  className={cn(
+                    "w-full flex items-center space-x-reverse space-x-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                    isActive
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                  )}
+                  title={uiState.sidebarCollapsed ? item.name : undefined}
+                >
+                  <Icon className="h-5 w-5 flex-shrink-0" />
+                  {!uiState.sidebarCollapsed && (
+                    <span className="truncate">{item.name}</span>
+                  )}
+                </button>
+              </React.Fragment>
             )
           })}
         </nav>
 
-        {/* Footer */}
-        <div className="p-4 border-t border-border">
-          <button
-            onClick={() => setActiveView('settings')}
-            className={cn(
-              "w-full flex items-center space-x-reverse space-x-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
-              uiState.activeView === 'settings'
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:bg-accent hover:text-foreground"
-            )}
-          >
-            <Settings className="h-5 w-5 flex-shrink-0" />
-            {!uiState.sidebarCollapsed && (
-              <span className="truncate">הגדרות</span>
-            )}
-          </button>
-        </div>
+        {/* Footer - Company Logo */}
+        {!uiState.sidebarCollapsed && logoUrl && (
+          <div className="p-6 border-t border-border">
+            <div className="w-full flex items-center justify-center">
+              <img
+                src={logoUrl}
+                alt="Company Logo"
+                className="max-h-24 w-full object-contain"
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Navigation Confirmation Dialog */}

@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { CheckCircle, Edit2, Trash2, AlertTriangle, TrendingUp, Package, Sparkles } from 'lucide-react';
+import { CheckCircle, Edit2, Trash2, AlertTriangle, TrendingUp, Package, Sparkles, GitMerge, Plus } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { Badge } from '../ui/badge';
 import type { AIExtractionResult, AIExtractedComponent } from '../../services/claudeAI';
-import type { Component } from '../../types';
+import type { Component, ComponentMatchDecision } from '../../types';
 
 // Type guards for metadata
 interface ExcelMetadata {
@@ -32,7 +33,8 @@ function hasPDFMetadata(metadata: unknown): metadata is PDFMetadata {
 
 interface AIExtractionPreviewProps {
   extractionResult: AIExtractionResult;
-  onConfirm: (components: Partial<Component>[]) => void;
+  matchDecisions?: ComponentMatchDecision[];
+  onConfirm: (components: Partial<Component>[], decisions: ComponentMatchDecision[]) => void;
   onCancel: () => void;
 }
 
@@ -42,6 +44,7 @@ interface PreviewComponent extends AIExtractedComponent {
   id: string;
   status: ComponentStatus;
   isEditing: boolean;
+  matchDecision?: ComponentMatchDecision;
 }
 
 const CATEGORIES = [
@@ -59,6 +62,7 @@ const CATEGORIES = [
 
 export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
   extractionResult,
+  matchDecisions = [],
   onConfirm,
   onCancel,
 }) => {
@@ -68,8 +72,11 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
       id: `extracted-${idx}`,
       status: 'approved' as ComponentStatus,
       isEditing: false,
+      matchDecision: matchDecisions.find(d => d.componentIndex === idx),
     }))
   );
+
+  const [localMatchDecisions, setLocalMatchDecisions] = useState<ComponentMatchDecision[]>(matchDecisions);
 
   const handleStatusChange = (id: string, status: ComponentStatus) => {
     setComponents((prev) =>
@@ -95,6 +102,28 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
     setComponents((prev) => prev.filter((c) => c.id !== id));
   };
 
+  /**
+   * Handle match decision change
+   */
+  const handleMatchDecision = (componentIndex: number, decision: 'accept_match' | 'create_new') => {
+    setLocalMatchDecisions((prev) =>
+      prev.map((d) =>
+        d.componentIndex === componentIndex
+          ? { ...d, userDecision: decision }
+          : d
+      )
+    );
+
+    // Also update the component's match decision
+    setComponents((prev) =>
+      prev.map((c, idx) =>
+        idx === componentIndex && c.matchDecision
+          ? { ...c, matchDecision: { ...c.matchDecision, userDecision: decision } }
+          : c
+      )
+    );
+  };
+
   const handleConfirm = () => {
     const approvedComponents = components
       .filter((c) => c.status !== 'rejected')
@@ -115,11 +144,16 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
         notes: c.notes,
       }));
 
-    onConfirm(approvedComponents);
+    onConfirm(approvedComponents, localMatchDecisions);
   };
 
   const approvedCount = components.filter((c) => c.status === 'approved').length;
   const modifiedCount = components.filter((c) => c.status === 'modified').length;
+
+  // Match statistics
+  const matchedCount = components.filter((c) => c.matchDecision && c.matchDecision.matches.length > 0).length;
+  const acceptedMatchCount = localMatchDecisions.filter((d) => d.userDecision === 'accept_match').length;
+  const newComponentCount = components.length - acceptedMatchCount;
 
   const getConfidenceColor = (confidence: number) => {
     if (confidence >= 0.8) return 'text-green-600 bg-green-100';
@@ -143,13 +177,21 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
         </div>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <div className="flex items-center gap-2 text-blue-700 mb-1">
               <Package className="w-4 h-4" />
               <span className="text-sm font-medium">סה"כ נמצאו</span>
             </div>
             <p className="text-2xl font-bold text-blue-900">{components.length}</p>
+          </div>
+
+          <div className="bg-cyan-50 border border-cyan-200 rounded-lg p-4">
+            <div className="flex items-center gap-2 text-cyan-700 mb-1">
+              <GitMerge className="w-4 h-4" />
+              <span className="text-sm font-medium">זוהו קיימים</span>
+            </div>
+            <p className="text-2xl font-bold text-cyan-900">{matchedCount}</p>
           </div>
 
           <div className="bg-green-50 border border-green-200 rounded-lg p-4">
@@ -178,6 +220,38 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
             </p>
           </div>
         </div>
+
+        {/* Match Summary */}
+        {matchedCount > 0 && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <GitMerge className="w-5 h-5 text-blue-600" />
+              <h3 className="text-sm font-medium text-blue-900">סיכום זיהוי רכיבים</h3>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+              <div>
+                <span className="text-blue-700">רכיבים דומים שנמצאו:</span>
+                <p className="font-bold text-blue-900">{matchedCount}</p>
+              </div>
+              <div>
+                <span className="text-green-700">יעדכנו מחיר:</span>
+                <p className="font-bold text-green-900">{acceptedMatchCount}</p>
+              </div>
+              <div>
+                <span className="text-purple-700">יווצרו חדשים:</span>
+                <p className="font-bold text-purple-900">{newComponentCount}</p>
+              </div>
+            </div>
+            {localMatchDecisions.filter(d => d.userDecision === 'pending').length > 0 && (
+              <div className="mt-2 text-xs text-blue-600 flex items-center gap-1">
+                <AlertTriangle className="w-3 h-3" />
+                <span>
+                  יש {localMatchDecisions.filter(d => d.userDecision === 'pending').length} רכיבים שממתינים להחלטה
+                </span>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Document Metadata */}
         <div className="bg-gray-50 border rounded-lg p-4">
@@ -340,6 +414,86 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
                 </Button>
               </div>
             </div>
+
+            {/* Match Information Card */}
+            {component.matchDecision && component.matchDecision.matches.length > 0 && (
+              <div className="mb-3 p-3 border rounded-lg bg-blue-50 border-blue-200">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <GitMerge className="w-4 h-4 text-blue-600" />
+                      <span className="text-sm font-medium text-blue-900">
+                        זוהה רכיב דומה בספרייה
+                      </span>
+                      <Badge
+                        variant={
+                          component.matchDecision.matchType === 'exact'
+                            ? 'default'
+                            : component.matchDecision.matchType === 'fuzzy'
+                            ? 'secondary'
+                            : 'outline'
+                        }
+                        className="text-xs"
+                      >
+                        {component.matchDecision.matchType === 'exact' && '🎯 התאמה מדויקת'}
+                        {component.matchDecision.matchType === 'fuzzy' && '📊 התאמה מטושטשת'}
+                        {component.matchDecision.matchType === 'ai' && '🤖 התאמה סמנטית'}
+                      </Badge>
+                      <span className="text-xs text-blue-700 font-medium">
+                        {Math.round(component.matchDecision.matches[0].confidence * 100)}% דיוק
+                      </span>
+                    </div>
+
+                    <div className="text-sm space-y-1 text-blue-800">
+                      <div>
+                        <span className="font-medium">רכיב קיים:</span>{' '}
+                        {component.matchDecision.matches[0].component.name}
+                      </div>
+                      {component.matchDecision.matches[0].component.manufacturerPN && (
+                        <div>
+                          <span className="font-medium">מק"ט:</span>{' '}
+                          {component.matchDecision.matches[0].component.manufacturerPN}
+                        </div>
+                      )}
+                      <div className="text-xs text-blue-600 mt-1">
+                        {component.matchDecision.matches[0].reasoning}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <Button
+                      size="sm"
+                      variant={
+                        component.matchDecision.userDecision === 'accept_match' ? 'default' : 'outline'
+                      }
+                      onClick={() => {
+                        const idx = parseInt(component.id.replace('extracted-', ''));
+                        handleMatchDecision(idx, 'accept_match');
+                      }}
+                      className="gap-1 whitespace-nowrap"
+                    >
+                      <GitMerge className="w-3 h-3" />
+                      עדכן מחיר
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={
+                        component.matchDecision.userDecision === 'create_new' ? 'default' : 'outline'
+                      }
+                      onClick={() => {
+                        const idx = parseInt(component.id.replace('extracted-', ''));
+                        handleMatchDecision(idx, 'create_new');
+                      }}
+                      className="gap-1 whitespace-nowrap"
+                    >
+                      <Plus className="w-3 h-3" />
+                      צור חדש
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {component.isEditing && (
               <div className="grid grid-cols-2 gap-3 mb-3">

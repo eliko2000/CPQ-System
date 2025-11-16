@@ -115,8 +115,8 @@ interface SettingsSection {
 function getDefaultSettings(): SettingsData {
   return {
     general: {
-      systemName: 'מערכת CPQ חכמה',
-      systemDescription: 'מערכת לניהול הצעות מחיר לפרויקטי רובוטיקה',
+      systemName: 'RadiaQ AI',
+      systemDescription: 'מערכת CPQ חכמה לניהול הצעות מחיר לפרויקטי רובוטיקה',
       timezone: 'Asia/Jerusalem',
       dateFormat: 'DD/MM/YYYY'
     },
@@ -136,7 +136,7 @@ function getDefaultSettings(): SettingsData {
       usdToIlsRate: 3.70,
       eurToIlsRate: 4.00,
       autoUpdateRates: false,
-      defaultMarkup: 25,
+      defaultMarkup: 0.75,
       defaultRisk: 5,
       dayWorkCost: 1200,
       vatRate: 17,
@@ -196,8 +196,8 @@ function validateSettings(settings: SettingsData): string[] {
   if (settings.pricing.eurToIlsRate <= 0) {
     errors.push('שער אירו לשקל חייב להיות חיובי')
   }
-  if (settings.pricing.defaultMarkup < 0 || settings.pricing.defaultMarkup > 100) {
-    errors.push('אחוז רווח חייב להיות בין 0 ל-100')
+  if (settings.pricing.defaultMarkup < 0 || settings.pricing.defaultMarkup > 1) {
+    errors.push('מקדם רווח חייב להיות בין 0 ל-1')
   }
   if (settings.pricing.defaultRisk < 0 || settings.pricing.defaultRisk > 50) {
     errors.push('אחוז סיכון חייב להיות בין 0 ל-50')
@@ -407,9 +407,9 @@ function GeneralSettings() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-2">שם המערכת</label>
-              <Input 
-                defaultValue="מערכת CPQ חכמה" 
-                
+              <Input
+                defaultValue="RadiaQ AI"
+
               />
             </div>
             <div>
@@ -419,9 +419,9 @@ function GeneralSettings() {
           </div>
           <div>
             <label className="block text-sm font-medium mb-2">תיאור מערכת</label>
-            <Input 
-              defaultValue="מערכת לניהול הצעות מחיר לפרויקטי רובוטיקה" 
-              
+            <Input
+              defaultValue="מערכת CPQ חכמה לניהול הצעות מחיר לפרויקטי רובוטיקה"
+
             />
           </div>
         </CardContent>
@@ -535,7 +535,7 @@ function PricingSettings() {
     usdToIlsRate: 3.70,
     eurToIlsRate: 4.00,
     autoUpdateRates: false,
-    defaultMarkup: 25,
+    defaultMarkup: 0.75,
     defaultRisk: 5,
     dayWorkCost: 1200,
     vatRate: 17,
@@ -656,12 +656,19 @@ function PricingSettings() {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium mb-2">אחוז רווח ברירת מחדל (%)</label>
+              <label className="block text-sm font-medium mb-2">מקדם רווח ברירת מחדל (0-1)</label>
               <Input
                 type="number"
-                step="0.1"
+                step="0.01"
+                min="0"
+                max="1"
                 value={pricingSettings.defaultMarkup}
-                onChange={(e) => handleChange('defaultMarkup', parseFloat(e.target.value) || 0)}
+                onChange={(e) => {
+                  const value = parseFloat(e.target.value) || 0
+                  // Round to 2 decimal places
+                  const rounded = Math.round(value * 100) / 100
+                  handleChange('defaultMarkup', rounded)
+                }}
               />
             </div>
             <div>
@@ -708,6 +715,111 @@ function PricingSettings() {
 }
 
 function QuotationSettings() {
+  const [isUploading, setIsUploading] = useState(false);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Load logo URL from settings on mount
+  useEffect(() => {
+    async function loadLogo() {
+      setIsLoading(true);
+      try {
+        const result = await loadSetting<{ logoUrl: string }>('companyLogo');
+        if (result.success && result.data?.logoUrl) {
+          setLogoUrl(result.data.logoUrl);
+        }
+      } catch (error) {
+        console.error('Error loading logo:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    loadLogo();
+  }, []);
+
+  const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('נא להעלות קובץ תמונה בלבד');
+      return;
+    }
+
+    // Validate file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      alert('גודל הקובץ חייב להיות עד 2MB');
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      // Import upload function dynamically to avoid circular dependencies
+      const { uploadFile } = await import('../../utils/storageHelpers');
+
+      const result = await uploadFile(file, 'company-logo', 'company-assets');
+
+      if (result.success && result.url) {
+        setLogoUrl(result.url);
+        // Save to settings
+        await saveSetting('companyLogo', { logoUrl: result.url });
+        // Dispatch event to notify other components
+        window.dispatchEvent(new CustomEvent('cpq-logo-updated', { detail: { logoUrl: result.url } }));
+      } else {
+        alert('שגיאה בהעלאת הלוגו: ' + (result.error || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Error uploading logo:', error);
+      alert('שגיאה בהעלאת הלוגו');
+    } finally {
+      setIsUploading(false);
+      // Reset input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleRemoveLogo = async () => {
+    if (!confirm('האם אתה בטוח שברצונך למחוק את הלוגו?')) return;
+
+    try {
+      // Import delete function
+      const { deleteFile } = await import('../../utils/storageHelpers');
+
+      await deleteFile('company-logo', 'company-assets');
+      setLogoUrl(null);
+      // Clear from settings
+      await saveSetting('companyLogo', { logoUrl: null });
+      // Dispatch event to notify other components
+      window.dispatchEvent(new CustomEvent('cpq-logo-updated', { detail: { logoUrl: null } }));
+    } catch (error) {
+      console.error('Error removing logo:', error);
+      alert('שגיאה במחיקת הלוגו');
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>תבנית הצעת מחיר</CardTitle>
+            <CardDescription>הגדרות תבנית ומראה הצעת המחיר</CardDescription>
+          </CardHeader>
+          <CardContent className="flex items-center justify-center py-8">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              <span>טוען הגדרות...</span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <Card>
@@ -718,19 +830,66 @@ function QuotationSettings() {
         <CardContent className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-2">כותרת הצעת מחיר</label>
-            <Input 
-              defaultValue="הצעת מחיר - {{project_name}}" 
-              
+            <Input
+              defaultValue="הצעת מחיר - {{project_name}}"
+
             />
           </div>
           <div>
             <label className="block text-sm font-medium mb-2">לוגו חברה</label>
-            <div className="flex items-center space-x-reverse space-x-3">
-              <Button variant="outline">
-                <Upload className="h-4 w-4 ml-2" />
-                העלה לוגו
-              </Button>
-              <Badge variant="secondary">אין לוגו</Badge>
+            <div className="space-y-3">
+              {logoUrl && (
+                <div className="flex items-center gap-3 p-4 border rounded-lg bg-muted/50">
+                  <img
+                    src={logoUrl}
+                    alt="Company Logo"
+                    className="h-16 w-auto object-contain"
+                  />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">לוגו נוכחי</p>
+                    <p className="text-xs text-muted-foreground">הלוגו יוצג בראש הצעות המחיר</p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRemoveLogo}
+                    disabled={isUploading}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+              <div className="flex items-center space-x-reverse space-x-3">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleLogoUpload}
+                  className="hidden"
+                  id="logo-upload"
+                />
+                <Button
+                  variant="outline"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploading}
+                >
+                  {isUploading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 ml-2 animate-spin" />
+                      מעלה...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-4 w-4 ml-2" />
+                      {logoUrl ? 'החלף לוגו' : 'העלה לוגו'}
+                    </>
+                  )}
+                </Button>
+                {!logoUrl && <Badge variant="secondary">אין לוגו</Badge>}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                תמונות עד 2MB בפורמט JPG, PNG, GIF או SVG
+              </p>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">

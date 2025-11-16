@@ -61,7 +61,7 @@ export default {
           foreground: "hsl(0, 0%, 98%)",
         },
         quote: {
-          DEFAULT: "hsl(221, 83%, 53%)", // Blue for quotes
+          DEFAULT: "hsl(204.7, 100%, 36.9%)", // RadiaQ AI Blue #0072BC for quotes
           foreground: "hsl(0, 0%, 98%)",
         }
       },

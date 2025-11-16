@@ -6,7 +6,7 @@ import { QuotationItem, QuotationSystem, Component } from '../../types'
 import { QuotationParameters } from './QuotationParameters'
 import { calculateQuotationTotals, renumberItems } from '../../utils/quotationCalculations'
 import { Button } from '../ui/button'
-import { Trash2, Plus, Settings, ChevronDown, X, Save, LogOut, Edit, FolderOpen } from 'lucide-react'
+import { Trash2, Plus, Settings, ChevronDown, X, LogOut, Edit, FolderOpen } from 'lucide-react'
 import { useClickOutside } from '../../hooks/useClickOutside'
 import { useTableConfig } from '../../hooks/useTableConfig'
 import { useQuotations } from '../../hooks/useQuotations'
@@ -192,8 +192,6 @@ export function QuotationEditor() {
   const [showComponentSelector, setShowComponentSelector] = useState(false)
   const [selectedSystemId, setSelectedSystemId] = useState<string>('')
   const [componentSearchText, setComponentSearchText] = useState('')
-  const [isDirty, setIsDirty] = useState(false)
-  const [showExitConfirmation, setShowExitConfirmation] = useState(false)
   const [showProjectPicker, setShowProjectPicker] = useState(false)
 
   // Close column manager when clicking outside
@@ -257,7 +255,6 @@ export function QuotationEditor() {
 
       setCurrentQuotation(updatedQuotation)
       updateQuotation(currentQuotation.id, { systems: updatedQuotation.systems })
-      setIsDirty(true)
     } catch (error) {
       console.error('Failed to save system:', error)
       alert('שגיאה בהוספת מערכת. נסה שוב.')
@@ -293,7 +290,7 @@ export function QuotationEditor() {
         total_cost: component.unitCostNIS || 0,
         unit_price: component.unitCostNIS || 0,
         total_price: component.unitCostNIS || 0,
-        margin_percentage: currentQuotation.parameters.markupPercent || 25,
+        margin_percentage: currentQuotation.parameters.markupPercent || 0.75,
         sort_order: itemOrder
       })
 
@@ -332,7 +329,6 @@ export function QuotationEditor() {
       setCurrentQuotation(updatedQuotation)
       updateQuotation(currentQuotation.id, { items: updatedQuotation.items })
       setShowComponentSelector(false)
-      setIsDirty(true)
     } catch (error) {
       console.error('Failed to save item:', error)
       alert('שגיאה בהוספת פריט. נסה שוב.')
@@ -363,7 +359,6 @@ export function QuotationEditor() {
 
     setCurrentQuotation(updatedQuotation)
     updateQuotation(currentQuotation.id, { items: renumberedItems })
-    setIsDirty(true)
   }, [currentQuotation, quotationsHook, setCurrentQuotation, updateQuotation])
 
   // Update item
@@ -399,7 +394,6 @@ export function QuotationEditor() {
 
     setCurrentQuotation(updatedQuotation)
     updateQuotation(currentQuotation.id, { items: updatedItems })
-    setIsDirty(true)
   }, [currentQuotation, quotationsHook, setCurrentQuotation, updateQuotation])
 
   // Update parameters
@@ -413,39 +407,12 @@ export function QuotationEditor() {
 
     setCurrentQuotation(updatedQuotation)
     updateQuotation(currentQuotation.id, { parameters })
-    setIsDirty(true)
   }, [currentQuotation, setCurrentQuotation, updateQuotation])
 
-  // Handle save and exit
-  const handleSaveAndExit = useCallback(() => {
-    if (currentQuotation) {
-      // Save is already handled through updateQuotation calls
-      // Just clear the current quotation to go back to list
-      setCurrentQuotation(null)
-      setIsDirty(false)
-    }
-  }, [currentQuotation, setCurrentQuotation])
-
-  // Handle close (with confirmation if dirty)
+  // Handle close - just navigate back to list
   const handleClose = useCallback(() => {
-    if (isDirty) {
-      setShowExitConfirmation(true)
-    } else {
-      setCurrentQuotation(null)
-    }
-  }, [isDirty, setCurrentQuotation])
-
-  // Confirm exit without saving
-  const confirmExit = useCallback(() => {
-    setShowExitConfirmation(false)
-    setIsDirty(false)
     setCurrentQuotation(null)
   }, [setCurrentQuotation])
-
-  // Cancel exit
-  const cancelExit = useCallback(() => {
-    setShowExitConfirmation(false)
-  }, [])
 
   // Handle project selection
   const handleProjectSelect = useCallback(async (project: any) => {
@@ -488,9 +455,6 @@ export function QuotationEditor() {
       })
       console.log('✅ Local state updated')
 
-      setIsDirty(false) // Mark as saved since we just saved to DB
-      console.log('✅ Marked as clean (not dirty)')
-
       // Show success message
       const { toast } = await import('sonner')
       toast.success('הפרויקט עודכן בהצלחה')
@@ -524,7 +488,7 @@ export function QuotationEditor() {
     if (!currentQuotation) return []
 
     const data: any[] = []
-    const markupPercent = currentQuotation.parameters?.markupPercent ?? 25
+    const profitCoefficient = currentQuotation.parameters?.markupPercent ?? 0.75
 
     // Defensive: ensure systems and items arrays exist
     const systems = currentQuotation.systems || []
@@ -533,10 +497,9 @@ export function QuotationEditor() {
     // Create tree structure with systems as parent nodes
     systems.forEach(system => {
       const systemItems = items.filter(item => item.systemId === system.id)
-      
+
       // Calculate system totals with current profit coefficient
       const systemTotalCost = systemItems.reduce((sum, item) => sum + ((item.unitPriceILS || 0) * (item.quantity ||1)), 0)
-      const profitCoefficient = 1 / (1 + markupPercent / 100)
       const systemCustomerPrice = systemTotalCost / profitCoefficient
       
       // Create system node
@@ -563,7 +526,6 @@ export function QuotationEditor() {
       systemItems.forEach(item => {
         const unitPrice = item.unitPriceILS || 0
         const quantity = item.quantity || 1
-        const profitCoefficient = 1 / (1 + markupPercent / 100)
         const customerPrice = (unitPrice * quantity) / profitCoefficient
         
         data.push({
@@ -593,11 +555,10 @@ export function QuotationEditor() {
             item.systemId === params.data.systemId && !item.isSystemGroup
           )
           // Calculate customer price with profit coefficient for system total
+          const profitCoefficient = currentQuotation?.parameters?.markupPercent ?? 0.75
           const itemsTotal = systemItems.reduce((sum: number, item: any) => {
             const unitPrice = item.unitPriceILS || 0
             const quantity = item.quantity || 1
-            const markupPercent = currentQuotation?.parameters?.markupPercent ?? 25
-            const profitCoefficient = 1 / (1 + markupPercent / 100)
             const customerPrice = (unitPrice * quantity) / profitCoefficient
             return sum + customerPrice
           }, 0)
@@ -606,8 +567,7 @@ export function QuotationEditor() {
         // Calculate customer price with profit coefficient for individual items
         const unitPrice = params.data.unitPriceILS || 0
         const quantity = params.data.quantity || 1
-        const markupPercent = currentQuotation?.parameters?.markupPercent ?? 25
-        const profitCoefficient = 1 / (1 + markupPercent / 100)
+        const profitCoefficient = currentQuotation?.parameters?.markupPercent ?? 0.75
         const customerPrice = (unitPrice * quantity) / profitCoefficient
         return customerPrice
       },
@@ -757,11 +717,12 @@ export function QuotationEditor() {
       width: 200,
       editable: (params: any) => params.data?.isSystemGroup, // ✅ Only systems editable
       cellEditor: SystemNameEditor, // ✅ Direct class assignment
-      cellClass: params => params.data?.isSystemGroup ? 'ag-cell-bold' : 'ag-cell-right',
+      cellClass: params => params.data?.isSystemGroup ? 'ag-cell-bold' : '',
+      cellStyle: { textAlign: 'right', direction: 'rtl' },
       cellRenderer: (params: ICellRendererParams) => {
         if (params.data?.isSystemGroup) {
           return (
-            <span className="font-bold">
+            <span className="font-bold w-full block text-right" style={{ direction: 'rtl' }}>
               {params.value}
             </span>
           )
@@ -777,7 +738,8 @@ export function QuotationEditor() {
                 setModal({ type: 'edit-component', data: component })
               }
             }}
-            className="cursor-pointer hover:text-blue-600"
+            className="cursor-pointer hover:text-blue-600 w-full text-right"
+            style={{ direction: 'rtl' }}
             title="לחץ פעמיים לפתיחת כרטיס רכיב"
           >
             {params.value}
@@ -883,7 +845,6 @@ export function QuotationEditor() {
 
                     setCurrentQuotation(updatedQuotation)
                     updateQuotation(currentQuotation.id, { systems: updatedSystems, items: renumberedItems })
-                    setIsDirty(true)
                   } catch (error) {
                     console.error('Failed to delete system:', error)
                     alert('שגיאה במחיקת מערכת. נסה שוב.')
@@ -1020,27 +981,29 @@ export function QuotationEditor() {
       // Handle system quantity changes
       if (params.colDef.field === 'quantity') {
         const newQuantity = params.newValue
-        const updatedSystems = currentQuotation?.systems.map(s => 
-          s.id === params.data.systemId 
+        const updatedSystems = currentQuotation?.systems.map(s =>
+          s.id === params.data.systemId
             ? { ...s, quantity: newQuantity }
             : s
         )
         if (updatedSystems) {
           setCurrentQuotation(currentQuotation ? { ...currentQuotation, systems: updatedSystems } : null)
-          updateQuotation(currentQuotation?.id || '', { systems: updatedSystems })
+          // Persist to database
+          quotationsHook.updateQuotationSystem(params.data.systemId, { quantity: newQuantity })
         }
       }
       // Handle system name changes
       else if (params.colDef.field === 'componentName') {
         const newName = params.newValue
-        const updatedSystems = currentQuotation?.systems.map(s => 
-          s.id === params.data.systemId 
+        const updatedSystems = currentQuotation?.systems.map(s =>
+          s.id === params.data.systemId
             ? { ...s, name: newName }
             : s
         )
         if (updatedSystems) {
           setCurrentQuotation(currentQuotation ? { ...currentQuotation, systems: updatedSystems } : null)
-          updateQuotation(currentQuotation?.id || '', { systems: updatedSystems })
+          // Persist to database
+          quotationsHook.updateQuotationSystem(params.data.systemId, { system_name: newName })
         }
       }
       return
@@ -1049,7 +1012,7 @@ export function QuotationEditor() {
     updateItem(params.data.id, {
       [params.colDef.field]: params.newValue
     })
-  }, [updateItem, currentQuotation, setCurrentQuotation, updateQuotation])
+  }, [updateItem, currentQuotation, setCurrentQuotation, updateQuotation, quotationsHook])
 
   // Handle double-click to open component card (now redundant since we handle it in cell renderer)
   const onCellDoubleClicked = useCallback((params: any) => {
@@ -1154,7 +1117,6 @@ export function QuotationEditor() {
         <div className="flex-1">
           <h1 className="text-2xl font-bold text-gray-900">
             {currentQuotation.name}
-            {isDirty && <span className="text-orange-500 text-sm mr-2">(שינויים שלא נשמרו)</span>}
           </h1>
           <div className="flex items-center gap-2 mt-1">
             <p className="text-gray-600">{currentQuotation.customerName}</p>
@@ -1178,19 +1140,12 @@ export function QuotationEditor() {
         </div>
         <div className="flex gap-3">
           <Button
-            onClick={handleSaveAndExit}
-            className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-2"
-          >
-            <Save className="h-4 w-4" />
-            שמור וצא
-          </Button>
-          <Button
             onClick={handleClose}
             variant="outline"
             className="flex items-center gap-2"
           >
             <LogOut className="h-4 w-4" />
-            סגור
+            חזור לרשימה
           </Button>
         </div>
       </div>
@@ -1290,8 +1245,8 @@ export function QuotationEditor() {
       {calculations && (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">סיכום חישובים</h3>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <div>
               <h4 className="text-sm font-medium text-gray-700 mb-2">עלויות</h4>
               <div className="space-y-1">
@@ -1314,38 +1269,20 @@ export function QuotationEditor() {
               <h4 className="text-sm font-medium text-gray-700 mb-2">מכירות</h4>
               <div className="space-y-1">
                 <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">סה"כ לפני סיכון מע"מ:</span>
-                  <span className="font-mono text-sm">₪{calculations.totalCustomerPriceILS.toLocaleString('he-IL', { minimumFractionDigits: 2 })}</span>
+                  <span className="text-sm text-gray-600">סה"כ מחיר נטו:</span>
+                  <span className="font-mono text-sm">₪{calculations.totalCostILS.toLocaleString('he-IL', { minimumFractionDigits: 2 })}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-600">רווח:</span>
+                  <span className="font-mono text-sm">₪{calculations.totalProfitILS.toLocaleString('he-IL', { minimumFractionDigits: 2 })}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-sm text-gray-600">תוספת סיכון:</span>
                   <span className="font-mono text-sm">₪{calculations.riskAdditionILS.toLocaleString('he-IL', { minimumFractionDigits: 2 })}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">סה"כ לפני מע"מ:</span>
+                <div className="flex justify-between font-bold">
+                  <span className="text-sm">סה"כ לפני מע"מ:</span>
                   <span className="font-mono text-sm">₪{calculations.totalQuoteILS.toLocaleString('he-IL', { minimumFractionDigits: 2 })}</span>
-                </div>
-                <div className="flex justify-between font-semibold">
-                  <span className="text-sm">סה"כ סופי:</span>
-                  <span className="font-mono text-sm">₪{calculations.finalTotalILS.toLocaleString('he-IL', { minimumFractionDigits: 2 })}</span>
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <h4 className="text-sm font-medium text-gray-700 mb-2">רווח</h4>
-              <div className="space-y-1">
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">סה"כ רווח:</span>
-                  <span className="font-mono text-sm">₪{calculations.totalProfitILS.toLocaleString('he-IL', { minimumFractionDigits: 2 })}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">אחוז רווח:</span>
-                  <span className="font-mono text-sm">{calculations.profitMarginPercent.toFixed(1)}%</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">סיכון:</span>
-                  <span className="font-mono text-sm">₪{calculations.riskAdditionILS.toLocaleString('he-IL', { minimumFractionDigits: 2 })}</span>
                 </div>
               </div>
             </div>
@@ -1364,6 +1301,10 @@ export function QuotationEditor() {
                 <div className="flex justify-between">
                   <span className="text-sm text-gray-600">פריטים שנבחרו:</span>
                   <span className="font-mono text-sm">{selectedItems.length}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-600">אחוז רווח:</span>
+                  <span className="font-mono text-sm">{calculations.profitMarginPercent.toFixed(1)}%</span>
                 </div>
               </div>
             </div>
@@ -1442,32 +1383,6 @@ export function QuotationEditor() {
                   ))}
                 </div>
               )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Exit Confirmation Dialog */}
-      {showExitConfirmation && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">שינויים שלא נשמרו</h3>
-            <p className="text-gray-600 mb-6">
-              יש לך שינויים שלא נשמרו. האם אתה בטוח שברצונך לצאת מבלי לשמור?
-            </p>
-            <div className="flex justify-end gap-3">
-              <Button
-                onClick={cancelExit}
-                variant="outline"
-              >
-                ביטול
-              </Button>
-              <Button
-                onClick={confirmExit}
-                className="bg-red-600 hover:bg-red-700 text-white"
-              >
-                צא מבלי לשמור
-              </Button>
             </div>
           </div>
         </div>

@@ -1,6 +1,6 @@
 import { useCPQ } from '../../contexts/CPQContext'
 import { Dashboard } from '../dashboard/Dashboard'
-import { QuoteIngestion } from '../ingestion/QuoteIngestion'
+import { SupplierQuotesPage } from '../supplier-quotes/SupplierQuotesPage'
 import { ComponentLibrary } from '../library/ComponentLibrary'
 import { ProjectList } from '../projects/ProjectList'
 import { ProjectDetailPage } from '../projects/ProjectDetailPage'
@@ -118,7 +118,7 @@ export function AppRoutes() {
     case 'dashboard':
       return <Dashboard />
     case 'quotes':
-      return <QuoteIngestion />
+      return <SupplierQuotesPage />
     case 'quotations':
       return <QuotationList />
     case 'components':

@@ -83,30 +83,52 @@ export function ProjectDetailPage({ projectId, onBack, onViewQuotation, onCreate
   const [isEditFormOpen, setIsEditFormOpen] = useState(false)
 
   // Load project and quotations
-  useEffect(() => {
-    const loadData = async () => {
-      if (!projectId) return
+  const loadData = async () => {
+    if (!projectId) return
 
-      try {
-        setLoading(true)
-        const [projectData, quotationsData] = await Promise.all([
-          getProject(projectId),
-          getProjectQuotations(projectId)
-        ])
+    try {
+      setLoading(true)
+      const [projectData, quotationsData] = await Promise.all([
+        getProject(projectId),
+        getProjectQuotations(projectId)
+      ])
 
-        setProject(projectData)
-        setQuotations(quotationsData)
-      } catch (error) {
-        console.error('Failed to load project:', error)
-        toast.error('שגיאה בטעינת הפרויקט')
-      } finally {
-        setLoading(false)
-      }
+      setProject(projectData)
+      setQuotations(quotationsData)
+    } catch (error) {
+      console.error('Failed to load project:', error)
+      toast.error('שגיאה בטעינת הפרויקט')
+    } finally {
+      setLoading(false)
     }
+  }
 
+  useEffect(() => {
     loadData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]) // Only re-run when projectId changes
+
+  // Refresh data when window/tab becomes visible or focused
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadData()
+      }
+    }
+
+    const handleFocus = () => {
+      loadData()
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('focus', handleFocus)
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('focus', handleFocus)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId])
 
   // Column definitions for quotations grid
   const columnDefs = useMemo<ColDef<DbQuotation>[]>(() => [

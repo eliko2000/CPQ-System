@@ -356,7 +356,7 @@ export function useQuotations() {
       const sourceQuotation = await getQuotation(sourceQuotationId)
       if (!sourceQuotation) throw new Error('Source quotation not found')
 
-      // Create new quotation
+      // Create new quotation (preserving project_id link)
       const newQuotation = await addQuotation({
         quotation_number: newQuotationNumber,
         version: newVersion || 1,
@@ -364,6 +364,7 @@ export function useQuotations() {
         customer_email: sourceQuotation.customer_email,
         project_name: `${sourceQuotation.project_name || ''} (עותק)`,
         project_description: sourceQuotation.project_description,
+        project_id: sourceQuotation.project_id, // Preserve project link
         currency: sourceQuotation.currency,
         exchange_rate: sourceQuotation.exchange_rate,
         margin_percentage: sourceQuotation.margin_percentage,

@@ -15,6 +15,8 @@ import { useTableConfig } from '../../hooks/useTableConfig'
 import { CustomHeader } from '../grid/CustomHeader'
 import { StatusCellEditor, QUOTATION_STATUS_OPTIONS } from '../grid/StatusCellEditor'
 import { getTableColumnSettings } from '../../constants/settings'
+import { ProjectPicker } from './ProjectPicker'
+import { supabase } from '../../supabaseClient'
 
 import 'ag-grid-community/styles/ag-grid.css'
 import 'ag-grid-community/styles/ag-theme-alpine.css'
@@ -122,6 +124,7 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; quotation?: DbQuotation }>({ open: false })
   const [creatingNew, setCreatingNew] = useState(false)
   const [showColumnManager, setShowColumnManager] = useState(false)
+  const [showProjectPicker, setShowProjectPicker] = useState(false)
   const isInitialMount = useRef(true)
 
   // Refetch quotations when component mounts to ensure fresh data after navigation
@@ -597,20 +600,35 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
     }
   }, [saveConfig])
 
-  // Add new quotation
-  const handleAddNew = useCallback(async () => {
-    if (creatingNew) return
+  // Add new quotation - show project picker first
+  const handleAddNew = useCallback(() => {
+    setShowProjectPicker(true)
+  }, [])
 
+  // Create quotation after project is selected
+  const handleProjectSelected = useCallback(async (projectId: string) => {
+    setShowProjectPicker(false)
     setCreatingNew(true)
+
     try {
+      // Get project data
+      const { data: project, error: projectError } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('id', projectId)
+        .single()
+
+      if (projectError) throw projectError
+
       // Load pricing settings from Supabase/cache
       const { loadDefaultQuotationParameters } = await import('../../utils/quotationCalculations')
       const defaultParams = await loadDefaultQuotationParameters()
 
       const newQuotation = await addQuotation({
         quotation_number: `Q-${Date.now()}`,
-        customer_name: 'לקוח חדש',
-        project_name: 'פרויקט חדש',
+        customer_name: project.company_name,
+        project_name: project.project_name,
+        project_id: projectId,
         currency: 'ILS',
         exchange_rate: defaultParams.usdToIlsRate,
         margin_percentage: defaultParams.markupPercent,
@@ -629,10 +647,11 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
       }
     } catch (error) {
       console.error('Failed to create quotation:', error)
+      alert('שגיאה ביצירת הצעת מחיר')
     } finally {
       setCreatingNew(false)
     }
-  }, [addQuotation, onQuotationEdit, setCurrentQuotation, creatingNew])
+  }, [addQuotation, onQuotationEdit, setCurrentQuotation])
 
   // Calculate summary statistics
   const summaryStats = useMemo(() => {
@@ -673,17 +692,18 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6" dir="rtl">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">הצעות מחיר</h1>
-          <p className="text-gray-600">ניהול ועריכה של הצעות מחיר</p>
+          <h1 className="text-3xl font-bold text-foreground">הצעות מחיר</h1>
+          <p className="text-muted-foreground">
+            ניהול ועריכה של הצעות מחיר ({quotations.length} הצעות)
+          </p>
         </div>
         <Button
           onClick={handleAddNew}
           disabled={creatingNew}
-          className="bg-blue-600 hover:bg-blue-700"
         >
           <Plus className="h-4 w-4 ml-2" />
           {creatingNew ? 'יוצר...' : 'הצעת מחיר חדשה'}
@@ -857,6 +877,16 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
         onCancel={() => setDeleteDialog({ open: false })}
         type="danger"
       />
+
+      {/* Project Picker Dialog */}
+      {showProjectPicker && (
+        <ProjectPicker
+          isOpen={showProjectPicker}
+          onClose={() => setShowProjectPicker(false)}
+          onSelect={(project) => handleProjectSelected(project.id)}
+          currentProjectId={null}
+        />
+      )}
     </div>
   )
 }

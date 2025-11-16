@@ -83,7 +83,7 @@ describe('Pricing Settings Persistence', () => {
       expect(params).toEqual({
         usdToIlsRate: 3.7,
         eurToIlsRate: 4.0,
-        markupPercent: 25,
+        markupPercent: 0.75,
         dayWorkCost: 1200,
         profitPercent: 20,
         riskPercent: 10,
@@ -100,7 +100,7 @@ describe('Pricing Settings Persistence', () => {
         pricing: {
           usdToIlsRate: 4.5,
           eurToIlsRate: 5.0,
-          defaultMarkup: 30,
+          defaultMarkup: 0.80,
           defaultRisk: 8,
           dayWorkCost: 1500,
           vatRate: 18,
@@ -112,7 +112,7 @@ describe('Pricing Settings Persistence', () => {
 
       expect(params.usdToIlsRate).toBe(4.5)
       expect(params.eurToIlsRate).toBe(5.0)
-      expect(params.markupPercent).toBe(30)
+      expect(params.markupPercent).toBe(0.80)
       expect(params.riskPercent).toBe(8)
       expect(params.dayWorkCost).toBe(1500)
       expect(params.vatRate).toBe(18)
@@ -135,7 +135,7 @@ describe('Pricing Settings Persistence', () => {
 
       // Should fall back to defaults
       expect(params.eurToIlsRate).toBe(4.0)
-      expect(params.markupPercent).toBe(25)
+      expect(params.markupPercent).toBe(0.75)
       expect(params.dayWorkCost).toBe(1200)
     })
 
@@ -149,7 +149,7 @@ describe('Pricing Settings Persistence', () => {
       expect(params).toEqual({
         usdToIlsRate: 3.7,
         eurToIlsRate: 4.0,
-        markupPercent: 25,
+        markupPercent: 0.75,
         dayWorkCost: 1200,
         profitPercent: 20,
         riskPercent: 10,
@@ -168,7 +168,7 @@ describe('Pricing Settings Persistence', () => {
         pricing: {
           usdToIlsRate: 4.5,
           eurToIlsRate: 5.0,
-          defaultMarkup: 30,
+          defaultMarkup: 0.80,
           defaultRisk: 8,
           dayWorkCost: 1500,
           vatRate: 18,
@@ -194,7 +194,7 @@ describe('Pricing Settings Persistence', () => {
         pricing: {
           usdToIlsRate: 3.7,
           eurToIlsRate: 4.0,
-          defaultMarkup: 35,
+          defaultMarkup: 0.70,
           defaultRisk: 12,
           dayWorkCost: 1200,
           vatRate: 17,
@@ -204,7 +204,7 @@ describe('Pricing Settings Persistence', () => {
 
       const params = getDefaultQuotationParameters()
 
-      expect(params.markupPercent).toBe(35)
+      expect(params.markupPercent).toBe(0.70)
       expect(params.riskPercent).toBe(12)
     })
   })

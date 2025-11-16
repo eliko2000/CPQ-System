@@ -168,8 +168,16 @@ function createExtractionPrompt(): string {
 Analyze this document and extract ALL component/product information. The document may be in English, Hebrew (עברית), or mixed languages.
 
 Extract the following information for each component:
-1. **name** - Component/product name or description
-2. **manufacturer** - Manufacturer name (e.g., Siemens, Festo, SMC)
+1. **name** - **CRITICAL**: Create a concise, descriptive Hebrew name (2-5 words max)
+   - If source is English: Translate key product type to Hebrew + keep model number
+   - Examples:
+     * "Dobot CRA20 Collaborative Robot" → "רובוט CRA20"
+     * "Heavy Duty Belt Conveyor 500mm" → "מסוע רצועה"
+     * "Siemens PLC S7-1200" → "בקר PLC S7-1200"
+     * "SMC Pneumatic Cylinder CDQ2B32-50DCZ" → "צילינדר פנאומטי CDQ2B32"
+   - Keep manufacturer in the manufacturer field, NOT in name
+   - Focus on WHAT it is, not ALL the specs
+2. **manufacturer** - Manufacturer name (e.g., Siemens, Festo, SMC, Dobot)
 3. **manufacturerPN** - Manufacturer part number (may appear as: P/N, PN, Part#, קטלוגי, מק"ט, Catalog#)
 4. **category** - Component category - MUST be one of these EXACT Hebrew values:
 ${categoryList}
@@ -181,10 +189,11 @@ ${categoryList}
 9. **unitPriceEUR** - Unit price in Euros (€, EUR)
 10. **currency** - Primary currency (NIS, USD, or EUR)
 11. **quoteDate** - Date of quotation (if visible)
-12. **notes** - Any important notes, specifications, or remarks
+12. **notes** - Any important notes, specifications, or remarks (keep technical specs here, NOT in name)
 13. **confidence** - Your confidence level (0.0 to 1.0) in the extraction accuracy for this item
 
 **Important guidelines:**
+- **NAME MUST BE SHORT & DESCRIPTIVE IN HEBREW**: Translate product type + model number only
 - Handle merged cells, multi-line descriptions, and complex table layouts
 - Recognize prices in various formats: "$1,234.56", "1234.56 USD", "₪5,000", "5000 ש״ח"
 - Understand Hebrew terms: מחיר (price), יצרן (manufacturer), ספק (supplier), כמות (quantity)
@@ -194,6 +203,7 @@ ${categoryList}
 - Be intelligent about categorization based on product description
 - Extract ALL items, even if some fields are missing
 - For tables with headers, use them to understand column meanings
+- Put detailed specifications in the notes field, NOT in the name
 
 **Response format:**
 Return a valid JSON object with this exact structure:

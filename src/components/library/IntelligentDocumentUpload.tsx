@@ -11,7 +11,7 @@ import {
 } from '../../services/documentParser';
 
 interface IntelligentDocumentUploadProps {
-  onExtractionComplete: (result: AIExtractionResult) => void;
+  onExtractionComplete: (result: AIExtractionResult, file: File) => void;
   onCancel: () => void;
 }
 
@@ -112,7 +112,7 @@ export const IntelligentDocumentUpload: React.FC<IntelligentDocumentUploadProps>
       if (result.success) {
         setStatus('completed');
         setTimeout(() => {
-          onExtractionComplete(result);
+          onExtractionComplete(result, file);
         }, 500);
       } else {
         setStatus('error');

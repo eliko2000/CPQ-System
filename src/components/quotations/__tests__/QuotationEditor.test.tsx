@@ -29,7 +29,7 @@ const mockQuotation = {
   parameters: {
     usdToIlsRate: 3.7,
     eurToIlsRate: 4.0,
-    markupPercent: 25,
+    markupPercent: 0.75,
     dayWorkCost: 1200,
     profitPercent: 20,
     riskPercent: 10,

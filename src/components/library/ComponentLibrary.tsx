@@ -2,6 +2,7 @@ import React, { useState, useMemo, useCallback } from 'react'
 import { Card, CardContent } from '../ui/card'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 import {
   Package,
   Plus,
@@ -9,11 +10,14 @@ import {
   DollarSign,
   Building,
   Calendar,
-  Sparkles
+  Sparkles,
+  Layers
 } from 'lucide-react'
 import { useCPQ } from '../../contexts/CPQContext'
-import { Component } from '../../types'
+import { Component, Assembly } from '../../types'
 import { ComponentForm } from './ComponentForm'
+import { AssemblyForm } from './AssemblyForm'
+import { AssemblyGrid } from './AssemblyGrid'
 import { ConfirmDialog } from '../ui/ConfirmDialog'
 import { EnhancedComponentGrid } from './EnhancedComponentGrid'
 import { SupplierQuoteImport } from '../supplier-quotes/SupplierQuoteImport'
@@ -21,10 +25,13 @@ import { useComponents } from '../../hooks/useComponents'
 import { toast } from 'sonner'
 
 export function ComponentLibrary() {
-  const { components, updateComponent, deleteComponent, setModal, modalState, closeModal } = useCPQ()
+  const { components, assemblies, updateComponent, deleteComponent, deleteAssembly, setModal, modalState, closeModal } = useCPQ()
   const { addComponent } = useComponents()
+  const [activeTab, setActiveTab] = useState<'components' | 'assemblies'>('components')
   const [searchTerm, setSearchTerm] = useState('')
   const [isAIImportOpen, setIsAIImportOpen] = useState(false)
+  const [selectedAssembly, setSelectedAssembly] = useState<Assembly | null>(null)
+  const [isAssemblyFormOpen, setIsAssemblyFormOpen] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; componentId: string | null; componentName: string }>({
     isOpen: false,
     componentId: null,
@@ -34,12 +41,18 @@ export function ComponentLibrary() {
   // Handle inline component updates
   const handleComponentUpdate = useCallback(async (componentId: string, field: string, value: any) => {
     try {
+      console.log('🎯 ComponentLibrary.handleComponentUpdate called:', { componentId, field, value })
       const component = components.find(c => c.id === componentId)
       if (component) {
+        console.log('🎯 Found component:', component)
+        console.log('🎯 Creating update object:', { [field]: value })
         await updateComponent(componentId, { [field]: value })
+        console.log('🎯 Update completed successfully')
+      } else {
+        console.error('❌ Component not found:', componentId)
       }
     } catch (error) {
-      console.error('Failed to update component:', error)
+      console.error('❌ Failed to update component:', error)
     }
   }, [components, updateComponent])
 
@@ -106,6 +119,28 @@ export function ComponentLibrary() {
     setDeleteConfirm({ isOpen: false, componentId: null, componentName: '' })
   }
 
+  // Assembly handlers
+  const handleAddAssembly = () => {
+    setSelectedAssembly(null)
+    setIsAssemblyFormOpen(true)
+  }
+
+  const handleEditAssembly = (assembly: Assembly) => {
+    setSelectedAssembly(assembly)
+    setIsAssemblyFormOpen(true)
+  }
+
+  const handleDeleteAssembly = async (assemblyId: string, assemblyName: string) => {
+    if (window.confirm(`האם אתה בטוח שברצונך למחוק את ההרכבה "${assemblyName}"?`)) {
+      try {
+        await deleteAssembly(assemblyId)
+        toast.success('ההרכבה נמחקה בהצלחה')
+      } catch (error) {
+        toast.error('שגיאה במחיקת הרכבה')
+      }
+    }
+  }
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -120,7 +155,7 @@ export function ComponentLibrary() {
         <div>
           <h1 className="text-3xl font-bold text-foreground">ספריית רכיבים</h1>
           <p className="text-muted-foreground">
-            נהל את הרכיבים והאסמבלים שלך ({components.length} רכיבים)
+            נהל את הרכיבים והאסמבלים שלך ({components.length} רכיבים, {assemblies.length} הרכבות)
           </p>
         </div>
         <div className="flex gap-2">
@@ -128,27 +163,49 @@ export function ComponentLibrary() {
             <Sparkles className="h-4 w-4" />
             ייבוא חכם
           </Button>
-          <Button onClick={handleAddComponent}>
-            <Plus className="h-4 w-4 ml-2" />
-            הוסף רכיב
-          </Button>
+          {activeTab === 'components' ? (
+            <Button onClick={handleAddComponent}>
+              <Plus className="h-4 w-4 ml-2" />
+              הוסף רכיב
+            </Button>
+          ) : (
+            <Button onClick={handleAddAssembly}>
+              <Plus className="h-4 w-4 ml-2" />
+              הוסף הרכבה
+            </Button>
+          )}
         </div>
       </div>
 
-      {/* Search */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="חיפוש לפי שם, יצרן, מקט, קטגוריה, סוג מוצר, ספק..."
-              value={searchTerm}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
-              className="pr-10"
-            />
-        </div>
-      </div>
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'components' | 'assemblies')}>
+        <TabsList>
+          <TabsTrigger value="components" className="gap-2">
+            <Package className="h-4 w-4" />
+            רכיבים ({components.length})
+          </TabsTrigger>
+          <TabsTrigger value="assemblies" className="gap-2">
+            <Layers className="h-4 w-4" />
+            הרכבות ({assemblies.length})
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Enhanced Grid */}
+        {/* Components Tab */}
+        <TabsContent value="components" className="space-y-4">
+          {/* Search */}
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="חיפוש לפי שם, יצרן, מקט, קטגוריה, סוג מוצר, ספק..."
+                value={searchTerm}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
+                className="pr-10"
+              />
+            </div>
+          </div>
+
+          {/* Enhanced Grid */}
       {filteredComponents.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
@@ -226,7 +283,7 @@ export function ComponentLibrary() {
               <span className="text-sm font-medium text-muted-foreground">עודכן לאחרונה</span>
             </div>
             <p className="text-2xl font-bold">
-              {components.length > 0 
+              {components.length > 0
                 ? new Date(Math.max(...components.map(c => new Date(c.updatedAt).getTime()))).toLocaleDateString('he-IL')
                 : '-'
               }
@@ -234,12 +291,33 @@ export function ComponentLibrary() {
           </CardContent>
         </Card>
       </div>
+        </TabsContent>
+
+        {/* Assemblies Tab */}
+        <TabsContent value="assemblies" className="space-y-4">
+          <AssemblyGrid
+            assemblies={assemblies}
+            onEdit={handleEditAssembly}
+            onDelete={handleDeleteAssembly}
+          />
+        </TabsContent>
+      </Tabs>
 
       {/* Component Form Modal */}
       <ComponentForm
         component={modalState?.type === 'edit-component' || modalState?.type === 'add-component' ? modalState.data : null}
         isOpen={modalState?.type === 'add-component' || modalState?.type === 'edit-component'}
         onClose={closeModal}
+      />
+
+      {/* Assembly Form Modal */}
+      <AssemblyForm
+        assembly={selectedAssembly}
+        isOpen={isAssemblyFormOpen}
+        onClose={() => {
+          setIsAssemblyFormOpen(false)
+          setSelectedAssembly(null)
+        }}
       />
 
       {/* AI Import Modal - Now uses enhanced SupplierQuoteImport */}

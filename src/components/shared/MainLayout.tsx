@@ -1,13 +1,11 @@
 import React from 'react'
 import { Sidebar } from './Sidebar'
-import { useCPQ } from '@/contexts/CPQContext'
 
 interface MainLayoutProps {
   children: React.ReactNode
 }
 
 export function MainLayout({ children }: MainLayoutProps) {
-  useCPQ()
 
   return (
     <div className="flex h-screen bg-background" dir="rtl">

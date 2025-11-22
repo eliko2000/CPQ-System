@@ -16,11 +16,14 @@ export function calculateItemTotals(item: QuotationItem, parameters: QuotationPa
   // Calculate total prices
   const totalPriceUSD = item.quantity * item.unitPriceUSD;
   const totalPriceILS = item.quantity * item.unitPriceILS;
-  
+
   // Apply profit coefficient to customer price (divide by coefficient)
+  // IMPORTANT: Labor items are sold at cost (no markup)
   const profitCoefficient = parameters.markupPercent ?? 0.75;
-  const customerPriceILS = totalPriceILS / profitCoefficient;
-  
+  const customerPriceILS = item.itemType === 'labor'
+    ? totalPriceILS  // Labor sold at cost
+    : totalPriceILS / profitCoefficient;  // Hardware/Software get markup
+
   return {
     ...item,
     totalPriceUSD,
@@ -38,8 +41,14 @@ export interface SystemTotals {
   totalILS: number;
   hardwareUSD: number;
   hardwareILS: number;
+  softwareUSD: number;
+  softwareILS: number;
   laborUSD: number;
   laborILS: number;
+  engineeringILS: number;
+  commissioningILS: number;
+  installationILS: number;
+  programmingILS: number;
   itemCount: number;
 }
 
@@ -54,19 +63,43 @@ export function calculateSystemTotals(
   const totals = systemItems.reduce(
     (acc, item) => {
       const calculatedItem = calculateItemTotals(item, parameters);
-      
+
       acc.totalUSD += calculatedItem.totalPriceUSD;
       acc.totalILS += calculatedItem.totalPriceILS;
       acc.itemCount += 1;
-      
-      if (calculatedItem.isLabor) {
-        acc.laborUSD += calculatedItem.totalPriceUSD;
-        acc.laborILS += calculatedItem.totalPriceILS;
-      } else {
-        acc.hardwareUSD += calculatedItem.totalPriceUSD;
-        acc.hardwareILS += calculatedItem.totalPriceILS;
+
+      // Classify by item type (hardware, software, labor)
+      switch (calculatedItem.itemType) {
+        case 'hardware':
+          acc.hardwareUSD += calculatedItem.totalPriceUSD;
+          acc.hardwareILS += calculatedItem.totalPriceILS;
+          break;
+        case 'software':
+          acc.softwareUSD += calculatedItem.totalPriceUSD;
+          acc.softwareILS += calculatedItem.totalPriceILS;
+          break;
+        case 'labor':
+          acc.laborUSD += calculatedItem.totalPriceUSD;
+          acc.laborILS += calculatedItem.totalPriceILS;
+
+          // Track labor subtypes
+          switch (calculatedItem.laborSubtype) {
+            case 'engineering':
+              acc.engineeringILS += calculatedItem.totalPriceILS;
+              break;
+            case 'commissioning':
+              acc.commissioningILS += calculatedItem.totalPriceILS;
+              break;
+            case 'installation':
+              acc.installationILS += calculatedItem.totalPriceILS;
+              break;
+            default:
+              // If no subtype specified, count as engineering
+              acc.engineeringILS += calculatedItem.totalPriceILS;
+          }
+          break;
       }
-      
+
       return acc;
     },
     {
@@ -74,8 +107,14 @@ export function calculateSystemTotals(
       totalILS: 0,
       hardwareUSD: 0,
       hardwareILS: 0,
+      softwareUSD: 0,
+      softwareILS: 0,
       laborUSD: 0,
       laborILS: 0,
+      engineeringILS: 0,
+      commissioningILS: 0,
+      installationILS: 0,
+      programmingILS: 0,
       itemCount: 0
     }
   );
@@ -88,8 +127,14 @@ export function calculateSystemTotals(
     totalILS: totals.totalILS * systemQuantity,
     hardwareUSD: totals.hardwareUSD * systemQuantity,
     hardwareILS: totals.hardwareILS * systemQuantity,
+    softwareUSD: totals.softwareUSD * systemQuantity,
+    softwareILS: totals.softwareILS * systemQuantity,
     laborUSD: totals.laborUSD * systemQuantity,
     laborILS: totals.laborILS * systemQuantity,
+    engineeringILS: totals.engineeringILS * systemQuantity,
+    commissioningILS: totals.commissioningILS * systemQuantity,
+    installationILS: totals.installationILS * systemQuantity,
+    programmingILS: totals.programmingILS * systemQuantity,
     itemCount: totals.itemCount
   };
 }
@@ -116,8 +161,14 @@ export function calculateQuotationTotals(project: QuotationProject): QuotationCa
     (acc, system) => {
       acc.totalHardwareUSD += system.hardwareUSD;
       acc.totalHardwareILS += system.hardwareILS;
+      acc.totalSoftwareUSD += system.softwareUSD;
+      acc.totalSoftwareILS += system.softwareILS;
       acc.totalLaborUSD += system.laborUSD;
       acc.totalLaborILS += system.laborILS;
+      acc.totalEngineeringILS += system.engineeringILS;
+      acc.totalCommissioningILS += system.commissioningILS;
+      acc.totalInstallationILS += system.installationILS;
+      acc.totalProgrammingILS += system.programmingILS;
       acc.subtotalUSD += system.totalUSD;
       acc.subtotalILS += system.totalILS;
       return acc;
@@ -125,8 +176,14 @@ export function calculateQuotationTotals(project: QuotationProject): QuotationCa
     {
       totalHardwareUSD: 0,
       totalHardwareILS: 0,
+      totalSoftwareUSD: 0,
+      totalSoftwareILS: 0,
       totalLaborUSD: 0,
       totalLaborILS: 0,
+      totalEngineeringILS: 0,
+      totalCommissioningILS: 0,
+      totalInstallationILS: 0,
+      totalProgrammingILS: 0,
       subtotalUSD: 0,
       subtotalILS: 0
     }
@@ -164,8 +221,14 @@ export function calculateQuotationTotals(project: QuotationProject): QuotationCa
   return {
     totalHardwareUSD: costAggregates.totalHardwareUSD,
     totalHardwareILS: costAggregates.totalHardwareILS,
+    totalSoftwareUSD: costAggregates.totalSoftwareUSD,
+    totalSoftwareILS: costAggregates.totalSoftwareILS,
     totalLaborUSD: costAggregates.totalLaborUSD,
     totalLaborILS: costAggregates.totalLaborILS,
+    totalEngineeringILS: costAggregates.totalEngineeringILS,
+    totalCommissioningILS: costAggregates.totalCommissioningILS,
+    totalInstallationILS: costAggregates.totalInstallationILS,
+    totalProgrammingILS: costAggregates.totalProgrammingILS,
     subtotalUSD: costAggregates.subtotalUSD,
     subtotalILS: costAggregates.subtotalILS,
     totalCustomerPriceILS,

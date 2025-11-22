@@ -12,6 +12,7 @@ import {
 } from '../types'
 import { useComponents } from '../hooks/useComponents'
 import { useQuotations } from '../hooks/useQuotations'
+import { useAssemblies } from '../hooks/useAssemblies'
 import { convertDbQuotationToQuotationProject } from '../lib/utils'
 
 // ============ State Shape ============
@@ -166,7 +167,7 @@ type CPQAction =
         displayNumber: '1.1',
         componentName: 'בקר PLC S7-1200',
         componentCategory: 'בקרים (PLCs)',
-        isLabor: false,
+        itemType: 'hardware',
         quantity: 1,
         unitPriceUSD: 1610,
         unitPriceILS: 5957,
@@ -186,7 +187,7 @@ type CPQAction =
         displayNumber: '1.2',
         componentName: 'מסוף HMI טאצ\' 7 אינץ\'',
         componentCategory: 'בקרים',
-        isLabor: false,
+        itemType: 'hardware',
         quantity: 1,
         unitPriceUSD: 890,
         unitPriceILS: 3293,
@@ -206,7 +207,7 @@ type CPQAction =
         displayNumber: '2.1',
         componentName: 'חיישן טמפרטורה PT100',
         componentCategory: 'חיישנים',
-        isLabor: false,
+        itemType: 'hardware',
         quantity: 4,
         unitPriceUSD: 125,
         unitPriceILS: 463,
@@ -226,7 +227,7 @@ type CPQAction =
         displayNumber: '2.2',
         componentName: 'חיישן לחץ דיפרנציאלי',
         componentCategory: 'חיישנים',
-        isLabor: false,
+        itemType: 'hardware',
         quantity: 2,
         unitPriceUSD: 89,
         unitPriceILS: 329,
@@ -246,7 +247,7 @@ type CPQAction =
         displayNumber: '3.1',
         componentName: 'ספק כוח 24VDC 10A',
         componentCategory: 'ספקי כוח',
-        isLabor: false,
+        itemType: 'hardware',
         quantity: 2,
         unitPriceUSD: 189,
         unitPriceILS: 699,
@@ -266,7 +267,7 @@ type CPQAction =
         displayNumber: '3.2',
         componentName: 'מפסק חשמלי מוגן',
         componentCategory: 'בטיחות',
-        isLabor: false,
+        itemType: 'hardware',
         quantity: 3,
         unitPriceUSD: 78,
         unitPriceILS: 289,
@@ -286,7 +287,8 @@ type CPQAction =
         displayNumber: '1.3',
         componentName: 'עבודת התקנה - בקר ו-HMI',
         componentCategory: 'עבודה',
-        isLabor: true,
+        itemType: 'labor',
+        laborSubtype: 'installation',
         quantity: 2,
         unitPriceUSD: 324,
         unitPriceILS: 1200,
@@ -302,8 +304,14 @@ type CPQAction =
         calculations: {
           totalHardwareUSD: 0,
           totalHardwareILS: 0,
+          totalSoftwareUSD: 0,
+          totalSoftwareILS: 0,
           totalLaborUSD: 0,
           totalLaborILS: 0,
+          totalEngineeringILS: 0,
+          totalCommissioningILS: 0,
+          totalInstallationILS: 0,
+          totalProgrammingILS: 0,
           subtotalUSD: 0,
           subtotalILS: 0,
           totalCustomerPriceILS: 0,
@@ -1173,9 +1181,26 @@ interface CPQContextType extends CPQState {
   deleteComponent: (id: string) => Promise<void>
 
   // Assembly actions
-  addAssembly: (assembly: Omit<Assembly, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>
-  updateAssembly: (id: string, updates: Partial<Assembly>) => Promise<void>
+  addAssembly: (
+    name: string,
+    components: Array<{ componentId: string; quantity: number }>,
+    description?: string,
+    notes?: string
+  ) => Promise<void>
+  updateAssembly: (
+    id: string,
+    updates: {
+      name?: string;
+      description?: string;
+      notes?: string;
+      components?: Array<{ componentId: string; quantity: number }>;
+    }
+  ) => Promise<void>
   deleteAssembly: (id: string) => Promise<void>
+  checkComponentUsage: (componentId: string) => Promise<{
+    isUsed: boolean;
+    assemblies: Array<{ id: string; name: string }>;
+  }>
 
   // Project actions
   createProject: (project: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>
@@ -1214,7 +1239,8 @@ export function CPQProvider({ children }: { children: React.ReactNode }) {
   // Use the new hooks for data management
   const componentsHook = useComponents()
   const quotationsHook = useQuotations()
-  
+  const assembliesHook = useAssemblies()
+
   const [state, dispatch] = useReducer(cpqReducer, initialState)
 
   // Sync hooks data with reducer state
@@ -1225,6 +1251,8 @@ export function CPQProvider({ children }: { children: React.ReactNode }) {
       name: comp.name,
       description: comp.description || '',
       category: comp.category || 'Other',
+      componentType: comp.component_type || 'hardware',
+      laborSubtype: comp.labor_subtype,
       productType: comp.category || 'Other',
       manufacturer: comp.manufacturer || '',
       manufacturerPN: comp.manufacturer_part_number || '',
@@ -1269,6 +1297,21 @@ export function CPQProvider({ children }: { children: React.ReactNode }) {
     }
   }, [quotationsHook.error])
 
+  // Sync assemblies hook data
+  useEffect(() => {
+    dispatch({ type: 'SET_ASSEMBLIES', payload: assembliesHook.assemblies })
+  }, [assembliesHook.assemblies])
+
+  useEffect(() => {
+    dispatch({ type: 'SET_LOADING', payload: { key: 'assemblies', value: assembliesHook.loading } })
+  }, [assembliesHook.loading])
+
+  useEffect(() => {
+    if (assembliesHook.error) {
+      dispatch({ type: 'SET_ERROR', payload: assembliesHook.error })
+    }
+  }, [assembliesHook.error])
+
   // ============ Basic Actions ============
   const setLoading = useCallback((key: keyof CPQState['loading'], value: boolean) => {
     dispatch({ type: 'SET_LOADING', payload: { key, value } })
@@ -1294,41 +1337,101 @@ export function CPQProvider({ children }: { children: React.ReactNode }) {
 
   const updateComponent = useCallback(async (id: string, updates: Partial<Component>) => {
     try {
+      console.log('🌐 CPQContext.updateComponent called:', { id, updates })
       await componentsHook.updateComponent(id, updates)
+      console.log('🌐 CPQContext.updateComponent completed')
       // Data will be updated automatically by the hook
     } catch (error) {
+      console.error('❌ CPQContext.updateComponent failed:', error)
       setError(`Failed to update component: ${error}`)
     }
   }, [componentsHook, setError])
 
   const deleteComponent = useCallback(async (id: string) => {
     try {
-      await componentsHook.deleteComponent(id)
+      // Check if component is used in assemblies
+      const usage = await assembliesHook.checkComponentUsage(id);
+
+      if (usage.isUsed) {
+        const assemblyNames = usage.assemblies.map(a => a.name).join(', ');
+        const message = `רכיב זה נמצא בשימוש ב-${usage.assemblies.length} הרכבות: ${assemblyNames}. האם להמשיך? ההרכבות יסומנו כלא שלמות.`;
+
+        // This will trigger a warning - the UI should handle this
+        // For now, we'll throw an error that needs to be caught by the UI
+        throw new Error(`ASSEMBLY_USAGE:${message}`);
+      }
+
+      await componentsHook.deleteComponent(id);
       // Data will be updated automatically by the hook
     } catch (error) {
-      setError(`Failed to delete component: ${error}`)
+      // Re-throw assembly usage errors for UI to handle
+      if (error instanceof Error && error.message.startsWith('ASSEMBLY_USAGE:')) {
+        throw error;
+      }
+      setError(`Failed to delete component: ${error}`);
+      throw error;
     }
-  }, [componentsHook, setError])
+  }, [componentsHook, assembliesHook, setError])
 
   // ============ Assembly Actions ============
-  const addAssembly = useCallback(async (assembly: Omit<Assembly, 'id' | 'createdAt' | 'updatedAt'>) => {
-    try {
-      setLoading('assemblies', true)
-      // TODO: Implement actual API call
-      const now = new Date().toISOString()
-      const newAssembly: Assembly = {
-        ...assembly,
-        id: `assembly_${Date.now()}`,
-        createdAt: now,
-        updatedAt: now,
+  const addAssembly = useCallback(
+    async (
+      name: string,
+      components: Array<{ componentId: string; quantity: number }>,
+      description?: string,
+      notes?: string
+    ) => {
+      try {
+        await assembliesHook.addAssembly(name, components, description, notes);
+        // Data will be updated automatically by the hook
+      } catch (error) {
+        setError(`Failed to add assembly: ${error}`);
+        throw error;
       }
-      dispatch({ type: 'ADD_ASSEMBLY', payload: newAssembly })
-    } catch (error) {
-      setError(`Failed to add assembly: ${error}`)
-    } finally {
-      setLoading('assemblies', false)
-    }
-  }, [setLoading, setError])
+    },
+    [assembliesHook, setError]
+  );
+
+  const updateAssembly = useCallback(
+    async (
+      id: string,
+      updates: {
+        name?: string;
+        description?: string;
+        notes?: string;
+        components?: Array<{ componentId: string; quantity: number }>;
+      }
+    ) => {
+      try {
+        await assembliesHook.updateAssembly(id, updates);
+        // Data will be updated automatically by the hook
+      } catch (error) {
+        setError(`Failed to update assembly: ${error}`);
+        throw error;
+      }
+    },
+    [assembliesHook, setError]
+  );
+
+  const deleteAssembly = useCallback(
+    async (id: string) => {
+      try {
+        await assembliesHook.deleteAssembly(id);
+        // Data will be updated automatically by the hook
+      } catch (error) {
+        setError(`Failed to delete assembly: ${error}`);
+        throw error;
+      }
+    },
+    [assembliesHook, setError]
+  );
+
+  const checkComponentUsage = useCallback(
+    async (componentId: string) => {
+      return await assembliesHook.checkComponentUsage(componentId);
+    },
+    [assembliesHook]
+  );
 
   // ============ Project Actions ============
   const createProject = useCallback(async (project: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>) => {
@@ -1422,17 +1525,7 @@ export function CPQProvider({ children }: { children: React.ReactNode }) {
     return { totalCost, totalPrice, margin }
   }, [])
 
-  // Placeholder implementations for missing functions
-  const updateAssembly = useCallback(async (_id: string, _updates: Partial<Assembly>) => {
-    // TODO: Implement
-    console.log('updateAssembly not implemented yet')
-  }, [])
-
-  const deleteAssembly = useCallback(async (_id: string) => {
-    // TODO: Implement
-    console.log('deleteAssembly not implemented yet')
-  }, [])
-
+  // Project update/delete implementations
   const updateProject = useCallback(async (_id: string, _updates: Partial<Project>) => {
     // TODO: Implement
     console.log('updateProject not implemented yet')
@@ -1491,6 +1584,7 @@ export function CPQProvider({ children }: { children: React.ReactNode }) {
     addAssembly,
     updateAssembly,
     deleteAssembly,
+    checkComponentUsage,
     createProject,
     updateProject,
     deleteProject,

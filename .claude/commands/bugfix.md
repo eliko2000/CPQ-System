@@ -8,6 +8,7 @@ Follow the bug resolution workflow:
    - **Medium:** UI issues, performance problems
    - **Low:** Styling, minor UX issues
 3. Gather context:
+   - ask followup questions if needed to get clearer context
    - Read affected files
    - Understand expected vs actual behavior
    - Check for pricing calculation impacts

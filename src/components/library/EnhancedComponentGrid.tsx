@@ -51,7 +51,7 @@ export function EnhancedComponentGrid({
 
   // Use table configuration hook - RTL order (reversed because AG Grid reverses it back)
   const { config, saveConfig, loading } = useTableConfig('component_library', {
-    columnOrder: ['description', 'notes', 'quoteDate', 'currency', 'unitCostEUR', 'unitCostUSD', 'unitCostNIS', 'category', 'supplier', 'manufacturer', 'name', 'manufacturerPN', 'actions'],
+    columnOrder: ['description', 'notes', 'quoteDate', 'currency', 'unitCostEUR', 'unitCostUSD', 'unitCostNIS', 'componentType', 'category', 'supplier', 'manufacturer', 'name', 'manufacturerPN', 'actions'],
     columnWidths: {},
     visibleColumns: getTableColumnSettings('component_library'),
     filterState: {}
@@ -70,8 +70,21 @@ export function EnhancedComponentGrid({
 
   // Handle inline editing
   const handleCellEdit = useCallback((params: ValueSetterParams) => {
+    console.log('🔧 EnhancedComponentGrid.handleCellEdit called:', {
+      field: params.colDef.field,
+      oldValue: params.oldValue,
+      newValue: params.newValue,
+      data: params.data
+    })
     if (onComponentUpdate && params.data && params.newValue !== params.oldValue) {
+      console.log('🔧 Calling onComponentUpdate with:', {
+        id: params.data.id,
+        field: params.colDef.field,
+        newValue: params.newValue
+      })
       onComponentUpdate(params.data.id, params.colDef.field!, params.newValue)
+    } else {
+      console.log('🔧 Skipped update - no change or missing handler')
     }
     return true
   }, [onComponentUpdate])
@@ -371,6 +384,107 @@ export function EnhancedComponentGrid({
       }
     },
     {
+      headerName: 'סוג',
+      field: 'componentType',
+      sortable: true,
+      filter: 'agSetColumnFilter',
+      resizable: true,
+      width: 100,
+      editable: true,
+      cellEditor: 'agSelectCellEditor',
+      cellEditorParams: {
+        values: ['hardware', 'software', 'labor']
+      },
+      valueSetter: (params) => {
+        console.log('💎 componentType valueSetter called:', { oldValue: params.oldValue, newValue: params.newValue })
+        if (params.newValue !== params.oldValue) {
+          params.data.componentType = params.newValue
+          handleCellEdit(params)
+        }
+        return true
+      },
+      valueFormatter: (params) => {
+        const type = params.value;
+        return type === 'hardware' ? 'חומרה' : type === 'software' ? 'תוכנה' : type === 'labor' ? 'עבודה' : '';
+      },
+      cellStyle: (params) => {
+        const type = params.data?.componentType;
+        return {
+          backgroundColor: type === 'hardware' ? '#e3f2fd' : type === 'software' ? '#e8f5e9' : type === 'labor' ? '#fff3e0' : 'white',
+          fontWeight: '500'
+        };
+      },
+      headerComponent: CustomHeader,
+      headerComponentParams: (params: any) => ({
+        displayName: 'סוג',
+        onMenuClick: handleColumnMenuClick,
+        onFilterClick: handleFilterClick,
+        api: params.api,
+        columnApi: params.columnApi,
+        column: params.column,
+        uniqueValues: ['hardware', 'software', 'labor']
+      }),
+      filterParams: {
+        values: ['hardware', 'software', 'labor'],
+        valueFormatter: (params: any) => {
+          const type = params.value;
+          return type === 'hardware' ? 'חומרה' : type === 'software' ? 'תוכנה' : type === 'labor' ? 'עבודה' : '';
+        }
+      }
+    },
+    {
+      headerName: 'סוג עבודה',
+      field: 'laborSubtype',
+      sortable: true,
+      filter: 'agSetColumnFilter',
+      resizable: true,
+      width: 120,
+      editable: (params) => params.data?.componentType === 'labor',
+      cellEditor: 'agSelectCellEditor',
+      cellEditorParams: {
+        values: ['engineering', 'commissioning', 'installation']
+      },
+      valueSetter: (params) => {
+        if (params.data?.componentType === 'labor' && params.newValue !== params.oldValue) {
+          params.data.laborSubtype = params.newValue
+          handleCellEdit(params)
+        }
+        return true
+      },
+      valueFormatter: (params) => {
+        if (params.data?.componentType !== 'labor') return '';
+        const subtype = params.value;
+        return subtype === 'engineering' ? 'פיתוח והנדסה' :
+               subtype === 'commissioning' ? 'הרצה' :
+               subtype === 'installation' ? 'התקנה' : '';
+      },
+      cellStyle: (params) => {
+        if (params.data?.componentType !== 'labor') {
+          return { backgroundColor: '#f5f5f5', color: '#aaa' };
+        }
+        return { fontWeight: '500' };
+      },
+      headerComponent: CustomHeader,
+      headerComponentParams: (params: any) => ({
+        displayName: 'סוג עבודה',
+        onMenuClick: handleColumnMenuClick,
+        onFilterClick: handleFilterClick,
+        api: params.api,
+        columnApi: params.columnApi,
+        column: params.column,
+        uniqueValues: ['engineering', 'commissioning', 'installation']
+      }),
+      filterParams: {
+        values: ['engineering', 'commissioning', 'installation'],
+        valueFormatter: (params: any) => {
+          const subtype = params.value;
+          return subtype === 'engineering' ? 'פיתוח והנדסה' :
+                 subtype === 'commissioning' ? 'הרצה' :
+                 subtype === 'installation' ? 'התקנה' : '';
+        }
+      }
+    },
+    {
       headerName: 'מחיר באירו',
       field: 'unitCostEUR',
       sortable: true,
@@ -636,8 +750,8 @@ export function EnhancedComponentGrid({
                   size="sm"
                   variant="outline"
                   onClick={() => saveConfig({
-                    visibleColumns: ['actions', 'manufacturerPN', 'name', 'manufacturer', 'supplier', 'category', 'unitCostNIS', 'unitCostUSD', 'quoteDate'],
-                    columnOrder: ['description', 'notes', 'quoteDate', 'currency', 'unitCostEUR', 'unitCostUSD', 'unitCostNIS', 'category', 'supplier', 'manufacturer', 'name', 'manufacturerPN', 'actions']
+                    visibleColumns: ['actions', 'manufacturerPN', 'name', 'manufacturer', 'supplier', 'category', 'componentType', 'unitCostNIS', 'unitCostUSD', 'quoteDate'],
+                    columnOrder: ['description', 'notes', 'quoteDate', 'currency', 'unitCostEUR', 'unitCostUSD', 'unitCostNIS', 'componentType', 'category', 'supplier', 'manufacturer', 'name', 'manufacturerPN', 'actions']
                   })}
                 >
                   אפס להגדרות ברירת מחדל

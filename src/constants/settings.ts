@@ -39,6 +39,7 @@ export const COMPONENT_LIBRARY_COLUMNS: TableColumnDefinition[] = [
   { id: 'manufacturer', label: 'יצרן', field: 'manufacturer', defaultVisible: true },
   { id: 'supplier', label: 'ספק', field: 'supplier', defaultVisible: true },
   { id: 'category', label: 'קטגוריה', field: 'category', defaultVisible: true },
+  { id: 'componentType', label: 'סוג', field: 'componentType', defaultVisible: true },
   { id: 'unitCostNIS', label: 'מחיר בש"ח', field: 'unitCostNIS', defaultVisible: true },
   { id: 'unitCostUSD', label: 'מחיר בדולר', field: 'unitCostUSD', defaultVisible: true },
   { id: 'unitCostEUR', label: 'מחיר באירו', field: 'unitCostEUR', defaultVisible: false },

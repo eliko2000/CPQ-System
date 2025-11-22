@@ -2,9 +2,11 @@ import { useState, useCallback, useMemo, useEffect } from 'react'
 import { AgGridReact } from 'ag-grid-react'
 import { ColDef, ICellRendererParams, ValueGetterParams, ICellEditorParams } from 'ag-grid-community'
 import { useCPQ } from '../../contexts/CPQContext'
-import { QuotationItem, QuotationSystem, Component } from '../../types'
+import { QuotationItem, QuotationSystem, Component, Assembly } from '../../types'
+import { calculateAssemblyPricing, formatAssemblyPricing } from '../../utils/assemblyCalculations'
 import { QuotationParameters } from './QuotationParameters'
 import { calculateQuotationTotals, renumberItems } from '../../utils/quotationCalculations'
+import { calculateQuotationStatistics } from '../../utils/quotationStatistics'
 import { Button } from '../ui/button'
 import { Trash2, Plus, Settings, ChevronDown, X, LogOut, Edit, FolderOpen } from 'lucide-react'
 import { useClickOutside } from '../../hooks/useClickOutside'
@@ -13,6 +15,10 @@ import { useQuotations } from '../../hooks/useQuotations'
 import { CustomHeader } from '../grid/CustomHeader'
 import { ComponentForm } from '../library/ComponentForm'
 import { ProjectPicker } from './ProjectPicker'
+import { QuotationStatisticsPanelSimplified } from './QuotationStatisticsPanelSimplified'
+import { AssemblyDetailModal } from './AssemblyDetailModal'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
+import { detectOriginalCurrency, convertToAllCurrencies, type ExchangeRates } from '../../utils/currencyConversion'
 import 'ag-grid-community/styles/ag-grid.css'
 import 'ag-grid-community/styles/ag-theme-alpine.css'
 
@@ -162,6 +168,7 @@ export function QuotationEditor() {
   const {
     currentQuotation,
     components,
+    assemblies,
     setCurrentQuotation,
     updateQuotation,
     setModal,
@@ -174,9 +181,9 @@ export function QuotationEditor() {
 
   // Use table configuration hook
   const { config, saveConfig, loading } = useTableConfig('quotation_editor', {
-    columnOrder: ['actions', 'displayNumber', 'componentName', 'quantity', 'unitPriceILS', 'totalPriceUSD', 'totalPriceILS', 'customerPriceILS'],
+    columnOrder: ['actions', 'displayNumber', 'componentName', 'itemType', 'laborSubtype', 'quantity', 'unitPriceILS', 'totalPriceUSD', 'totalPriceILS', 'customerPriceILS'],
     columnWidths: {},
-    visibleColumns: ['actions', 'displayNumber', 'componentName', 'quantity', 'unitPriceILS', 'totalPriceUSD', 'totalPriceILS', 'customerPriceILS'],
+    visibleColumns: ['actions', 'displayNumber', 'componentName', 'itemType', 'laborSubtype', 'quantity', 'unitPriceILS', 'totalPriceUSD', 'totalPriceILS', 'customerPriceILS'],
     filterState: {}
   })
 
@@ -193,6 +200,9 @@ export function QuotationEditor() {
   const [selectedSystemId, setSelectedSystemId] = useState<string>('')
   const [componentSearchText, setComponentSearchText] = useState('')
   const [showProjectPicker, setShowProjectPicker] = useState(false)
+  const [selectorTab, setSelectorTab] = useState<'components' | 'assemblies'>('components')
+  const [showAssemblyDetail, setShowAssemblyDetail] = useState(false)
+  const [selectedAssemblyForDetail, setSelectedAssemblyForDetail] = useState<Assembly | null>(null)
 
   // Close column manager when clicking outside
   const columnManagerRef = useClickOutside<HTMLDivElement>(() => {
@@ -207,12 +217,21 @@ export function QuotationEditor() {
   // Filter components for popup
   const filteredComponents = useMemo(() => {
     if (!componentSearchText) return components
-    return components.filter(comp => 
+    return components.filter(comp =>
       comp.name.toLowerCase().includes(componentSearchText.toLowerCase()) ||
       comp.manufacturer?.toLowerCase().includes(componentSearchText.toLowerCase()) ||
       comp.category?.toLowerCase().includes(componentSearchText.toLowerCase())
     )
   }, [components, componentSearchText])
+
+  // Filter assemblies for popup
+  const filteredAssemblies = useMemo(() => {
+    if (!componentSearchText) return assemblies
+    return assemblies.filter(asm =>
+      asm.name.toLowerCase().includes(componentSearchText.toLowerCase()) ||
+      asm.description?.toLowerCase().includes(componentSearchText.toLowerCase())
+    )
+  }, [assemblies, componentSearchText])
 
   // Add a new system
   const addSystem = useCallback(async () => {
@@ -277,6 +296,41 @@ export function QuotationEditor() {
 
     const itemOrder = currentQuotation.items.filter(item => item.systemId === selectedSystemId).length + 1
 
+    // CRITICAL: Use component's ORIGINAL currency and convert to other currencies
+    // using the quotation's current exchange rates
+    const quotationRates: ExchangeRates = {
+      usdToIlsRate: currentQuotation.parameters.usdToIlsRate,
+      eurToIlsRate: currentQuotation.parameters.eurToIlsRate
+    }
+
+    // Convert from original currency to all currencies using quotation rates
+    const convertedPrices = convertToAllCurrencies(
+      component.originalCost,
+      component.currency,
+      quotationRates
+    )
+
+    // DEBUG: Log component prices being used
+    console.log('💰 [CURRENCY-ADD] Adding component to quotation:', {
+      componentName: component.name,
+      componentFromLibrary: {
+        unitCostILS: component.unitCostNIS,
+        unitCostUSD: component.unitCostUSD,
+        unitCostEUR: component.unitCostEUR,
+        detectedCurrency: component.currency,
+        detectedOriginalCost: component.originalCost
+      },
+      quotationRates,
+      convertedPrices,
+      willSaveToQuotation: {
+        unitPriceILS: convertedPrices.unitCostNIS,
+        unitPriceUSD: convertedPrices.unitCostUSD,
+        unitPriceEUR: convertedPrices.unitCostEUR,
+        originalCurrency: component.currency,
+        originalCost: component.originalCost
+      }
+    })
+
     // Persist item to Supabase FIRST to get real ID
     try {
       const dbItem = await quotationsHook.addQuotationItem({
@@ -285,20 +339,25 @@ export function QuotationEditor() {
         item_name: component.name,
         manufacturer: component.manufacturer,
         manufacturer_part_number: component.manufacturerPN,
+        item_type: component.componentType || 'hardware',
+        labor_subtype: component.laborSubtype,
         quantity: 1,
-        unit_cost: component.unitCostNIS || 0,
-        total_cost: component.unitCostNIS || 0,
-        unit_price: component.unitCostNIS || 0,
-        total_price: component.unitCostNIS || 0,
+        unit_cost: convertedPrices.unitCostNIS,
+        total_cost: convertedPrices.unitCostNIS,
+        unit_price: convertedPrices.unitCostNIS,
+        total_price: convertedPrices.unitCostNIS,
         margin_percentage: currentQuotation.parameters.markupPercent || 0.75,
-        sort_order: itemOrder
+        sort_order: itemOrder,
+        // CRITICAL: Save original currency and cost for proper exchange rate handling
+        original_currency: component.currency,
+        original_cost: component.originalCost
       })
 
       if (!dbItem) {
         throw new Error('Failed to create item')
       }
 
-      // Create local item with DB ID
+      // Create local item with DB ID and converted prices from original currency
       const newItem: QuotationItem = {
         id: dbItem.id,
         systemId: selectedSystemId,
@@ -308,12 +367,17 @@ export function QuotationEditor() {
         componentId: component.id,
         componentName: component.name,
         componentCategory: component.category,
-        isLabor: false,
+        itemType: component.componentType || 'hardware',
+        laborSubtype: component.laborSubtype, // Inherit from component library
         quantity: dbItem.quantity,
-        unitPriceUSD: component.unitCostUSD || 0,
-        unitPriceILS: dbItem.unit_cost || 0,
-        totalPriceUSD: (component.unitCostUSD || 0) * dbItem.quantity,
-        totalPriceILS: dbItem.total_cost || 0,
+        unitPriceUSD: convertedPrices.unitCostUSD,
+        unitPriceILS: convertedPrices.unitCostNIS,
+        unitPriceEUR: convertedPrices.unitCostEUR,
+        totalPriceUSD: convertedPrices.unitCostUSD * dbItem.quantity,
+        totalPriceILS: convertedPrices.unitCostNIS * dbItem.quantity,
+        // Store original currency to preserve it when exchange rates change
+        originalCurrency: component.currency,
+        originalCost: component.originalCost,
         itemMarkupPercent: dbItem.margin_percentage || 25,
         customerPriceILS: dbItem.total_price || 0,
         notes: dbItem.notes || '',
@@ -321,17 +385,103 @@ export function QuotationEditor() {
         updatedAt: dbItem.updated_at
       }
 
+      // Renumber items after adding component
+      const updatedItems = [...currentQuotation.items, newItem]
+      const renumberedItems = renumberItems(updatedItems)
+
       const updatedQuotation = {
         ...currentQuotation,
-        items: [...currentQuotation.items, newItem]
+        items: renumberedItems
       }
 
       setCurrentQuotation(updatedQuotation)
-      updateQuotation(currentQuotation.id, { items: updatedQuotation.items })
+      updateQuotation(currentQuotation.id, { items: renumberedItems })
       setShowComponentSelector(false)
     } catch (error) {
       console.error('Failed to save item:', error)
       alert('שגיאה בהוספת פריט. נסה שוב.')
+    }
+  }, [currentQuotation, selectedSystemId, setCurrentQuotation, updateQuotation, quotationsHook])
+
+  // Add assembly to system (as single line item)
+  const addAssemblyToSystem = useCallback(async (assembly: Assembly) => {
+    if (!currentQuotation || !selectedSystemId) return
+
+    const system = currentQuotation.systems.find(s => s.id === selectedSystemId)
+    if (!system) return
+
+    const quotationRates: ExchangeRates = {
+      usdToIlsRate: currentQuotation.parameters.usdToIlsRate,
+      eurToIlsRate: currentQuotation.parameters.eurToIlsRate
+    }
+
+    try {
+      // Calculate total assembly price using assembly calculations
+      const assemblyPricing = calculateAssemblyPricing(assembly, quotationRates)
+
+      const itemOrder = currentQuotation.items.filter(item => item.systemId === selectedSystemId).length + 1
+
+      // Create single item for the entire assembly
+      const dbItem = await quotationsHook.addQuotationItem({
+        quotation_system_id: selectedSystemId,
+        assembly_id: assembly.id, // Link to assembly
+        item_name: assembly.name,
+        manufacturer: '', // Not applicable for assemblies
+        manufacturer_part_number: '', // Not applicable for assemblies
+        item_type: 'hardware', // Assemblies are treated as hardware
+        labor_subtype: undefined,
+        quantity: 1, // Default quantity for assembly
+        unit_cost: assemblyPricing.totalCostNIS,
+        total_cost: assemblyPricing.totalCostNIS,
+        unit_price: assemblyPricing.totalCostNIS,
+        total_price: assemblyPricing.totalCostNIS,
+        margin_percentage: currentQuotation.parameters.markupPercent || 0.75,
+        notes: assembly.description || 'הרכבה',
+        sort_order: itemOrder
+      })
+
+      if (!dbItem) {
+        throw new Error('Failed to create assembly item in database')
+      }
+
+      // Create local item
+      const newItem: QuotationItem = {
+        id: dbItem.id,
+        systemId: selectedSystemId,
+        systemOrder: system.order,
+        itemOrder,
+        displayNumber: `${system.order}.${itemOrder}`,
+        assemblyId: assembly.id, // Link to assembly
+        componentName: assembly.name,
+        componentCategory: 'הרכבה', // Assembly category
+        itemType: 'hardware',
+        quantity: 1,
+        unitPriceUSD: assemblyPricing.totalCostUSD,
+        unitPriceILS: assemblyPricing.totalCostNIS,
+        totalPriceUSD: assemblyPricing.totalCostUSD,
+        totalPriceILS: assemblyPricing.totalCostNIS,
+        itemMarkupPercent: currentQuotation.parameters.markupPercent || 0.75,
+        customerPriceILS: assemblyPricing.totalCostNIS * (1 + (currentQuotation.parameters.markupPercent || 0.75)),
+        notes: assembly.description || 'הרכבה',
+        createdAt: dbItem.created_at,
+        updatedAt: dbItem.updated_at
+      }
+
+      // Renumber items after adding assembly
+      const updatedItems = [...currentQuotation.items, newItem]
+      const renumberedItems = renumberItems(updatedItems)
+
+      const updatedQuotation = {
+        ...currentQuotation,
+        items: renumberedItems
+      }
+
+      setCurrentQuotation(updatedQuotation)
+      updateQuotation(currentQuotation.id, { items: renumberedItems })
+      setShowComponentSelector(false)
+    } catch (error) {
+      console.error('Failed to add assembly:', error)
+      alert('שגיאה בהוספת הרכבה. נסה שוב.')
     }
   }, [currentQuotation, selectedSystemId, setCurrentQuotation, updateQuotation, quotationsHook])
 
@@ -396,17 +546,75 @@ export function QuotationEditor() {
     updateQuotation(currentQuotation.id, { items: updatedItems })
   }, [currentQuotation, quotationsHook, setCurrentQuotation, updateQuotation])
 
-  // Update parameters
+  // Update parameters and recalculate item prices if exchange rates changed
   const updateParameters = useCallback((parameters: any) => {
     if (!currentQuotation) return
 
+    // Check if exchange rates changed
+    const ratesChanged =
+      parameters.usdToIlsRate !== currentQuotation.parameters.usdToIlsRate ||
+      parameters.eurToIlsRate !== currentQuotation.parameters.eurToIlsRate
+
+    // If rates changed, recalculate all item prices
+    let updatedItems = currentQuotation.items
+    if (ratesChanged) {
+      const newRates: ExchangeRates = {
+        usdToIlsRate: parameters.usdToIlsRate,
+        eurToIlsRate: parameters.eurToIlsRate
+      }
+
+      console.log('🔄 Exchange rates changed, recalculating item prices:', {
+        oldRates: {
+          usdToIlsRate: currentQuotation.parameters.usdToIlsRate,
+          eurToIlsRate: currentQuotation.parameters.eurToIlsRate
+        },
+        newRates
+      })
+
+      // Recalculate each item's prices with new exchange rates
+      updatedItems = currentQuotation.items.map(item => {
+        // CRITICAL: Detect the original currency for this item
+        // This preserves the original price when exchange rates change
+        const { currency: originalCurrency, amount: originalAmount } = detectOriginalCurrency(
+          item.unitPriceILS,
+          item.unitPriceUSD,
+          item.unitPriceEUR,
+          item.originalCurrency // Use stored original currency if available
+        )
+
+        console.log(`  📦 ${item.componentName}:`, {
+          originalCurrency,
+          originalAmount,
+          storedOriginalCurrency: item.originalCurrency,
+          storedOriginalCost: item.originalCost
+        })
+
+        // Use stored originalCost if available (most reliable)
+        const finalAmount = item.originalCost || originalAmount
+
+        // Convert from ORIGINAL currency with new rates
+        // This ensures ILS-only items stay ILS, USD-only items stay USD, etc.
+        const convertedPrices = convertToAllCurrencies(finalAmount, originalCurrency, newRates)
+
+        return {
+          ...item,
+          unitPriceILS: convertedPrices.unitCostNIS,
+          unitPriceUSD: convertedPrices.unitCostUSD,
+          unitPriceEUR: convertedPrices.unitCostEUR,
+          totalPriceILS: convertedPrices.unitCostNIS * item.quantity,
+          totalPriceUSD: convertedPrices.unitCostUSD * item.quantity
+        }
+      })
+    }
+
     const updatedQuotation = {
       ...currentQuotation,
-      parameters
+      parameters,
+      items: updatedItems
     }
 
     setCurrentQuotation(updatedQuotation)
-    updateQuotation(currentQuotation.id, { parameters })
+    updateQuotation(currentQuotation.id, { parameters, items: updatedItems })
   }, [currentQuotation, setCurrentQuotation, updateQuotation])
 
   // Handle close - just navigate back to list
@@ -661,7 +869,7 @@ export function QuotationEditor() {
       cellClass: params => params.data?.isSystemGroup ? 'ag-cell-bold' : 'ag-cell-right',
       valueGetter: (params: ValueGetterParams) => {
         if (params.data.isSystemGroup) {
-          const systemItems = gridData.filter(item => 
+          const systemItems = gridData.filter(item =>
             item.systemId === params.data.systemId && !item.isSystemGroup
           )
           const totalCost = systemItems.reduce((sum: number, item: any) => {
@@ -728,6 +936,32 @@ export function QuotationEditor() {
           )
         }
 
+        // Check if this is an assembly item
+        const isAssembly = params.data?.assemblyId
+
+        // For assembly items: click opens assembly detail modal
+        if (isAssembly) {
+          return (
+            <div
+              onClick={(e) => {
+                e.stopPropagation()
+                const assembly = assemblies.find(asm => asm.id === params.data.assemblyId)
+                if (assembly) {
+                  setSelectedAssemblyForDetail(assembly)
+                  setShowAssemblyDetail(true)
+                }
+              }}
+              className="cursor-pointer hover:text-green-600 w-full text-right flex items-center gap-2"
+              style={{ direction: 'rtl' }}
+              title="לחץ לצפייה בפרטי ההרכבה"
+            >
+              <span className="inline-flex items-center gap-1">
+                📦 {params.value}
+              </span>
+            </div>
+          )
+        }
+
         // For component items: double-click opens component card
         return (
           <div
@@ -759,6 +993,74 @@ export function QuotationEditor() {
         columnApi: params.columnApi,
         column: params.column,
         uniqueValues: getUniqueValues('componentName')
+      })
+    },
+    {
+      headerName: 'סוג',
+      field: 'itemType',
+      width: 100,
+      editable: (params: any) => !params.data?.isSystemGroup,
+      cellEditor: 'agSelectCellEditor',
+      cellEditorParams: {
+        values: ['hardware', 'software', 'labor']
+      },
+      valueFormatter: (params) => {
+        if (params.data?.isSystemGroup) return '';
+        const type = params.value;
+        return type === 'hardware' ? 'חומרה' : type === 'software' ? 'תוכנה' : type === 'labor' ? 'עבודה' : '';
+      },
+      cellClass: params => params.data?.isSystemGroup ? '' : 'ag-cell-right',
+      cellStyle: (params) => {
+        if (params.data?.isSystemGroup) return {};
+        const type = params.data?.itemType;
+        return {
+          backgroundColor: type === 'hardware' ? '#e3f2fd' : type === 'software' ? '#e8f5e9' : type === 'labor' ? '#fff3e0' : 'white',
+          textAlign: 'right'
+        };
+      },
+      headerComponent: CustomHeader,
+      headerComponentParams: (params: any) => ({
+        displayName: 'סוג',
+        onMenuClick: handleColumnMenuClick,
+        onFilterClick: handleFilterClick,
+        api: params.api,
+        columnApi: params.columnApi,
+        column: params.column,
+        uniqueValues: ['hardware', 'software', 'labor']
+      })
+    },
+    {
+      headerName: 'תת-סוג עבודה',
+      field: 'laborSubtype',
+      width: 120,
+      editable: (params: any) => !params.data?.isSystemGroup && params.data?.itemType === 'labor',
+      cellEditor: 'agSelectCellEditor',
+      cellEditorParams: {
+        values: ['engineering', 'commissioning', 'installation']
+      },
+      valueFormatter: (params) => {
+        if (params.data?.isSystemGroup || params.data?.itemType !== 'labor') return '';
+        const subtype = params.value;
+        return subtype === 'engineering' ? 'פיתוח והנדסה' :
+               subtype === 'commissioning' ? 'הרצה' :
+               subtype === 'installation' ? 'התקנה' : '';
+      },
+      cellClass: params => params.data?.isSystemGroup || params.data?.itemType !== 'labor' ? 'ag-cell-disabled' : 'ag-cell-right',
+      cellStyle: (params) => {
+        if (params.data?.isSystemGroup || params.data?.itemType !== 'labor') {
+          return { backgroundColor: '#f5f5f5', color: '#aaa', textAlign: 'right' };
+        }
+        return { textAlign: 'right' };
+      },
+      headerComponent: CustomHeader,
+      headerComponentParams: (params: any) => ({
+        displayName: 'תת-סוג עבודה',
+        onMenuClick: handleColumnMenuClick,
+        onFilterClick: handleFilterClick,
+        api: params.api,
+        columnApi: params.columnApi,
+        column: params.column,
+        uniqueValues: ['engineering', 'commissioning', 'installation', 'programming']
       })
     },
     {
@@ -1097,6 +1399,32 @@ export function QuotationEditor() {
     return calculateQuotationTotals(currentQuotation)
   }, [currentQuotation])
 
+  // Calculate statistics
+  const statistics = useMemo(() => {
+    console.log('🔍 STATISTICS CHECK:', {
+      hasQuotation: !!currentQuotation,
+      hasCalculations: !!calculations,
+      itemsCount: currentQuotation?.items?.length || 0,
+      systemsCount: currentQuotation?.systems?.length || 0,
+      calculations: calculations
+    })
+
+    if (!currentQuotation || !calculations) return null
+
+    // IMPORTANT: Ensure calculations are attached to the quotation object
+    const quotationWithCalcs = {
+      ...currentQuotation,
+      calculations: calculations
+    }
+
+    try {
+      return calculateQuotationStatistics(quotationWithCalcs)
+    } catch (error) {
+      console.error('Failed to calculate statistics:', error)
+      return null
+    }
+  }, [currentQuotation, calculations])
+
   if (loading) {
     return <div className="flex items-center justify-center h-64">Loading table configuration...</div>
   }
@@ -1156,6 +1484,15 @@ export function QuotationEditor() {
         onChange={updateParameters}
       />
 
+      {/* Tabs for Items and Statistics */}
+      <Tabs defaultValue="items" className="w-full">
+        <TabsList className="grid w-full grid-cols-2 max-w-md">
+          <TabsTrigger value="items">פריטי הצעת מחיר</TabsTrigger>
+          <TabsTrigger value="statistics">סטטיסטיקה</TabsTrigger>
+        </TabsList>
+
+        {/* Items Tab */}
+        <TabsContent value="items" className="space-y-6">
       {/* Systems and Items */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200">
         <div className="p-4 border-b border-gray-200 flex justify-between items-center">
@@ -1255,10 +1592,28 @@ export function QuotationEditor() {
                   <span className="font-mono text-sm">₪{calculations.totalHardwareILS.toLocaleString('he-IL', { minimumFractionDigits: 2 })}</span>
                 </div>
                 <div className="flex justify-between">
+                  <span className="text-sm text-gray-600">תוכנה:</span>
+                  <span className="font-mono text-sm">₪{calculations.totalSoftwareILS.toLocaleString('he-IL', { minimumFractionDigits: 2 })}</span>
+                </div>
+                <div className="flex justify-between">
                   <span className="text-sm text-gray-600">עבודה:</span>
                   <span className="font-mono text-sm">₪{calculations.totalLaborILS.toLocaleString('he-IL', { minimumFractionDigits: 2 })}</span>
                 </div>
-                <div className="flex justify-between font-semibold">
+                <div className="mr-4 space-y-0.5 text-xs text-gray-500">
+                  <div className="flex justify-between">
+                    <span>→ הנדסה:</span>
+                    <span className="font-mono">₪{calculations.totalEngineeringILS.toLocaleString('he-IL', { minimumFractionDigits: 0 })}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>→ הרצה:</span>
+                    <span className="font-mono">₪{calculations.totalCommissioningILS.toLocaleString('he-IL', { minimumFractionDigits: 0 })}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>→ התקנה:</span>
+                    <span className="font-mono">₪{calculations.totalInstallationILS.toLocaleString('he-IL', { minimumFractionDigits: 0 })}</span>
+                  </div>
+                </div>
+                <div className="flex justify-between font-semibold border-t pt-1">
                   <span className="text-sm">סה"כ עלות:</span>
                   <span className="font-mono text-sm">₪{calculations.totalCostILS.toLocaleString('he-IL', { minimumFractionDigits: 2 })}</span>
                 </div>
@@ -1312,12 +1667,27 @@ export function QuotationEditor() {
         </div>
       )}
 
-      {/* Component Selector Popup */}
+        </TabsContent>
+
+        {/* Statistics Tab */}
+        <TabsContent value="statistics" className="space-y-6">
+          {statistics ? (
+            <QuotationStatisticsPanelSimplified statistics={statistics} />
+          ) : (
+            <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
+              <p className="text-gray-500">אין נתונים סטטיסטיים זמינים</p>
+              <p className="text-sm text-gray-400 mt-2">הוסף פריטים להצעת המחיר כדי לראות סטטיסטיקה</p>
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
+
+      {/* Component/Assembly Selector Popup */}
       {showComponentSelector && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div ref={componentSelectorRef} className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[80vh] overflow-hidden">
             <div className="p-6 border-b border-gray-200">
-              <div className="flex justify-between items-center">
+              <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-semibold text-gray-900">בחר רכיב מהספרייה</h3>
                 <Button
                   variant="outline"
@@ -1329,60 +1699,125 @@ export function QuotationEditor() {
                 </Button>
               </div>
 
-              <div className="mt-4">
-                <input
-                  type="text"
-                  value={componentSearchText}
-                  onChange={(e) => setComponentSearchText(e.target.value)}
-                  placeholder="חפש לפי שם, יצרן או קטגוריה..."
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  autoFocus
-                />
-              </div>
-            </div>
+              {/* Tabs */}
+              <Tabs value={selectorTab} onValueChange={(v) => setSelectorTab(v as 'components' | 'assemblies')}>
+                <TabsList className="mb-4">
+                  <TabsTrigger value="components">רכיבים ({components.length})</TabsTrigger>
+                  <TabsTrigger value="assemblies">הרכבות ({assemblies.length})</TabsTrigger>
+                </TabsList>
 
-            <div className="p-6 overflow-y-auto max-h-[60vh]">
-              {filteredComponents.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-gray-500">לא נמצאו רכיבים התואמים לחיפוש</p>
+                <div className="mb-4">
+                  <input
+                    type="text"
+                    value={componentSearchText}
+                    onChange={(e) => setComponentSearchText(e.target.value)}
+                    placeholder={selectorTab === 'components' ? 'חפש לפי שם, יצרן או קטגוריה...' : 'חפש הרכבה לפי שם או תיאור...'}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    autoFocus
+                  />
                 </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {filteredComponents.map((component) => (
-                    <div
-                      key={component.id}
-                      className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer"
-                      onClick={() => addComponentToSystem(component)}
-                    >
-                      <div className="flex justify-between items-start mb-2">
-                        <h4 className="font-medium text-gray-900">{component.name}</h4>
-                        <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                          {component.category}
-                        </span>
+
+                {/* Components Tab */}
+                <TabsContent value="components" className="mt-0">
+                  <div className="overflow-y-auto max-h-[50vh]">
+                    {filteredComponents.length === 0 ? (
+                      <div className="text-center py-8">
+                        <p className="text-gray-500">לא נמצאו רכיבים התואמים לחיפוש</p>
                       </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {filteredComponents.map((component) => (
+                          <div
+                            key={component.id}
+                            className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer"
+                            onClick={() => addComponentToSystem(component)}
+                          >
+                            <div className="flex justify-between items-start mb-2">
+                              <h4 className="font-medium text-gray-900">{component.name}</h4>
+                              <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                                {component.category}
+                              </span>
+                            </div>
 
-                      <p className="text-sm text-gray-600 mb-3">{component.manufacturer}</p>
+                            <p className="text-sm text-gray-600 mb-3">{component.manufacturer}</p>
 
-                      <div className="space-y-1 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">מחיר יחידה:</span>
-                          <span className="font-mono">
-                            ₪{component.unitCostNIS?.toLocaleString('he-IL', { minimumFractionDigits: 2 }) || '0.00'}
-                          </span>
-                        </div>
-                        {component.unitCostUSD && (
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">מחיר דולר:</span>
-                            <span className="font-mono">
-                              ${component.unitCostUSD.toFixed(2)}
-                            </span>
+                            <div className="space-y-1 text-sm">
+                              <div className="flex justify-between">
+                                <span className="text-gray-600">מחיר יחידה:</span>
+                                <span className="font-mono">
+                                  ₪{component.unitCostNIS?.toLocaleString('he-IL', { minimumFractionDigits: 2 }) || '0.00'}
+                                </span>
+                              </div>
+                              {component.unitCostUSD && (
+                                <div className="flex justify-between">
+                                  <span className="text-gray-600">מחיר דולר:</span>
+                                  <span className="font-mono">
+                                    ${component.unitCostUSD.toFixed(2)}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
                           </div>
-                        )}
+                        ))}
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    )}
+                  </div>
+                </TabsContent>
+
+                {/* Assemblies Tab */}
+                <TabsContent value="assemblies" className="mt-0">
+                  <div className="overflow-y-auto max-h-[50vh]">
+                    {filteredAssemblies.length === 0 ? (
+                      <div className="text-center py-8">
+                        <p className="text-gray-500">לא נמצאו הרכבות התואמות לחיפוש</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {filteredAssemblies.map((assembly) => {
+                          const pricing = calculateAssemblyPricing(assembly)
+                          const formatted = formatAssemblyPricing(pricing)
+                          return (
+                            <div
+                              key={assembly.id}
+                              className="border border-gray-200 rounded-lg p-4 hover:border-green-300 hover:shadow-md transition-all cursor-pointer"
+                              onClick={() => addAssemblyToSystem(assembly)}
+                            >
+                              <div className="flex justify-between items-start mb-2">
+                                <h4 className="font-medium text-gray-900">{assembly.name}</h4>
+                                <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                                  {pricing.componentCount} רכיבים
+                                </span>
+                              </div>
+
+                              {assembly.description && (
+                                <p className="text-sm text-gray-600 mb-3">{assembly.description}</p>
+                              )}
+
+                              <div className="space-y-1 text-sm">
+                                <div className="flex justify-between">
+                                  <span className="text-gray-600">מחיר כולל:</span>
+                                  <span className="font-mono font-semibold">
+                                    {formatted.nis}
+                                  </span>
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  {formatted.usd} • {formatted.eur}
+                                </div>
+                              </div>
+
+                              {!assembly.isComplete && (
+                                <div className="mt-2 text-xs text-red-600 bg-red-50 px-2 py-1 rounded">
+                                  ⚠ הרכבה לא שלמה
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </TabsContent>
+              </Tabs>
             </div>
           </div>
         </div>
@@ -1401,6 +1836,16 @@ export function QuotationEditor() {
         onClose={() => setShowProjectPicker(false)}
         onSelect={handleProjectSelect}
         currentProjectId={currentQuotation?.projectId}
+      />
+
+      {/* Assembly Detail Modal */}
+      <AssemblyDetailModal
+        assembly={selectedAssemblyForDetail}
+        isOpen={showAssemblyDetail}
+        onClose={() => {
+          setShowAssemblyDetail(false)
+          setSelectedAssemblyForDetail(null)
+        }}
       />
     </div>
   )

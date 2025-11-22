@@ -10,7 +10,8 @@
 6. [Quotation Management](#quotation-management)
 7. [Database Schema](#database-schema)
 8. [Business Logic](#business-logic)
-9. [Testing](#testing)
+9. [Multi-Currency System](#multi-currency-system)
+10. [Testing](#testing)
 
 ---
 
@@ -599,6 +600,374 @@ function normalizePriceToILS(
       return price;
   }
 }
+```
+
+---
+
+## Multi-Currency System
+
+### Overview
+
+The CPQ system supports multi-currency pricing (NIS/ILS, USD, EUR) with intelligent original currency tracking and dynamic exchange rate recalculation.
+
+### Core Principles
+
+1. **Original Currency Preservation**: Each component has an original currency that NEVER changes
+2. **Dynamic Conversion**: Other currencies are calculated from the original using exchange rates
+3. **Exchange Rate Flexibility**: Changing rates recalculates conversions while preserving originals
+4. **Database Persistence**: Original currency and cost are stored in the database
+
+### Currency Tracking Fields
+
+#### Components Table
+```sql
+ALTER TABLE components
+ADD COLUMN currency TEXT CHECK (currency IN ('NIS', 'USD', 'EUR')) DEFAULT 'NIS',
+ADD COLUMN original_cost DECIMAL(12,2);
+```
+
+#### Quotation Items Table
+```sql
+ALTER TABLE quotation_items
+ADD COLUMN original_currency TEXT CHECK (original_currency IN ('NIS', 'USD', 'EUR')),
+ADD COLUMN original_cost DECIMAL(12,2);
+```
+
+### How Currency Tracking Works
+
+#### 1. Component Level (Global Catalog)
+
+**File**: `src/hooks/useComponents.ts`
+
+Each component in the library stores:
+- `currency`: The original currency (NIS, USD, or EUR)
+- `originalCost`: The price in the original currency
+- `unitCostNIS`, `unitCostUSD`, `unitCostEUR`: Converted prices
+
+**Example**:
+```typescript
+// Component stored with USD as original currency
+{
+  name: "Siemens PLC S7-1500",
+  currency: "USD",           // Original currency
+  originalCost: 2500.00,     // Original price: $2,500
+  unitCostUSD: 2500.00,      // Same as original
+  unitCostNIS: 9250.00,      // Converted at rate 3.7
+  unitCostEUR: 2200.00       // Converted via cross-rate
+}
+```
+
+#### 2. Quotation Item Level (Local to Quotation)
+
+**File**: `src/lib/utils.ts` (convertDbQuotationToQuotationProject)
+
+When components are added to a quotation, they preserve original currency:
+- `originalCurrency`: Copied from component's currency
+- `originalCost`: Copied from component's originalCost
+- Prices are stored in all three currencies
+
+**Example**:
+```typescript
+// Quotation item maintains original currency
+{
+  componentName: "Siemens PLC S7-1500",
+  originalCurrency: "USD",   // Preserved from component
+  originalCost: 2500.00,     // Preserved from component
+  unitPriceUSD: 2500.00,     // Original stays fixed
+  unitPriceILS: 9250.00,     // Calculated with quotation's exchange rate
+  quantity: 2
+}
+```
+
+#### 3. Exchange Rate Changes
+
+**File**: `src/components/quotations/QuotationEditor.tsx` (updateParameters)
+
+When exchange rates change in a quotation:
+1. System reads each item's `originalCurrency` and `originalCost`
+2. Keeps the original currency value fixed
+3. Recalculates other currencies using new rates
+
+**Example**:
+```typescript
+// Initial state (USD/ILS = 3.7)
+Item: $2,500 USD = ₪9,250 ILS
+
+// User changes USD/ILS rate to 4.0
+// After recalculation:
+Item: $2,500 USD = ₪10,000 ILS  // USD stays fixed, ILS recalculated
+```
+
+### Currency Detection
+
+**File**: `src/hooks/useComponents.ts` (dbToComponent function)
+
+When loading components from the database, the system detects original currency:
+
+```typescript
+// 1. If DB has explicit currency tracking, use it
+if (dbComp.currency && dbComp.original_cost) {
+  currency = dbComp.currency
+  originalCost = dbComp.original_cost
+}
+
+// 2. Otherwise, detect from price ratios
+if (usd > 0 && ils > 0) {
+  const ratio = ils / usd
+  if (ratio >= 3 && ratio <= 5) {
+    // ILS looks like conversion from USD
+    currency = 'USD'
+    originalCost = usd
+  }
+}
+```
+
+### Currency Conversion Functions
+
+**File**: `src/utils/currencyConversion.ts`
+
+#### convertToAllCurrencies
+
+Converts a price from its original currency to all three currencies:
+
+```typescript
+convertToAllCurrencies(
+  amount: number,           // Original price
+  originalCurrency: Currency,  // 'NIS' | 'USD' | 'EUR'
+  rates: ExchangeRates     // { usdToIlsRate, eurToIlsRate }
+): CurrencyPrices
+```
+
+**Logic**:
+```typescript
+switch (originalCurrency) {
+  case 'USD':
+    unitCostUSD = amount;                    // Keep original
+    unitCostNIS = amount * usdToIlsRate;     // Convert to ILS
+    unitCostEUR = amount * usdToEurRate;     // Convert to EUR
+    break;
+
+  case 'EUR':
+    unitCostEUR = amount;                    // Keep original
+    unitCostNIS = amount * eurToIlsRate;     // Convert to ILS
+    unitCostUSD = amount / usdToEurRate;     // Convert to USD
+    break;
+
+  case 'NIS':
+    unitCostNIS = amount;                    // Keep original
+    unitCostUSD = amount / usdToIlsRate;     // Convert to USD
+    unitCostEUR = amount / eurToIlsRate;     // Convert to EUR
+    break;
+}
+```
+
+### Critical Implementation Details
+
+#### Database Loading (src/lib/utils.ts lines 67-113)
+
+When loading quotations from the database:
+
+```typescript
+// CRITICAL: Use original_currency and original_cost fields
+const originalCurrency = dbItem.original_currency || 'NIS'
+const originalCost = dbItem.original_cost || dbItem.unit_cost || 0
+
+// Convert from original currency to all currencies
+if (originalCurrency === 'USD') {
+  unitPriceUSD = originalCost              // Keep USD original
+  unitPriceILS = originalCost * usdRate    // Convert to ILS
+} else if (originalCurrency === 'EUR') {
+  unitPriceEUR = originalCost              // Keep EUR original
+  unitPriceILS = originalCost * eurRate    // Convert to ILS
+} else {
+  unitPriceILS = originalCost              // Keep ILS original
+  unitPriceUSD = originalCost / usdRate    // Convert to USD
+}
+
+// CRITICAL: Preserve original currency and cost in QuotationItem
+items.push({
+  // ... other fields ...
+  unitPriceUSD,
+  unitPriceILS,
+  originalCurrency: originalCurrency,  // Must be included!
+  originalCost: originalCost,          // Must be included!
+  // ... rest of fields ...
+})
+```
+
+**Why This Matters**:
+- Without `originalCurrency` and `originalCost` in the QuotationItem object, exchange rate recalculation won't know which currency to preserve
+- This was a critical bug that caused all USD prices to change when USD/ILS rate changed
+
+#### Exchange Rate Recalculation (QuotationEditor.tsx lines 575-607)
+
+When user changes exchange rates:
+
+```typescript
+const updateParameters = useCallback((parameters) => {
+  // Check if exchange rates changed
+  const ratesChanged =
+    parameters.usdToIlsRate !== currentQuotation.parameters.usdToIlsRate ||
+    parameters.eurToIlsRate !== currentQuotation.parameters.eurToIlsRate
+
+  if (ratesChanged) {
+    // Recalculate each item's prices with new exchange rates
+    updatedItems = currentQuotation.items.map(item => {
+      // Use stored original currency (CRITICAL!)
+      const originalCurrency = item.originalCurrency || 'NIS'
+      const originalAmount = item.originalCost || 0
+
+      // Convert from ORIGINAL currency with new rates
+      const convertedPrices = convertToAllCurrencies(
+        originalAmount,
+        originalCurrency,
+        newRates
+      )
+
+      return {
+        ...item,
+        unitPriceILS: convertedPrices.unitCostNIS,
+        unitPriceUSD: convertedPrices.unitCostUSD,
+        unitPriceEUR: convertedPrices.unitCostEUR,
+        // Totals also recalculated
+        totalPriceILS: convertedPrices.unitCostNIS * item.quantity,
+        totalPriceUSD: convertedPrices.unitCostUSD * item.quantity
+      }
+    })
+  }
+}, [currentQuotation, setCurrentQuotation, updateQuotation])
+```
+
+### Common Bugs and Fixes
+
+#### Bug #1: Currency Data Lost on Reload
+**Symptom**: Quotation loads with wrong currencies after page refresh
+
+**Root Cause**: `convertDbQuotationToQuotationProject` wasn't using `original_currency` and `original_cost` from database
+
+**Fix**: Modified `src/lib/utils.ts` lines 67-87 to read and use these fields
+
+**Files Changed**:
+- `src/lib/utils.ts`: Read `original_currency` and `original_cost` from DB
+- Database: Added currency tracking columns to `components` and `quotation_items` tables
+
+#### Bug #2: Exchange Rate Changes Affect Original Prices
+**Symptom**: Changing USD/ILS rate from 4.6 to 5.0 changes USD prices (they should stay fixed)
+
+**Root Cause**: `convertDbQuotationToQuotationProject` didn't set `originalCurrency` and `originalCost` fields in the returned QuotationItem objects
+
+**Fix**: Modified `src/lib/utils.ts` lines 108-110 to include these fields
+
+**Before Fix**:
+```typescript
+items.push({
+  unitPriceUSD,
+  unitPriceILS,
+  // originalCurrency and originalCost missing!
+})
+```
+
+**After Fix**:
+```typescript
+items.push({
+  unitPriceUSD,
+  unitPriceILS,
+  originalCurrency: originalCurrency,  // Added
+  originalCost: originalCost,          // Added
+})
+```
+
+### Testing Currency Conversion
+
+**Test File**: `src/utils/__tests__/currencyConversion.test.ts`
+
+```typescript
+describe('convertToAllCurrencies', () => {
+  it('preserves USD when converting from USD', () => {
+    const result = convertToAllCurrencies(100, 'USD', {
+      usdToIlsRate: 3.7,
+      eurToIlsRate: 4.0
+    })
+
+    expect(result.unitCostUSD).toBe(100)  // Original preserved
+    expect(result.unitCostNIS).toBe(370)  // Converted
+  })
+})
+```
+
+### Migration Scripts
+
+#### Add Currency Tracking to Components
+```sql
+-- scripts/add-component-currency-tracking.sql
+ALTER TABLE components
+ADD COLUMN IF NOT EXISTS currency TEXT CHECK (currency IN ('NIS', 'USD', 'EUR')) DEFAULT 'NIS';
+
+ALTER TABLE components
+ADD COLUMN IF NOT EXISTS original_cost DECIMAL(12,2);
+
+-- Detect currency from existing price ratios
+UPDATE components
+SET currency = CASE
+  WHEN unit_cost_usd > 0 AND unit_cost_ils > 0
+   AND (unit_cost_ils / unit_cost_usd) BETWEEN 3 AND 5
+  THEN 'USD'
+  WHEN unit_cost_eur > 0 AND unit_cost_ils > 0
+   AND (unit_cost_ils / unit_cost_eur) BETWEEN 3.5 AND 5
+  THEN 'EUR'
+  ELSE 'NIS'
+END;
+```
+
+#### Add Currency Tracking to Quotation Items
+```sql
+-- scripts/add-currency-tracking.sql
+ALTER TABLE quotation_items
+ADD COLUMN IF NOT EXISTS original_currency TEXT CHECK (original_currency IN ('NIS', 'USD', 'EUR'));
+
+ALTER TABLE quotation_items
+ADD COLUMN IF NOT EXISTS original_cost DECIMAL(12,2);
+```
+
+### Best Practices
+
+1. **Always Set Original Currency**: When creating components or quotation items, always set `currency` and `originalCost`
+
+2. **Never Modify Original Values**: Original currency and cost should only change when user explicitly edits the component
+
+3. **Use Conversion Functions**: Always use `convertToAllCurrencies` for conversions, never calculate manually
+
+4. **Preserve on Database Save**: When saving to database, include `original_currency` and `original_cost`
+
+5. **Test Exchange Rate Changes**: After any currency-related changes, test that changing exchange rates preserves original prices
+
+### Architecture Summary
+
+```
+Component Library (Global)
+├── Component 1: USD original ($2,500)
+│   ├── unitCostUSD: $2,500 (original)
+│   ├── unitCostNIS: ₪9,250 (converted)
+│   └── unitCostEUR: €2,200 (converted)
+│
+Quotation (Local)
+├── Parameters
+│   ├── usdToIlsRate: 3.7
+│   └── eurToIlsRate: 4.0
+│
+├── Item 1 (from Component 1)
+│   ├── originalCurrency: "USD"
+│   ├── originalCost: 2500
+│   ├── unitPriceUSD: $2,500 (stays fixed)
+│   ├── unitPriceILS: ₪9,250 (recalculated on rate change)
+│   └── quantity: 2
+│
+└── [User changes usdToIlsRate to 4.0]
+    └── Item 1 recalculated:
+        ├── originalCurrency: "USD" (unchanged)
+        ├── originalCost: 2500 (unchanged)
+        ├── unitPriceUSD: $2,500 (STAYS FIXED ✓)
+        └── unitPriceILS: ₪10,000 (RECALCULATED ✓)
 ```
 
 ---

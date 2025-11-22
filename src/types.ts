@@ -1,11 +1,17 @@
 // Core Types for CPQ System - Redesigned for specific business needs
 
+// ============ Component Types ============
+export type ComponentType = 'hardware' | 'software' | 'labor';
+export type LaborSubtype = 'engineering' | 'commissioning' | 'installation';
+
 // ============ Components (רכיבים) ============
 export interface Component {
   id: string;
   name: string;
   description?: string;
   category: string;
+  componentType: ComponentType; // Hardware, Software, or Labor
+  laborSubtype?: LaborSubtype; // For labor components: engineering, commissioning, installation, programming
   productType?: string; // סוג מוצר כמו "שסתומים", "חיישנים", וכו'
   manufacturer: string;
   manufacturerPN: string;
@@ -103,26 +109,35 @@ export interface QuotationItem {
   systemOrder: number; // System's order (1, 2, 3...)
   itemOrder: number; // Item's order within system (1, 2, 3...)
   displayNumber: string; // "1.1", "1.2", "2.1", etc.
-  
-  // Linked library component
+
+  // Linked library component or assembly
   componentId?: string;
   componentName: string;
   componentCategory: string;
-  isLabor: boolean; // True for labor items
-  
+  itemType: ComponentType; // Hardware, Software, or Labor
+  laborSubtype?: LaborSubtype; // For labor items: engineering, commissioning, installation, programming
+
+  // Assembly tracking
+  assemblyId?: string; // Link to assembly in library if this is an assembly line item
+
   // Quantities and pricing
   quantity: number;
   unitPriceUSD: number;
   unitPriceILS: number;
+  unitPriceEUR?: number; // EUR pricing (optional)
   totalPriceUSD: number;
   totalPriceILS: number;
-  
+
+  // Original currency tracking (to preserve original price when rates change)
+  originalCurrency?: 'NIS' | 'USD' | 'EUR';
+  originalCost?: number; // Price in original currency
+
   // Markup
   itemMarkupPercent: number; // Default from project, can override
-  
+
   // Calculated customer price
   customerPriceILS: number;
-  
+
   // Metadata
   notes?: string;
   createdAt: string;
@@ -150,31 +165,80 @@ export interface QuotationParameters {
 }
 
 export interface QuotationCalculations {
-  // Hardware vs Labor breakdown
+  // Type breakdown (HW/SW/Labor)
   totalHardwareUSD: number;
   totalHardwareILS: number;
+  totalSoftwareUSD: number;
+  totalSoftwareILS: number;
   totalLaborUSD: number;
   totalLaborILS: number;
-  
+
+  // Labor subtype breakdown
+  totalEngineeringILS: number;
+  totalCommissioningILS: number;
+  totalInstallationILS: number;
+  totalProgrammingILS: number;
+
   // Subtotals
   subtotalUSD: number;
   subtotalILS: number;
-  
+
   // Customer price before risk
   totalCustomerPriceILS: number;
-  
+
   // Risk addition
   riskAdditionILS: number;
-  
+
   // Final totals
   totalQuoteILS: number;
   totalVATILS: number;
   finalTotalILS: number;
-  
+
   // Profit calculations
   totalCostILS: number;
   totalProfitILS: number;
   profitMarginPercent: number;
+}
+
+// ============ Quotation Statistics ============
+export interface QuotationStatistics {
+  // Cost breakdown percentages
+  hardwarePercent: number;
+  softwarePercent: number;
+  laborPercent: number;
+
+  // Labor breakdown percentages
+  engineeringPercent: number;
+  commissioningPercent: number;
+
+  // Material vs Labor ratio
+  materialPercent: number; // (Hardware + Software) / Total
+  laborOnlyPercent: number; // Labor / Total
+
+  // Key ratios (formatted strings like "45:29:14")
+  hwEngineeringCommissioningRatio: string; // "HW%:Eng%:Comm%"
+
+  // Robot-specific analysis (if applicable)
+  robotComponents?: {
+    totalCostILS: number;
+    percentOfTotal: number;
+    count: number;
+  };
+
+  // Component counts
+  componentCounts: {
+    hardware: number;
+    software: number;
+    labor: number;
+    total: number;
+  };
+
+  // Profit by type
+  profitByType: {
+    hardware: { profit: number; margin: number };
+    software: { profit: number; margin: number };
+    labor: { profit: number; margin: number };
+  };
 }
 
 // ============ Legacy Project Types (for compatibility) ============
@@ -387,26 +451,93 @@ export interface PaginatedResponse<T> {
   hasMore: boolean;
 }
 
-// ============ Assemblies (אסמבלים) ============
+// ============ Assemblies (הרכבות) ============
+
+/**
+ * Assembly - A collection of components that form a complete unit
+ * Total price is calculated dynamically from constituent components
+ */
 export interface Assembly {
   id: string;
   name: string;
   description?: string;
-  components: AssemblyComponent[];
-  totalCost: number;
-  totalPrice: number;
-  margin: number;
+  isComplete: boolean; // False if any referenced components were deleted
+  notes?: string;
+  components: AssemblyComponent[]; // Linked components with quantities
   createdAt: string;
   updatedAt: string;
 }
 
+/**
+ * Assembly Component - Junction table entry linking component to assembly
+ * Stores snapshot data in case component is deleted
+ */
 export interface AssemblyComponent {
-  componentId: string;
+  id: string;
+  assemblyId: string;
+  componentId: string | null; // Null if component was deleted
+  componentName: string; // Snapshot - preserved even if component deleted
+  componentManufacturer?: string; // Snapshot for reference
+  componentPartNumber?: string; // Snapshot for reference
   quantity: number;
-  unitCost: number;
-  unitPrice: number;
-  totalCost: number;
-  totalPrice: number;
+  sortOrder: number;
+
+  // Populated from joined component data (if component still exists)
+  component?: Component;
+}
+
+/**
+ * Database schema for assemblies table
+ */
+export interface DbAssembly {
+  id: string;
+  name: string;
+  description?: string;
+  is_complete: boolean;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Database schema for assembly_components table
+ */
+export interface DbAssemblyComponent {
+  id: string;
+  assembly_id: string;
+  component_id: string | null;
+  component_name: string;
+  component_manufacturer?: string;
+  component_part_number?: string;
+  quantity: number;
+  sort_order: number;
+  created_at: string;
+}
+
+/**
+ * Calculated pricing breakdown for an assembly
+ * Respects each component's original currency
+ */
+export interface AssemblyPricing {
+  totalCostNIS: number;
+  totalCostUSD: number;
+  totalCostEUR: number;
+  componentCount: number;
+  missingComponentCount: number; // Components that were deleted
+
+  // Breakdown by currency (sum of components in their original currency)
+  breakdown: {
+    nisComponents: { count: number; total: number };
+    usdComponents: { count: number; total: number };
+    eurComponents: { count: number; total: number };
+  };
+}
+
+/**
+ * Assembly with calculated pricing (for display)
+ */
+export interface AssemblyWithPricing extends Assembly {
+  pricing: AssemblyPricing;
 }
 
 // ============ Pricing Rules ============
@@ -485,6 +616,8 @@ export interface DbQuotationItem {
   item_name: string;
   manufacturer?: string;
   manufacturer_part_number?: string;
+  item_type: 'hardware' | 'software' | 'labor';
+  labor_subtype?: 'engineering' | 'commissioning' | 'installation' | 'programming';
   quantity: number;
   unit_cost?: number;
   total_cost?: number;
@@ -493,9 +626,12 @@ export interface DbQuotationItem {
   total_price?: number;
   notes?: string;
   sort_order: number;
+  // Currency tracking for proper exchange rate handling
+  original_currency?: 'NIS' | 'USD' | 'EUR';
+  original_cost?: number;
   created_at: string;
   updated_at: string;
-  
+
   // Related data from joins
   component?: DbComponent;
 }
@@ -506,6 +642,8 @@ export interface DbComponent {
   manufacturer?: string;
   manufacturer_part_number?: string;
   category?: string;
+  component_type: 'hardware' | 'software' | 'labor';
+  labor_subtype?: 'engineering' | 'commissioning' | 'installation';
   description?: string;
   unit_cost_usd?: number;
   unit_cost_ils?: number;

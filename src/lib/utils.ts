@@ -64,6 +64,28 @@ export function convertDbQuotationToQuotationProject(dbQuotation: DbQuotation): 
     ;(dbSystem.quotation_items || []).forEach((dbItem, itemIndex) => {
       const itemOrder = dbItem.sort_order || itemIndex + 1
 
+      // CRITICAL: Use original_currency and original_cost to properly convert prices
+      // This ensures that when exchange rates change, we convert from the ORIGINAL currency
+      const originalCurrency = dbItem.original_currency || 'NIS'
+      const originalCost = dbItem.original_cost || dbItem.unit_cost || 0
+      const usdRate = dbQuotation.exchange_rate || 3.7
+      const eurRate = dbQuotation.eur_to_ils_rate || 4.0
+
+      // Convert from original currency to USD and ILS
+      let unitPriceUSD = 0
+      let unitPriceILS = 0
+
+      if (originalCurrency === 'USD') {
+        unitPriceUSD = originalCost
+        unitPriceILS = originalCost * usdRate
+      } else if (originalCurrency === 'EUR') {
+        unitPriceUSD = (originalCost * eurRate) / usdRate  // EUR -> ILS -> USD
+        unitPriceILS = originalCost * eurRate
+      } else {  // NIS
+        unitPriceUSD = originalCost / usdRate
+        unitPriceILS = originalCost
+      }
+
       items.push({
         id: dbItem.id,
         systemId: dbSystem.id,
@@ -73,15 +95,19 @@ export function convertDbQuotationToQuotationProject(dbQuotation: DbQuotation): 
         componentId: dbItem.component_id,
         componentName: dbItem.item_name,
         componentCategory: dbItem.component?.category || 'כללי',
-        isLabor: dbItem.item_name.toLowerCase().includes('labor') || dbItem.item_name.toLowerCase().includes('עבודה'),
+        itemType: dbItem.item_type || 'hardware',
+        laborSubtype: dbItem.labor_subtype,
         quantity: dbItem.quantity || 1,
-        unitPriceUSD: dbItem.unit_cost || 0,
-        unitPriceILS: (dbItem.unit_cost || 0) * (dbQuotation.exchange_rate || 3.7),
-        totalPriceUSD: (dbItem.unit_cost || 0) * (dbItem.quantity || 1),
-        totalPriceILS: (dbItem.unit_cost || 0) * (dbItem.quantity || 1) * (dbQuotation.exchange_rate || 3.7),
+        unitPriceUSD,
+        unitPriceILS,
+        totalPriceUSD: unitPriceUSD * (dbItem.quantity || 1),
+        totalPriceILS: unitPriceILS * (dbItem.quantity || 1),
         itemMarkupPercent: dbItem.margin_percentage || dbQuotation.margin_percentage || 25,
         customerPriceILS: (dbItem.total_price || 0),
         notes: dbItem.notes,
+        // CRITICAL: Preserve original currency and cost for exchange rate recalculation
+        originalCurrency: originalCurrency,
+        originalCost: originalCost,
         createdAt: dbItem.created_at,
         updatedAt: dbItem.updated_at
       })
@@ -121,8 +147,14 @@ export function convertDbQuotationToQuotationProject(dbQuotation: DbQuotation): 
     calculations: {
       totalHardwareUSD: 0,
       totalHardwareILS: 0,
+      totalSoftwareUSD: 0,
+      totalSoftwareILS: 0,
       totalLaborUSD: 0,
       totalLaborILS: 0,
+      totalEngineeringILS: 0,
+      totalCommissioningILS: 0,
+      totalInstallationILS: 0,
+      totalProgrammingILS: 0,
       subtotalUSD: 0,
       subtotalILS: 0,
       totalCustomerPriceILS: dbQuotation.total_price || 0,

@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Badge } from '../ui/badge';
 import type { AIExtractionResult, AIExtractedComponent } from '../../services/claudeAI';
 import type { Component, ComponentMatchDecision } from '../../types';
+import { normalizeComponentPrices } from '../../utils/currencyConversion';
 
 // Type guards for metadata
 interface ExcelMetadata {
@@ -127,22 +128,33 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
   const handleConfirm = () => {
     const approvedComponents = components
       .filter((c) => c.status !== 'rejected')
-      .map((c): Partial<Component> => ({
-        name: c.name,
-        description: c.description,
-        category: c.category || 'אחר',
-        manufacturer: c.manufacturer || '',
-        manufacturerPN: c.manufacturerPN || '',
-        supplier: c.supplier || extractionResult.metadata.supplier || '',
-        unitCostNIS: c.unitPriceNIS || 0,
-        unitCostUSD: c.unitPriceUSD,
-        unitCostEUR: c.unitPriceEUR,
-        currency: c.currency || 'NIS',
-        originalCost: c.unitPriceNIS || c.unitPriceUSD || c.unitPriceEUR || 0,
-        quoteDate: c.quoteDate || extractionResult.metadata.quoteDate || new Date().toISOString().split('T')[0],
-        quoteFileUrl: '', // Will be set when saved
-        notes: c.notes,
-      }));
+      .map((c): Partial<Component> => {
+        // Normalize prices - ensure all currencies are calculated
+        const normalizedPrices = normalizeComponentPrices({
+          unitCostNIS: c.unitPriceNIS,
+          unitCostUSD: c.unitPriceUSD,
+          unitCostEUR: c.unitPriceEUR,
+          currency: c.currency,
+          originalCost: c.unitPriceNIS || c.unitPriceUSD || c.unitPriceEUR || 0
+        });
+
+        return {
+          name: c.name,
+          description: c.description,
+          category: c.category || 'אחר',
+          manufacturer: c.manufacturer || '',
+          manufacturerPN: c.manufacturerPN || '',
+          supplier: c.supplier || extractionResult.metadata.supplier || '',
+          unitCostNIS: normalizedPrices.unitCostNIS,
+          unitCostUSD: normalizedPrices.unitCostUSD,
+          unitCostEUR: normalizedPrices.unitCostEUR,
+          currency: normalizedPrices.currency,
+          originalCost: normalizedPrices.originalCost,
+          quoteDate: c.quoteDate || extractionResult.metadata.quoteDate || new Date().toISOString().split('T')[0],
+          quoteFileUrl: '', // Will be set when saved
+          notes: c.notes,
+        };
+      });
 
     onConfirm(approvedComponents, localMatchDecisions);
   };

@@ -3,16 +3,12 @@ import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { useCPQ } from '../../contexts/CPQContext'
-import { Component, ComponentFormData } from '../../types'
+import { Component, ComponentFormData, ComponentType, LaborSubtype } from '../../types'
 import { useClickOutside } from '../../hooks/useClickOutside'
 import { getComponentCategories, CATEGORIES_UPDATED_EVENT } from '../../constants/settings'
-
-// Exchange rates (can be moved to a config file or fetched from API)
-const EXCHANGE_RATES = {
-  USD_TO_NIS: 3.7,
-  EUR_TO_NIS: 4.0,
-  USD_TO_EUR: 0.92
-}
+import { classifyComponent } from '../../services/componentTypeClassifier'
+import { convertToAllCurrencies, getGlobalExchangeRates, type Currency } from '../../utils/currencyConversion'
+import { classifyLaborSubtype } from '../../services/laborClassifier'
 
 interface ComponentFormProps {
   component?: Component | null
@@ -23,10 +19,12 @@ interface ComponentFormProps {
 export function ComponentForm({ component, isOpen, onClose }: ComponentFormProps) {
   const { addComponent, updateComponent } = useCPQ()
   const [categories, setCategories] = useState<string[]>(() => getComponentCategories())
-  const [formData, setFormData] = useState<ComponentFormData>({
+  const [formData, setFormData] = useState<ComponentFormData & { componentType: ComponentType; laborSubtype?: LaborSubtype }>({
     name: '',
     description: '',
         category: 'אחר',
+    componentType: 'hardware',
+    laborSubtype: undefined,
     productType: '',
     manufacturer: '',
     manufacturerPN: '',
@@ -66,6 +64,8 @@ export function ComponentForm({ component, isOpen, onClose }: ComponentFormProps
           name: component.name,
           description: component.description || '',
           category: component.category,
+          componentType: component.componentType || 'hardware',
+          laborSubtype: component.laborSubtype, // ← FIXED: Include laborSubtype
           productType: component.productType || '',
           manufacturer: component.manufacturer,
           manufacturerPN: component.manufacturerPN,
@@ -83,7 +83,10 @@ export function ComponentForm({ component, isOpen, onClose }: ComponentFormProps
       } else {
         // ComponentFormData - duplicating or new with pre-filled data
         const formDataCurrency = (component as ComponentFormData).currency || 'NIS'
-        setFormData(component as ComponentFormData)
+        setFormData({
+          ...(component as ComponentFormData),
+          componentType: (component as any).componentType || 'hardware'
+        })
         setPriceInputField(formDataCurrency)
       }
     } else {
@@ -91,6 +94,7 @@ export function ComponentForm({ component, isOpen, onClose }: ComponentFormProps
         name: '',
         description: '',
         category: 'אחר',
+        componentType: 'hardware',  // ← ADDED THIS
         productType: '',
         manufacturer: '',
         manufacturerPN: '',
@@ -107,41 +111,29 @@ export function ComponentForm({ component, isOpen, onClose }: ComponentFormProps
     }
   }, [component])
 
-  const handleInputChange = (field: keyof ComponentFormData, value: string | number) => {
+  const handleInputChange = (field: keyof ComponentFormData | 'componentType', value: string | number) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
     }))
   }
 
-  const handlePriceChange = (currency: 'NIS' | 'USD' | 'EUR', value: number) => {
+  const handlePriceChange = (currency: Currency, value: number) => {
     setPriceInputField(currency)
-    
-    let newNIS = formData.unitCostNIS
-    let newUSD = formData.unitCostUSD || 0
-    let newEUR = formData.unitCostEUR || 0
 
-    if (currency === 'NIS') {
-      newNIS = value
-      newUSD = Math.round((value / EXCHANGE_RATES.USD_TO_NIS) * 100) / 100
-      newEUR = Math.round((value / EXCHANGE_RATES.EUR_TO_NIS) * 100) / 100
-    } else if (currency === 'USD') {
-      newUSD = value
-      newNIS = Math.round((value * EXCHANGE_RATES.USD_TO_NIS) * 100) / 100
-      newEUR = Math.round((value * EXCHANGE_RATES.USD_TO_EUR) * 100) / 100
-    } else if (currency === 'EUR') {
-      newEUR = value
-      newNIS = Math.round((value * EXCHANGE_RATES.EUR_TO_NIS) * 100) / 100
-      newUSD = Math.round((value / EXCHANGE_RATES.USD_TO_EUR) * 100) / 100
-    }
+    // Get exchange rates from global settings
+    const rates = getGlobalExchangeRates()
+
+    // Convert to all currencies
+    const convertedPrices = convertToAllCurrencies(value, currency, rates)
 
     setFormData(prev => ({
       ...prev,
-      unitCostNIS: newNIS,
-      unitCostUSD: newUSD,
-      unitCostEUR: newEUR,
-      originalCost: value,
-      currency: currency
+      unitCostNIS: convertedPrices.unitCostNIS,
+      unitCostUSD: convertedPrices.unitCostUSD,
+      unitCostEUR: convertedPrices.unitCostEUR,
+      originalCost: convertedPrices.originalCost,
+      currency: convertedPrices.currency
     }))
   }
 
@@ -223,7 +215,7 @@ export function ComponentForm({ component, isOpen, onClose }: ComponentFormProps
                 
                 <div>
                   <label className="block text-sm font-medium mb-1">
-                    סוג רכיב
+                    קטגוריה
                   </label>
                   <select
                     value={formData.category}
@@ -235,6 +227,89 @@ export function ComponentForm({ component, isOpen, onClose }: ComponentFormProps
                     ))}
                   </select>
                 </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    סוג רכיב *
+                  </label>
+                  <select
+                    value={formData.componentType}
+                    onChange={(e) => handleInputChange('componentType', e.target.value as ComponentType)}
+                    className="w-full px-3 py-2 border border-input bg-background rounded-md text-sm"
+                  >
+                    <option value="hardware">חומרה (Hardware)</option>
+                    <option value="software">תוכנה (Software)</option>
+                    <option value="labor">עבודה (Labor)</option>
+                  </select>
+                  {formData.name && (() => {
+                    const suggestion = classifyComponent(formData.name, formData.category, formData.description);
+                    if (suggestion.componentType !== formData.componentType && suggestion.confidence > 0.5) {
+                      return (
+                        <div className="mt-1 text-xs text-amber-600 flex items-center gap-1">
+                          <span>💡</span>
+                          <span>
+                            הצעה: {suggestion.componentType === 'hardware' ? 'חומרה' : suggestion.componentType === 'software' ? 'תוכנה' : 'עבודה'}
+                            {' '}({(suggestion.confidence * 100).toFixed(0)}% ביטחון)
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleInputChange('componentType', suggestion.componentType)}
+                            className="underline hover:text-amber-800"
+                          >
+                            החל
+                          </button>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+                </div>
+
+                {/* Labor Subtype - Only show for labor components */}
+                {formData.componentType === 'labor' && (
+                  <div>
+                    <label className="block text-sm font-medium mb-1">
+                      סוג עבודה *
+                    </label>
+                    <select
+                      value={formData.laborSubtype || ''}
+                      onChange={(e) => handleInputChange('laborSubtype', e.target.value as LaborSubtype)}
+                      className="w-full px-3 py-2 border border-input bg-background rounded-md text-sm"
+                    >
+                      <option value="">בחר סוג עבודה...</option>
+                      <option value="engineering">פיתוח והנדסה (Engineering & Development)</option>
+                      <option value="commissioning">הזמנה והפעלה (Commissioning)</option>
+                      <option value="installation">התקנה (Installation)</option>
+                    </select>
+                    {formData.name && formData.componentType === 'labor' && (() => {
+                      const laborClassification = classifyLaborSubtype(formData.name, formData.description);
+                      if (laborClassification.laborSubtype !== formData.laborSubtype && laborClassification.confidence > 0.5) {
+                        const hebrewLabels: Record<LaborSubtype, string> = {
+                          engineering: 'פיתוח והנדסה',
+                          commissioning: 'הזמנה והפעלה',
+                          installation: 'התקנה'
+                        };
+                        return (
+                          <div className="mt-1 text-xs text-amber-600 flex items-center gap-1">
+                            <span>💡</span>
+                            <span>
+                              הצעה: {hebrewLabels[laborClassification.laborSubtype]}
+                              {' '}({(laborClassification.confidence * 100).toFixed(0)}% ביטחון)
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleInputChange('laborSubtype', laborClassification.laborSubtype)}
+                              className="underline hover:text-amber-800"
+                            >
+                              החל
+                            </button>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
+                  </div>
+                )}
               </div>
 
               <div>

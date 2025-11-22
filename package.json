@@ -56,6 +56,7 @@
     "react-dom": "^18.2.0",
     "react-hook-form": "^7.48.2",
     "react-router-dom": "^6.20.1",
+    "recharts": "^3.4.1",
     "sonner": "^2.0.7",
     "string-similarity": "^4.0.4",
     "tailwind-merge": "^3.3.1",

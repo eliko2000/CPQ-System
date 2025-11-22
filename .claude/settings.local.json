@@ -19,7 +19,18 @@
       "Bash(npm test:*)",
       "Bash(npm run build:*)",
       "Bash(timeout 15 npm run dev:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "WebSearch",
+      "mcp__playwright__browser_navigate",
+      "mcp__playwright__browser_wait_for",
+      "mcp__playwright__browser_type",
+      "Bash(npx tsc:*)",
+      "Bash(timeout /t 10)",
+      "Bash(nul)",
+      "Bash(findstr:*)",
+      "mcp__playwright__browser_evaluate",
+      "mcp__playwright__browser_take_screenshot",
+      "Bash(timeout 30 tail:*)"
     ],
     "deny": [],
     "ask": []

@@ -3,45 +3,125 @@ import { supabase } from '../supabaseClient'
 import { DbComponent, Component } from '../types'
 
 // Transform UI Component to DB format
+// Only includes fields that are actually present in the input (for partial updates)
 function componentToDb(component: Partial<Component>): Partial<DbComponent> {
-  return {
-    name: component.name,
-    manufacturer: component.manufacturer,
-    manufacturer_part_number: component.manufacturerPN,
-    category: component.category,
-    description: component.description,
-    unit_cost_usd: component.unitCostUSD,
-    unit_cost_ils: component.unitCostNIS,
-    unit_cost_eur: component.unitCostEUR,
-    currency: component.currency,
-    original_cost: component.originalCost,
-    supplier: component.supplier,
-    notes: component.notes,
-    is_active: true
+  const result: Partial<DbComponent> = {};
+
+  if (component.name !== undefined) result.name = component.name;
+  if (component.manufacturer !== undefined) result.manufacturer = component.manufacturer;
+  if (component.manufacturerPN !== undefined) result.manufacturer_part_number = component.manufacturerPN;
+  if (component.category !== undefined) result.category = component.category;
+  if (component.componentType !== undefined) result.component_type = component.componentType;
+  // Handle laborSubtype: convert empty string to null, only set if component is labor type
+  if (component.laborSubtype !== undefined) {
+    result.labor_subtype = component.laborSubtype === '' ? null : component.laborSubtype;
   }
+  if (component.description !== undefined) result.description = component.description;
+  if (component.unitCostUSD !== undefined) result.unit_cost_usd = component.unitCostUSD;
+  if (component.unitCostNIS !== undefined) result.unit_cost_ils = component.unitCostNIS;
+  if (component.unitCostEUR !== undefined) result.unit_cost_eur = component.unitCostEUR;
+  if (component.currency !== undefined) result.currency = component.currency;
+  if (component.originalCost !== undefined) result.original_cost = component.originalCost;
+  if (component.supplier !== undefined) result.supplier = component.supplier;
+  if (component.notes !== undefined) result.notes = component.notes;
+
+  return result;
 }
 
 // Transform DB format to UI Component
 function dbToComponent(dbComp: DbComponent): Component {
-  return {
+  console.log('📥 dbToComponent converting:', {
+    id: dbComp.id,
+    name: dbComp.name,
+    component_type: dbComp.component_type,
+    labor_subtype: dbComp.labor_subtype // Added for debugging
+  })
+
+  // CRITICAL: Properly detect original currency
+  // If original_cost and currency are set in DB, use them
+  // Otherwise, detect which price field has the highest value (likely the original)
+  let detectedCurrency: 'NIS' | 'USD' | 'EUR' = dbComp.currency || 'NIS'
+  let detectedOriginalCost: number = dbComp.original_cost || 0
+
+  // If no original_cost in DB, detect from price fields
+  if (!dbComp.original_cost || dbComp.original_cost === 0) {
+    const ils = dbComp.unit_cost_ils || 0
+    const usd = dbComp.unit_cost_usd || 0
+    const eur = dbComp.unit_cost_eur || 0
+
+    // Find which price is non-zero and likely the original
+    // Heuristic: If USD or EUR price exists and is significantly different from ILS/rate,
+    // it's likely the original
+    if (usd > 0 && ils > 0) {
+      // Check if ILS looks like a conversion from USD (ILS ≈ USD × 3-5)
+      const ratio = ils / usd
+      if (ratio >= 3 && ratio <= 5) {
+        // ILS is likely converted from USD, so USD is original
+        detectedCurrency = 'USD'
+        detectedOriginalCost = usd
+      } else {
+        // ILS doesn't match USD conversion, so ILS is likely original
+        detectedCurrency = 'NIS'
+        detectedOriginalCost = ils
+      }
+    } else if (eur > 0 && ils > 0) {
+      // Check if ILS looks like a conversion from EUR (ILS ≈ EUR × 3.5-5)
+      const ratio = ils / eur
+      if (ratio >= 3.5 && ratio <= 5) {
+        // ILS is likely converted from EUR, so EUR is original
+        detectedCurrency = 'EUR'
+        detectedOriginalCost = eur
+      } else {
+        // ILS doesn't match EUR conversion, so ILS is likely original
+        detectedCurrency = 'NIS'
+        detectedOriginalCost = ils
+      }
+    } else if (usd > 0) {
+      detectedCurrency = 'USD'
+      detectedOriginalCost = usd
+    } else if (eur > 0) {
+      detectedCurrency = 'EUR'
+      detectedOriginalCost = eur
+    } else {
+      detectedCurrency = 'NIS'
+      detectedOriginalCost = ils
+    }
+  }
+
+  const result = {
     id: dbComp.id,
     name: dbComp.name,
     manufacturer: dbComp.manufacturer || '',
     manufacturerPN: dbComp.manufacturer_part_number || '',
     category: dbComp.category || 'אחר',
+    componentType: dbComp.component_type || 'hardware',
+    laborSubtype: dbComp.labor_subtype || undefined, // Explicitly convert null to undefined
     description: dbComp.description || '',
     unitCostNIS: dbComp.unit_cost_ils || 0,
     unitCostUSD: dbComp.unit_cost_usd || 0,
     unitCostEUR: dbComp.unit_cost_eur || 0,
     supplier: dbComp.supplier || '',
-    currency: dbComp.currency || 'NIS',
-    originalCost: dbComp.original_cost || dbComp.unit_cost_ils || 0,
+    currency: detectedCurrency,
+    originalCost: detectedOriginalCost,
     quoteDate: new Date().toISOString().split('T')[0],
     quoteFileUrl: '',
     notes: dbComp.notes || '',
     createdAt: dbComp.created_at,
     updatedAt: dbComp.updated_at
   }
+
+  console.log('📥 dbToComponent result:', {
+    id: result.id,
+    name: result.name,
+    componentType: result.componentType,
+    laborSubtype: result.laborSubtype, // Added for debugging
+    currency: result.currency,
+    originalCost: result.originalCost,
+    unitCostILS: result.unitCostNIS,
+    unitCostUSD: result.unitCostUSD,
+    unitCostEUR: result.unitCostEUR
+  })
+  return result
 }
 
 export function useComponents() {
@@ -104,8 +184,12 @@ export function useComponents() {
     try {
       setError(null)
 
+      // Debug logging
+      console.log('🔍 updateComponent called with:', { id, updates })
+
       // Transform to DB format
       const dbUpdates = componentToDb(updates)
+      console.log('🔍 Transformed to DB format:', dbUpdates)
 
       const { data, error } = await supabase
         .from('components')
@@ -116,12 +200,15 @@ export function useComponents() {
 
       if (error) throw error
 
+      console.log('✅ Database updated successfully:', data)
+
       // Update state with DB format
       setComponents(prev =>
         prev.map(comp => comp.id === id ? { ...comp, ...data } : comp)
       )
       return data
     } catch (err) {
+      console.error('❌ Update failed:', err)
       setError(err instanceof Error ? err.message : 'Failed to update component')
       throw err
     }

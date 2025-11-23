@@ -12,6 +12,7 @@
 import { extractComponentsFromDocument, type AIExtractionResult } from './claudeAI';
 import { parseExcelFile } from './excelParser';
 import { parsePDFFile } from './pdfParser';
+import { logger } from '../lib/logger';
 
 /**
  * Extraction method type
@@ -149,7 +150,7 @@ export async function parseDocument(file: File): Promise<AIExtractionResult> {
       }
     }
   } catch (error) {
-    console.error('Document parsing error:', error);
+    logger.error('Document parsing error:', error);
 
     return {
       success: false,

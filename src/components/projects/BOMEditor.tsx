@@ -7,6 +7,7 @@ import { Button } from '../ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Badge } from '../ui/badge'
 import { Plus, Save, Calculator } from 'lucide-react'
+import { logger } from '@/lib/logger'
 import 'ag-grid-community/styles/ag-grid.css'
 import 'ag-grid-community/styles/ag-theme-alpine.css'
 
@@ -37,7 +38,7 @@ const StatusRenderer = ({ value }: { value: string }) => {
 }
 
 export function BOMEditor() {
-  console.log('🔧 BOMEditor component rendered')
+  logger.debug('🔧 BOMEditor component rendered')
   const { currentProject, currentProjectBOM, updateBOMItem, deleteBOMItem, calculateBOMTotals } = useCPQ()
   const gridRef = useRef<AgGridReact>(null)
 
@@ -189,7 +190,7 @@ export function BOMEditor() {
     },
   ]
 
-    console.log('BOMEditor columnDefs order:', cols.map(c => c.headerName || c.field))
+    logger.debug('BOMEditor columnDefs order:', cols.map(c => c.headerName || c.field))
     return cols
   }, [deleteBOMItem])
 
@@ -226,7 +227,7 @@ export function BOMEditor() {
     const { overIndex, node } = event
 
     // Reorder logic would go here
-    console.log(`Row ${node.data?.name} moved to position ${overIndex}`)
+    logger.debug(`Row ${node.data?.name} moved to position ${overIndex}`)
     // TODO: Implement reordering in the BOM array
   }, [])
 
@@ -242,13 +243,13 @@ export function BOMEditor() {
 
     // This will be handled by the context
     // TODO: Implement addBOMItem in context
-    console.log('Add new BOM item:', newItem)
+    logger.debug('Add new BOM item:', newItem)
   }, [])
 
   // Save project
   const handleSave = useCallback(() => {
     // TODO: Implement project saving
-    console.log('Save project with BOM:', currentProjectBOM)
+    logger.debug('Save project with BOM:', currentProjectBOM)
   }, [currentProjectBOM])
 
   if (!currentProject) {

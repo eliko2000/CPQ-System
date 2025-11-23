@@ -14,6 +14,7 @@ import { useComponents } from '../hooks/useComponents'
 import { useQuotations } from '../hooks/useQuotations'
 import { useAssemblies } from '../hooks/useAssemblies'
 import { convertDbQuotationToQuotationProject } from '../lib/utils'
+import { logger } from '../lib/logger'
 
 // ============ State Shape ============
 interface CPQState {
@@ -1337,12 +1338,12 @@ export function CPQProvider({ children }: { children: React.ReactNode }) {
 
   const updateComponent = useCallback(async (id: string, updates: Partial<Component>) => {
     try {
-      console.log('🌐 CPQContext.updateComponent called:', { id, updates })
+      logger.debug('🌐 CPQContext.updateComponent called:', { id, updates })
       await componentsHook.updateComponent(id, updates)
-      console.log('🌐 CPQContext.updateComponent completed')
+      logger.debug('🌐 CPQContext.updateComponent completed')
       // Data will be updated automatically by the hook
     } catch (error) {
-      console.error('❌ CPQContext.updateComponent failed:', error)
+      logger.error('❌ CPQContext.updateComponent failed:', error)
       setError(`Failed to update component: ${error}`)
     }
   }, [componentsHook, setError])
@@ -1528,12 +1529,12 @@ export function CPQProvider({ children }: { children: React.ReactNode }) {
   // Project update/delete implementations
   const updateProject = useCallback(async (_id: string, _updates: Partial<Project>) => {
     // TODO: Implement
-    console.log('updateProject not implemented yet')
+    logger.debug('updateProject not implemented yet')
   }, [])
 
   const deleteProject = useCallback(async (_id: string) => {
     // TODO: Implement
-    console.log('deleteProject not implemented yet')
+    logger.debug('deleteProject not implemented yet')
   }, [])
 
   // ============ Quotation Actions ============
@@ -1567,7 +1568,7 @@ export function CPQProvider({ children }: { children: React.ReactNode }) {
       try {
         await quotationsHook.updateQuotation(id, dbUpdates)
       } catch (error) {
-        console.error('Failed to save quotation updates to database:', error)
+        logger.error('Failed to save quotation updates to database:', error)
         // Optionally revert local state or show error to user
       }
     }

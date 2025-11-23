@@ -10,6 +10,7 @@ import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { testSupplierQuotesDb } from '../../scripts/testSupplierQuotesDb';
 import { CheckCircle, XCircle, Play, Loader2 } from 'lucide-react';
+import { logger } from '@/lib/logger';
 
 export function DatabaseTestPanel() {
   const [testing, setTesting] = useState(false);
@@ -23,7 +24,7 @@ export function DatabaseTestPanel() {
       const testResults = await testSupplierQuotesDb();
       setResults(testResults);
     } catch (error) {
-      console.error('Test execution failed:', error);
+      logger.error('Test execution failed:', error);
       setResults({
         passed: 0,
         failed: 1,

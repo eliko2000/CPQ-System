@@ -22,6 +22,7 @@ import type { AIExtractionResult } from '../../services/claudeAI';
 import type { Component, SupplierQuote, ComponentMatchDecision } from '../../types';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
+import { logger } from '@/lib/logger'
 
 interface SupplierQuoteImportProps {
   isOpen: boolean;
@@ -59,7 +60,7 @@ export const SupplierQuoteImport: React.FC<SupplierQuoteImportProps> = ({
       const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
       const filePath = `${year}/${month}/${uuid}_${sanitizedName}`;
 
-      console.log('📤 Uploading file to Supabase Storage:', filePath);
+      logger.debug('📤 Uploading file to Supabase Storage:', filePath);
 
       // Upload to Supabase Storage
       const { data, error } = await supabase.storage
@@ -70,11 +71,11 @@ export const SupplierQuoteImport: React.FC<SupplierQuoteImportProps> = ({
         });
 
       if (error) {
-        console.error('Storage upload error:', error);
+        logger.error('Storage upload error:', error);
         throw error;
       }
 
-      console.log('✅ File uploaded successfully:', data.path);
+      logger.debug('✅ File uploaded successfully:', data.path);
 
       // Get public URL
       const { data: urlData } = supabase.storage
@@ -83,7 +84,7 @@ export const SupplierQuoteImport: React.FC<SupplierQuoteImportProps> = ({
 
       return urlData.publicUrl;
     } catch (error) {
-      console.error('Error uploading file:', error);
+      logger.error('Error uploading file:', error);
       toast.error('שגיאה בהעלאת הקובץ');
       return null;
     }
@@ -93,7 +94,7 @@ export const SupplierQuoteImport: React.FC<SupplierQuoteImportProps> = ({
    * Handle extraction complete - save file, create quote, and run smart matching
    */
   const handleExtractionComplete = async (result: AIExtractionResult, file: File) => {
-    console.log('📋 Extraction complete:', result);
+    logger.debug('📋 Extraction complete:', result);
 
     setExtractionResult(result);
     setUploadedFile(file);
@@ -126,7 +127,7 @@ export const SupplierQuoteImport: React.FC<SupplierQuoteImportProps> = ({
       return;
     }
 
-    console.log('✅ Quote saved:', quote);
+    logger.debug('✅ Quote saved:', quote);
     setCreatedQuote(quote);
 
     // Run smart matching for all components
@@ -150,21 +151,21 @@ export const SupplierQuoteImport: React.FC<SupplierQuoteImportProps> = ({
    */
   const runSmartMatching = async (quote: SupplierQuote, components: any[]) => {
     try {
-      console.log('🔍 Running smart matching for', components.length, 'components...');
+      logger.debug('🔍 Running smart matching for', components.length, 'components...');
 
       const decisions: ComponentMatchDecision[] = [];
 
       // Process each component with smart matching
       for (let i = 0; i < components.length; i++) {
         const component = components[i];
-        console.log(`\n🔍 Matching component ${i + 1}/${components.length}:`, component.name);
+        logger.debug(`\n🔍 Matching component ${i + 1}/${components.length}:`, component.name);
 
         // Run smart matching (3-tier: exact/fuzzy/AI)
         const matchResults = await processQuoteWithMatching(quote.id, [component]);
         const matchResult = matchResults[0];
 
         if (!matchResult) {
-          console.warn('⚠️  No match result returned for:', component.name);
+          logger.warn('⚠️  No match result returned for:', component.name);
           decisions.push({
             componentIndex: i,
             matchType: 'none',
@@ -185,7 +186,7 @@ export const SupplierQuoteImport: React.FC<SupplierQuoteImportProps> = ({
 
         decisions.push(decision);
 
-        console.log(`✅ Match result: ${matchResult.matchType}`, {
+        logger.debug(`✅ Match result: ${matchResult.matchType}`, {
           hasMatches: matchResult.matches.length > 0,
           topConfidence: matchResult.matches[0]?.confidence,
         });
@@ -195,7 +196,7 @@ export const SupplierQuoteImport: React.FC<SupplierQuoteImportProps> = ({
       setMatchDecisions(decisions);
       setStep('preview');
 
-      console.log('✅ Smart matching complete:', {
+      logger.debug('✅ Smart matching complete:', {
         total: decisions.length,
         withMatches: decisions.filter(d => d.matches.length > 0).length,
         exact: decisions.filter(d => d.matchType === 'exact').length,
@@ -205,7 +206,7 @@ export const SupplierQuoteImport: React.FC<SupplierQuoteImportProps> = ({
       });
 
     } catch (error) {
-      console.error('❌ Smart matching failed:', error);
+      logger.error('❌ Smart matching failed:', error);
       toast.error('שגיאה בזיהוי רכיבים קיימים');
       // Continue to preview even if matching fails
       setMatchDecisions([]);
@@ -235,7 +236,7 @@ export const SupplierQuoteImport: React.FC<SupplierQuoteImportProps> = ({
         const comp = components[i];
         const decision = decisions.find(d => d.componentIndex === i);
 
-        console.log(`\n📦 Processing component ${i + 1}/${components.length}:`, comp.name);
+        logger.debug(`\n📦 Processing component ${i + 1}/${components.length}:`, comp.name);
 
         // Check user decision
         if (decision && decision.userDecision === 'accept_match' && decision.matches.length > 0) {
@@ -245,10 +246,10 @@ export const SupplierQuoteImport: React.FC<SupplierQuoteImportProps> = ({
             : decision.matches[0].component;
 
           if (matchedComponent) {
-            console.log(`✅ User accepted match: ${matchedComponent.name} (${decision.matchType} match)`);
+            logger.debug(`✅ User accepted match: ${matchedComponent.name} (${decision.matchType} match)`);
 
             // First, clear the "current price" flag from ALL previous quotes for this component
-            console.log(`🔄 Clearing 'current price' from previous quotes for component:`, matchedComponent.id);
+            logger.debug(`🔄 Clearing 'current price' from previous quotes for component:`, matchedComponent.id);
             await supabase
               .from('component_quote_history')
               .update({ is_current_price: false })
@@ -268,7 +269,7 @@ export const SupplierQuoteImport: React.FC<SupplierQuoteImportProps> = ({
             });
 
             // Also update the component's main price fields
-            console.log(`💰 Updating component's current price`);
+            logger.debug(`💰 Updating component's current price`);
             await supabase
               .from('components')
               .update({
@@ -281,11 +282,11 @@ export const SupplierQuoteImport: React.FC<SupplierQuoteImportProps> = ({
               .eq('id', matchedComponent.id);
 
             updatedCount++;
-            console.log(`📊 Added to price history and updated current price`);
+            logger.debug(`📊 Added to price history and updated current price`);
           }
         } else {
           // User wants to create new component (or no match found)
-          console.log('✨ Creating new component');
+          logger.debug('✨ Creating new component');
 
           const newComponent = await addComponent({
             name: comp.name || '',
@@ -317,7 +318,7 @@ export const SupplierQuoteImport: React.FC<SupplierQuoteImportProps> = ({
             });
 
             newCount++;
-            console.log(`✅ New component created`);
+            logger.debug(`✅ New component created`);
           }
         }
 
@@ -339,7 +340,7 @@ export const SupplierQuoteImport: React.FC<SupplierQuoteImportProps> = ({
         }
       }, 2000);
     } catch (error) {
-      console.error('Import failed:', error);
+      logger.error('Import failed:', error);
       toast.error('שגיאה בייבוא רכיבים');
       // Reset to preview to allow retry
       setStep('preview');

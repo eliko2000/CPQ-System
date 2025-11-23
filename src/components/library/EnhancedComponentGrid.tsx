@@ -11,6 +11,7 @@ import { useClickOutside } from '../../hooks/useClickOutside'
 import { useTableConfig } from '../../hooks/useTableConfig'
 import { CustomHeader } from '../grid/CustomHeader'
 import { getComponentCategories, getTableColumnSettings, CATEGORIES_UPDATED_EVENT } from '../../constants/settings'
+import { logger } from '@/lib/logger'
 
 interface EnhancedComponentGridProps {
   components: Component[]
@@ -70,34 +71,34 @@ export function EnhancedComponentGrid({
 
   // Handle inline editing
   const handleCellEdit = useCallback((params: ValueSetterParams) => {
-    console.log('🔧 EnhancedComponentGrid.handleCellEdit called:', {
+    logger.debug('🔧 EnhancedComponentGrid.handleCellEdit called:', {
       field: params.colDef.field,
       oldValue: params.oldValue,
       newValue: params.newValue,
       data: params.data
     })
     if (onComponentUpdate && params.data && params.newValue !== params.oldValue) {
-      console.log('🔧 Calling onComponentUpdate with:', {
+      logger.debug('🔧 Calling onComponentUpdate with:', {
         id: params.data.id,
         field: params.colDef.field,
         newValue: params.newValue
       })
       onComponentUpdate(params.data.id, params.colDef.field!, params.newValue)
     } else {
-      console.log('🔧 Skipped update - no change or missing handler')
+      logger.debug('🔧 Skipped update - no change or missing handler')
     }
     return true
   }, [onComponentUpdate])
 
   // Handle column menu click
   const handleColumnMenuClick = useCallback((columnId: string) => {
-    console.log('Column menu clicked:', columnId)
+    logger.debug('Column menu clicked:', columnId)
     // Menu functionality will be implemented in Phase 2
   }, [])
 
   // Handle filter click
   const handleFilterClick = useCallback((columnId: string) => {
-    console.log('Filter clicked:', columnId)
+    logger.debug('Filter clicked:', columnId)
     // Smart filter is now handled by the CustomHeader component
   }, [])
 
@@ -396,7 +397,7 @@ export function EnhancedComponentGrid({
         values: ['hardware', 'software', 'labor']
       },
       valueSetter: (params) => {
-        console.log('💎 componentType valueSetter called:', { oldValue: params.oldValue, newValue: params.newValue })
+        logger.debug('💎 componentType valueSetter called:', { oldValue: params.oldValue, newValue: params.newValue })
         if (params.newValue !== params.oldValue) {
           params.data.componentType = params.newValue
           handleCellEdit(params)

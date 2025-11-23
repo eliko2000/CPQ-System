@@ -5,6 +5,7 @@ import {
   QuotationCalculations,
   QuotationParameters
 } from '../types';
+import { logger } from '@/lib/logger';
 
 // ============ Display Number Generation ============
 export function generateDisplayNumber(systemOrder: number, itemOrder: number): string {
@@ -321,7 +322,7 @@ export function getDefaultQuotationParameters(): QuotationParameters {
       }
     }
   } catch (error) {
-    console.error('Error loading pricing settings from cache:', error);
+    logger.error('Error loading pricing settings from cache:', error);
   }
 
   // Fallback to hard-coded defaults
@@ -372,7 +373,7 @@ export async function loadDefaultQuotationParameters(): Promise<QuotationParamet
       };
     }
   } catch (error) {
-    console.error('Error loading pricing settings from Supabase:', error);
+    logger.error('Error loading pricing settings from Supabase:', error);
   }
 
   // Fallback to synchronous defaults

@@ -15,6 +15,7 @@ import { convertDbQuotationToQuotationProject } from '../../lib/utils'
 import { loadDefaultQuotationParameters } from '../../utils/quotationCalculations'
 import { supabase } from '../../supabaseClient'
 import { toast } from 'sonner'
+import { logger } from '@/lib/logger'
 
 export function AppRoutes() {
   const {
@@ -96,7 +97,7 @@ export function AppRoutes() {
         setViewingProjectId(null)
       }
     } catch (error) {
-      console.error('Failed to create quotation:', error)
+      logger.error('Failed to create quotation:', error)
       toast.error('שגיאה ביצירת הצעת מחיר')
     }
   }

@@ -11,6 +11,7 @@ import { Badge } from '../ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { useSupplierQuotes } from '../../hooks/useSupplierQuotes';
 import { SupplierQuote, Component } from '../../types';
+import { logger } from '@/lib/logger'
 import {
   X,
   FileText,
@@ -60,7 +61,7 @@ export function SupplierQuoteDetailsDrawer({
         setComponents(result.components);
       }
     } catch (error) {
-      console.error('Error loading quote details:', error);
+      logger.error('Error loading quote details:', error);
     } finally {
       setLoading(false);
     }

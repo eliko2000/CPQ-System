@@ -75,20 +75,38 @@ The application will be available at `http://localhost:5173`
 
 ### Environment Variables
 
-Create a `.env.local` file in the root directory:
+Create a `.env.local` file based on `.env.example`:
+
+```bash
+# Copy the example file
+cp .env.example .env.local
+
+# Edit .env.local with your actual keys
+```
+
+Required variables:
 
 ```env
 # Supabase Configuration (Required)
-VITE_SUPABASE_URL=your_supabase_url
-VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+# Get these from https://supabase.com/dashboard > Project Settings > API
+VITE_SUPABASE_URL=https://your-project-id.supabase.co
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key_here
 
 # Anthropic API (Optional - for AI Vision features)
-VITE_ANTHROPIC_API_KEY=sk-ant-api03-your_api_key
+# Get from https://console.anthropic.com
+VITE_ANTHROPIC_API_KEY=sk-ant-api03-your_api_key_here
 
-# Exchange Rates (Optional - defaults provided)
-VITE_DEFAULT_USD_TO_ILS_RATE=3.7
-VITE_DEFAULT_EUR_TO_ILS_RATE=4.0
+# Development Configuration
+VITE_DEV_MODE=true
+VITE_API_URL=http://localhost:3001
 ```
+
+**⚠️ Security Notes:**
+- `.env.local` is gitignored and should **NEVER** be committed
+- Use `.env.example` as a template (safe to commit)
+- **NEVER** use `SUPABASE_SERVICE_ROLE_KEY` in client-side code
+- Service role keys should only be used in backend/server environments
+- Rotate all API keys if accidentally exposed
 
 ### Build for Production
 

@@ -30,7 +30,10 @@
       "Bash(findstr:*)",
       "mcp__playwright__browser_evaluate",
       "mcp__playwright__browser_take_screenshot",
-      "Bash(timeout 30 tail:*)"
+      "Bash(timeout 30 tail:*)",
+      "Bash(find:*)",
+      "Bash(node scripts/replace-console-with-logger.js:*)",
+      "Bash(node scripts/replace-console-with-logger.cjs:*)"
     ],
     "deny": [],
     "ask": []

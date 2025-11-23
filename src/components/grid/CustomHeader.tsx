@@ -5,6 +5,7 @@ import { MoreVertical, Filter } from 'lucide-react'
 import { SmartFilter } from './SmartFilter'
 import { DateFilter } from './DateFilter'
 import { NumberFilter } from './NumberFilter'
+import { logger } from '@/lib/logger'
 
 interface CustomHeaderProps {
   displayName: string
@@ -61,7 +62,7 @@ export function CustomHeader(props: CustomHeaderProps) {
           }
         }
       }).catch((error: any) => {
-        console.error('Error syncing filter state:', error)
+        logger.error('Error syncing filter state:', error)
       })
     }
   }, [props.api, props.column])
@@ -125,13 +126,13 @@ export function CustomHeader(props: CustomHeaderProps) {
             const filterInstance = await props.api.getColumnFilterInstance(colId)
             if (filterInstance) {
               const filterTypeName = filterInstance.constructor?.name
-              console.log(`[CustomHeader] Filter instance type:`, filterTypeName)
+              logger.debug(`[CustomHeader] Filter instance type:`, filterTypeName)
 
               // CRITICAL VALIDATION: Ensure filter type matches expectations
               // This prevents the bug where SetFilter format was used with TextFilter
               if (filterTypeName !== 'SetFilter' && filterTypeName !== 'TextFilter' &&
                   filterTypeName !== 'SetFloatingFilter') {
-                console.warn(
+                logger.warn(
                   `[CustomHeader] Unexpected filter type "${filterTypeName}" for column ${colId}. ` +
                   `Expected TextFilter (Community) or SetFilter (Enterprise). ` +
                   `Filter may not work correctly.`
@@ -146,13 +147,13 @@ export function CustomHeader(props: CustomHeaderProps) {
                 const stringValues = filterModel.map(v => String(v))
                 model = { values: stringValues }
 
-                console.log(`[CustomHeader] Using SetFilter (Enterprise) format for ${colId}`)
+                logger.debug(`[CustomHeader] Using SetFilter (Enterprise) format for ${colId}`)
               } else {
                 // Community TextFilter format: Use 'equals' operator with multiple conditions
                 // For multiple values, we need to use OR conditions
                 const stringValues = filterModel.map(v => String(v))
 
-                console.log(`[CustomHeader] Using TextFilter (Community) format for ${colId}`)
+                logger.debug(`[CustomHeader] Using TextFilter (Community) format for ${colId}`)
 
                 if (stringValues.length === 1) {
                   // Single value: simple equals filter
@@ -175,7 +176,7 @@ export function CustomHeader(props: CustomHeaderProps) {
                 }
               }
 
-              console.log(`[CustomHeader] Setting filter for ${colId}:`, model)
+              logger.debug(`[CustomHeader] Setting filter for ${colId}:`, model)
 
               // setModel returns a promise, await it
               const result = filterInstance.setModel(model)
@@ -183,11 +184,11 @@ export function CustomHeader(props: CustomHeaderProps) {
                 await result
               }
 
-              console.log(`[CustomHeader] Filter model set, triggering onFilterChanged for ${colId}`)
+              logger.debug(`[CustomHeader] Filter model set, triggering onFilterChanged for ${colId}`)
 
               // Check if filterInstance has applyModel method (some AG Grid filters require this)
               if (typeof filterInstance.applyModel === 'function') {
-                console.log(`[CustomHeader] Calling applyModel() for ${colId}`)
+                logger.debug(`[CustomHeader] Calling applyModel() for ${colId}`)
                 filterInstance.applyModel()
               }
 
@@ -200,16 +201,16 @@ export function CustomHeader(props: CustomHeaderProps) {
               // Verify the filter was actually set
               const verifyModel = filterInstance.getModel()
               const isActive = filterInstance.isFilterActive()
-              console.log(`[CustomHeader] Filter verification for ${colId}:`, {
+              logger.debug(`[CustomHeader] Filter verification for ${colId}:`, {
                 modelSet: verifyModel,
                 isActive: isActive,
                 fullFilterModel: props.api.getFilterModel()
               })
 
-              console.log(`[CustomHeader] Filter applied successfully for ${colId}`)
+              logger.debug(`[CustomHeader] Filter applied successfully for ${colId}`)
             }
           } catch (error) {
-            console.error('[CustomHeader] Error setting filter:', error)
+            logger.error('[CustomHeader] Error setting filter:', error)
           }
         })()
       } else {
@@ -251,9 +252,9 @@ export function CustomHeader(props: CustomHeaderProps) {
           })
         }, 100)
         
-        console.log('Auto-sized all columns')
+        logger.debug('Auto-sized all columns')
       } catch (error) {
-        console.error('Error auto-sizing all columns:', error)
+        logger.error('Error auto-sizing all columns:', error)
       }
     }
     setShowMenu(false)

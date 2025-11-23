@@ -35,6 +35,7 @@ import {
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { he } from 'date-fns/locale';
+import { logger } from '@/lib/logger'
 
 export function SupplierQuotesPage() {
   const { quotes, loading, error, deleteQuote } = useSupplierQuotes();
@@ -110,7 +111,7 @@ export function SupplierQuotesPage() {
       await downloadFile(quote.fileUrl, quote.fileName);
       toast.success('הקובץ הורד בהצלחה');
     } catch (error) {
-      console.error('Download error:', error);
+      logger.error('Download error:', error);
       toast.error('שגיאה בהורדת הקובץ');
     }
   };
@@ -337,7 +338,7 @@ export function SupplierQuotesPage() {
         isOpen={showUploadModal}
         onClose={() => setShowUploadModal(false)}
         onSuccess={(quote) => {
-          console.log('Quote uploaded successfully:', quote);
+          logger.debug('Quote uploaded successfully:', quote);
           setShowUploadModal(false);
         }}
       />

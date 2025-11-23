@@ -9,6 +9,7 @@ import type {
   LaborMetrics,
   CustomerMetrics
 } from '../../utils/analyticsCalculations';
+import { logger } from '@/lib/logger';
 
 interface ExportButtonProps {
   revenue: RevenueMetrics;
@@ -368,7 +369,7 @@ export function ExportButton({ revenue, margin, component, labor, customer, date
       window.URL.revokeObjectURL(url);
 
     } catch (error) {
-      console.error('Export failed:', error);
+      logger.error('Export failed:', error);
       alert('שגיאה בייצוא הנתונים. אנא נסה שנית.');
     } finally {
       setIsExporting(false);

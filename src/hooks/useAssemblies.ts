@@ -14,6 +14,7 @@ import type {
   Component,
 } from '../types';
 import { supabase } from '../supabaseClient';
+import { logger } from '../lib/logger';
 
 interface UseAssembliesReturn {
   assemblies: Assembly[];
@@ -144,7 +145,7 @@ export function useAssemblies(): UseAssembliesReturn {
 
       setAssemblies(mappedAssemblies);
     } catch (err: any) {
-      console.error('Error fetching assemblies:', err);
+      logger.error('Error fetching assemblies:', err);
       setError(err.message || 'Failed to load assemblies');
     } finally {
       setLoading(false);
@@ -212,7 +213,7 @@ export function useAssemblies(): UseAssembliesReturn {
         // Refresh assemblies
         await fetchAssemblies();
       } catch (err: any) {
-        console.error('Error adding assembly:', err);
+        logger.error('Error adding assembly:', err);
         setError(err.message || 'Failed to add assembly');
         throw err;
       }
@@ -303,7 +304,7 @@ export function useAssemblies(): UseAssembliesReturn {
         // Refresh assemblies
         await fetchAssemblies();
       } catch (err: any) {
-        console.error('Error updating assembly:', err);
+        logger.error('Error updating assembly:', err);
         setError(err.message || 'Failed to update assembly');
         throw err;
       }
@@ -326,7 +327,7 @@ export function useAssemblies(): UseAssembliesReturn {
         // Refresh assemblies
         await fetchAssemblies();
       } catch (err: any) {
-        console.error('Error deleting assembly:', err);
+        logger.error('Error deleting assembly:', err);
         setError(err.message || 'Failed to delete assembly');
         throw err;
       }
@@ -361,7 +362,7 @@ export function useAssemblies(): UseAssembliesReturn {
         assemblies,
       };
     } catch (err: any) {
-      console.error('Error checking component usage:', err);
+      logger.error('Error checking component usage:', err);
       return { isUsed: false, assemblies: [] };
     }
   }, []);

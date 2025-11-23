@@ -17,6 +17,7 @@ import { StatusCellEditor, QUOTATION_STATUS_OPTIONS } from '../grid/StatusCellEd
 import { getTableColumnSettings } from '../../constants/settings'
 import { ProjectPicker } from './ProjectPicker'
 import { supabase } from '../../supabaseClient'
+import { logger } from '@/lib/logger'
 
 import 'ag-grid-community/styles/ag-grid.css'
 import 'ag-grid-community/styles/ag-theme-alpine.css'
@@ -153,12 +154,12 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
 
   // Handle column menu click
   const handleColumnMenuClick = useCallback((columnId: string) => {
-    console.log('Column menu clicked:', columnId)
+    logger.debug('Column menu clicked:', columnId)
   }, [])
 
   // Handle filter click
   const handleFilterClick = useCallback((columnId: string) => {
-    console.log('Filter clicked:', columnId)
+    logger.debug('Filter clicked:', columnId)
   }, [])
 
   // Handle edit
@@ -192,7 +193,7 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
         }
       }
     } catch (error) {
-      console.error('Failed to duplicate quotation:', error)
+      logger.error('Failed to duplicate quotation:', error)
       alert('שגיאה בשכפול הצעת מחיר. נסה שוב.')
     }
   }, [duplicateQuotation, onQuotationEdit, setCurrentQuotation])
@@ -214,7 +215,7 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
         }
       }
     } catch (error) {
-      console.error('Failed to create new version:', error)
+      logger.error('Failed to create new version:', error)
       alert('שגיאה ביצירת גרסה חדשה. נסה שוב.')
     }
   }, [duplicateQuotation, onQuotationEdit, setCurrentQuotation])
@@ -316,7 +317,7 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
       cellEditorParams: {
         options: QUOTATION_STATUS_OPTIONS,
         onStatusChange: async (id: string, newStatus: string) => {
-          console.log('QuotationDataGrid - onStatusChange called:', { id, newStatus })
+          logger.debug('QuotationDataGrid - onStatusChange called:', { id, newStatus })
           await updateQuotation(id, { status: newStatus as any })
         }
       },
@@ -418,8 +419,8 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
       ? config.columnOrder
       : defaultOrder
 
-    console.log('QuotationDataGrid - effectiveOrder:', effectiveOrder)
-    console.log('QuotationDataGrid - config.visibleColumns:', config.visibleColumns)
+    logger.debug('QuotationDataGrid - effectiveOrder:', effectiveOrder)
+    logger.debug('QuotationDataGrid - config.visibleColumns:', config.visibleColumns)
 
     // If no visible columns configured, show all columns
     if (!config.visibleColumns || config.visibleColumns.length === 0) {
@@ -437,7 +438,7 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
       .filter(fieldId => visible.some(col => col.field === fieldId))
       .map(fieldId => visible.find(col => col.field === fieldId)!)
 
-    console.log('QuotationDataGrid - ordered:', ordered.map(c => c?.field))
+    logger.debug('QuotationDataGrid - ordered:', ordered.map(c => c?.field))
 
     // Don't reverse! columnDefs is already reversed and AG Grid RTL will handle it
     return ordered.length > 0 ? ordered : visible
@@ -480,7 +481,7 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
   // Handle cell value changes
   const handleCellValueChanged = useCallback(async (params: NewValueParams) => {
     const { data, colDef, newValue, oldValue } = params
-    console.log('🟢 QuotationDataGrid - onCellValueChanged fired:', {
+    logger.debug('🟢 QuotationDataGrid - onCellValueChanged fired:', {
       field: colDef.field,
       oldValue,
       newValue,
@@ -488,18 +489,18 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
     })
 
     if (newValue === oldValue) {
-      console.log('No change detected, skipping update')
+      logger.debug('No change detected, skipping update')
       return
     }
 
     try {
-      console.log('Updating quotation field:', colDef.field)
+      logger.debug('Updating quotation field:', colDef.field)
       await updateQuotation(data.id, {
         [colDef.field!]: newValue
       })
-      console.log('✅ Quotation updated successfully')
+      logger.debug('✅ Quotation updated successfully')
     } catch (error) {
-      console.error('❌ Failed to update quotation:', error)
+      logger.error('❌ Failed to update quotation:', error)
       // Revert change in grid
       if (params.node) {
         params.node.setDataValue(colDef.field!, oldValue)
@@ -515,7 +516,7 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
       await deleteQuotation(deleteDialog.quotation.id)
       setDeleteDialog({ open: false })
     } catch (error) {
-      console.error('Failed to delete quotation:', error)
+      logger.error('Failed to delete quotation:', error)
     }
   }, [deleteDialog.quotation, deleteQuotation])
 
@@ -576,7 +577,7 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
       columns?.forEach((col: any) => {
         widths[col.getColId()] = col.getActualWidth()
       })
-      console.log('Column resized, saving widths:', widths)
+      logger.debug('Column resized, saving widths:', widths)
       saveConfig({ columnWidths: widths })
     }
   }, [saveConfig])
@@ -587,7 +588,7 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
       const displayedOrder = params.api.getAllDisplayedColumns()?.map((col: any) => col.getColId()) || []
       // Reverse because AG Grid gives us reversed order in RTL
       const actualOrder = [...displayedOrder].reverse()
-      console.log('Column moved - displayed:', displayedOrder, 'saving:', actualOrder)
+      logger.debug('Column moved - displayed:', displayedOrder, 'saving:', actualOrder)
       saveConfig({ columnOrder: actualOrder })
     }
   }, [saveConfig])
@@ -646,7 +647,7 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
         }
       }
     } catch (error) {
-      console.error('Failed to create quotation:', error)
+      logger.error('Failed to create quotation:', error)
       alert('שגיאה ביצירת הצעת מחיר')
     } finally {
       setCreatingNew(false)

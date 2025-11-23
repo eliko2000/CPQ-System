@@ -1,6 +1,7 @@
 import React, { forwardRef, useImperativeHandle, useState, useRef, useEffect } from 'react'
 import { ICellEditorParams } from 'ag-grid-community'
 import { toast } from 'sonner'
+import { logger } from '@/lib/logger'
 
 export interface StatusOption {
   value: string
@@ -25,12 +26,12 @@ export const StatusCellEditor = forwardRef((props: StatusCellEditorProps, ref) =
 
   useImperativeHandle(ref, () => ({
     getValue() {
-      console.log('getValue() called, returning:', value)
+      logger.debug('getValue() called, returning:', value)
       return value
     },
     isCancelAfterEnd() {
       const shouldCancel = value === props.value
-      console.log('isCancelAfterEnd() called:', { value, propsValue: props.value, shouldCancel })
+      logger.debug('isCancelAfterEnd() called:', { value, propsValue: props.value, shouldCancel })
       return shouldCancel
     }
   }))
@@ -38,7 +39,7 @@ export const StatusCellEditor = forwardRef((props: StatusCellEditorProps, ref) =
   const handleChange = async (event: React.ChangeEvent<HTMLSelectElement>) => {
     const newValue = event.target.value
     const oldValue = props.value
-    console.log('StatusCellEditor - Value changed:', { old: oldValue, new: newValue })
+    logger.debug('StatusCellEditor - Value changed:', { old: oldValue, new: newValue })
 
     // Update local state
     setValue(newValue)
@@ -46,7 +47,7 @@ export const StatusCellEditor = forwardRef((props: StatusCellEditorProps, ref) =
     // If we have a custom status change handler, use it (same as modal approach)
     if (props.onStatusChange && props.data?.id) {
       try {
-        console.log('StatusCellEditor - Calling onStatusChange handler')
+        logger.debug('StatusCellEditor - Calling onStatusChange handler')
         await props.onStatusChange(props.data.id, newValue)
 
         // Update the cell data
@@ -56,9 +57,9 @@ export const StatusCellEditor = forwardRef((props: StatusCellEditorProps, ref) =
         }
 
         toast.success('הסטטוס עודכן בהצלחה')
-        console.log('StatusCellEditor - Status updated successfully')
+        logger.debug('StatusCellEditor - Status updated successfully')
       } catch (error) {
-        console.error('StatusCellEditor - Failed to update status:', error)
+        logger.error('StatusCellEditor - Failed to update status:', error)
         toast.error('שגיאה בעדכון סטטוס')
 
         // Revert to old value on error

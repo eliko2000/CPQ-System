@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
+import { logger } from '../lib/logger'
 
 type Theme = 'dark' | 'light' | 'system'
 
@@ -43,7 +44,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     try {
       localStorage.setItem('cpq-theme', theme)
     } catch (e) {
-      console.warn('Failed to save theme preference:', e)
+      logger.warn('Failed to save theme preference:', e)
     }
   }, [theme, systemTheme])
 
@@ -55,7 +56,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         setTheme(saved)
       }
     } catch (e) {
-      console.warn('Failed to load theme preference:', e)
+      logger.warn('Failed to load theme preference:', e)
     }
   }, [])
 

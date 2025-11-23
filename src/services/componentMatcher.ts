@@ -16,6 +16,7 @@ import type { AIExtractedComponent } from './claudeAI';
 import Fuse from 'fuse.js';
 import { compareTwoStrings } from 'string-similarity';
 import Anthropic from '@anthropic-ai/sdk';
+import { logger } from '@/lib/logger';
 
 // ============================================
 // Types
@@ -144,7 +145,7 @@ async function exactMatch(
 
     return dbToComponent(data);
   } catch (error) {
-    console.error('Exact match error:', error);
+    logger.error('Exact match error:', error);
     return null;
   }
 }
@@ -167,7 +168,7 @@ async function fuzzyMatch(
       .select('*');
 
     if (error || !allComponents) {
-      console.error('Error fetching components for fuzzy match:', error);
+      logger.error('Error fetching components for fuzzy match:', error);
       return [];
     }
 
@@ -217,7 +218,7 @@ async function fuzzyMatch(
     // Sort by match score (best first)
     return candidates.sort((a, b) => b.matchScore - a.matchScore);
   } catch (error) {
-    console.error('Fuzzy match error:', error);
+    logger.error('Fuzzy match error:', error);
     return [];
   }
 }
@@ -240,7 +241,7 @@ async function aiSemanticMatch(
   try {
     const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
     if (!apiKey) {
-      console.error('Anthropic API key not configured');
+      logger.error('Anthropic API key not configured');
       return [];
     }
 
@@ -306,7 +307,7 @@ Do not include any other text, just the JSON array.`;
     // Extract JSON from response
     const jsonMatch = responseText.match(/\[[\s\S]*\]/);
     if (!jsonMatch) {
-      console.error('AI response did not contain valid JSON:', responseText);
+      logger.error('AI response did not contain valid JSON:', responseText);
       return [];
     }
 
@@ -314,7 +315,7 @@ Do not include any other text, just the JSON array.`;
     return results;
 
   } catch (error) {
-    console.error('AI semantic match error:', error);
+    logger.error('AI semantic match error:', error);
     return [];
   }
 }
@@ -332,14 +333,14 @@ export async function findComponentMatches(
 ): Promise<MatchResult> {
 
   // TIER 1: Try exact match first (fastest)
-  console.log('🔍 Tier 1: Checking for exact match...');
+  logger.debug('🔍 Tier 1: Checking for exact match...');
   const exactResult = await exactMatch(
     newComponent.manufacturer,
     newComponent.manufacturerPN
   );
 
   if (exactResult) {
-    console.log('✅ Exact match found!');
+    logger.debug('✅ Exact match found!');
     return {
       matchType: 'exact',
       matches: [{
@@ -352,11 +353,11 @@ export async function findComponentMatches(
   }
 
   // TIER 2: Try fuzzy match
-  console.log('🔍 Tier 2: Running fuzzy logic match...');
+  logger.debug('🔍 Tier 2: Running fuzzy logic match...');
   const fuzzyResults = await fuzzyMatch(newComponent);
 
   if (fuzzyResults.length === 0) {
-    console.log('❌ No fuzzy matches found - this is a new component');
+    logger.debug('❌ No fuzzy matches found - this is a new component');
     return {
       matchType: 'none',
       matches: [],
@@ -365,11 +366,11 @@ export async function findComponentMatches(
   }
 
   const bestFuzzyMatch = fuzzyResults[0];
-  console.log(`📊 Best fuzzy match: ${(bestFuzzyMatch.matchScore * 100).toFixed(0)}% confidence`);
+  logger.debug(`📊 Best fuzzy match: ${(bestFuzzyMatch.matchScore * 100).toFixed(0)}% confidence`);
 
   // High confidence fuzzy match (90%+) - suggest immediately
   if (bestFuzzyMatch.matchScore >= FUZZY_MATCH_THRESHOLDS.HIGH_CONFIDENCE) {
-    console.log('✅ High confidence fuzzy match found!');
+    logger.debug('✅ High confidence fuzzy match found!');
     return {
       matchType: 'fuzzy',
       matches: fuzzyResults.slice(0, 3).map(r => ({
@@ -383,7 +384,7 @@ export async function findComponentMatches(
 
   // Medium confidence fuzzy match (70-89%) - use AI to verify
   if (bestFuzzyMatch.matchScore >= FUZZY_MATCH_THRESHOLDS.MEDIUM_CONFIDENCE) {
-    console.log('🤖 Tier 3: Using AI to verify medium-confidence matches...');
+    logger.debug('🤖 Tier 3: Using AI to verify medium-confidence matches...');
 
     const topCandidates = fuzzyResults.slice(0, 3).map(r => r.component);
     const aiResults = await aiSemanticMatch(newComponent, topCandidates);
@@ -394,7 +395,7 @@ export async function findComponentMatches(
       .sort((a, b) => b.confidence - a.confidence)[0];
 
     if (bestAIMatch) {
-      console.log('✅ AI verified match found!');
+      logger.debug('✅ AI verified match found!');
       const matchedComponent = topCandidates[bestAIMatch.componentIndex - 1];
       return {
         matchType: 'ai',
@@ -409,7 +410,7 @@ export async function findComponentMatches(
   }
 
   // No good matches found - it's a new component
-  console.log('❌ No confident matches found - this appears to be a new component');
+  logger.debug('❌ No confident matches found - this appears to be a new component');
   return {
     matchType: 'none',
     matches: [],

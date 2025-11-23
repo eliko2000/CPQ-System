@@ -613,6 +613,7 @@ export interface DbQuotationItem {
   id: string;
   quotation_system_id: string;
   component_id?: string;
+  assembly_id?: string; // Link to assembly if this item represents an assembly
   item_name: string;
   manufacturer?: string;
   manufacturer_part_number?: string;

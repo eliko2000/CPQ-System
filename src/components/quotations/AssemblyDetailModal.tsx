@@ -90,75 +90,76 @@ export function AssemblyDetailModal({ assembly, isOpen, onClose }: AssemblyDetai
 
           {/* Components List */}
           <div>
-            <h3 className="font-semibold mb-3 flex items-center gap-2">
+            <h3 className="font-semibold mb-2 flex items-center gap-2">
               <Package className="h-4 w-4" />
               רכיבים בהרכבה ({assembly.components.length})
             </h3>
-            <div className="border rounded-lg divide-y">
+            <div className="border rounded-lg overflow-hidden">
               {assembly.components.length === 0 ? (
-                <div className="p-8 text-center text-muted-foreground">
+                <div className="p-6 text-center text-muted-foreground text-sm">
                   אין רכיבים בהרכבה זו
                 </div>
               ) : (
-                assembly.components.map((assemblyComp, index) => {
-                  const component = assemblyComp.component;
-                  const isDeleted = !component || !assemblyComp.componentId;
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/50">
+                    <tr className="border-b">
+                      <th className="text-right p-2 font-semibold">שם</th>
+                      <th className="text-right p-2 font-semibold">יצרן / מק"ט</th>
+                      <th className="text-center p-2 font-semibold">כמות</th>
+                      <th className="text-left p-2 font-semibold">מחיר יחידה</th>
+                      <th className="text-left p-2 font-semibold">סה"כ</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {assembly.components.map((assemblyComp, index) => {
+                      const component = assemblyComp.component;
+                      const isDeleted = !component || !assemblyComp.componentId;
 
-                  return (
-                    <div key={assemblyComp.id || index} className="p-4">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <h4 className={`font-medium ${isDeleted ? 'text-muted-foreground line-through' : ''}`}>
-                              {assemblyComp.componentName || 'רכיב לא ידוע'}
-                            </h4>
-                            {isDeleted && (
-                              <Badge variant="destructive" className="text-xs">
-                                נמחק
-                              </Badge>
-                            )}
-                          </div>
-
-                          {component && (
-                            <>
-                              <div className="text-sm text-muted-foreground mt-1">
-                                {component.manufacturer} • {component.manufacturerPN}
-                              </div>
-                              <div className="text-sm text-muted-foreground">
-                                {component.category}
-                              </div>
-                            </>
-                          )}
-
-                          {!component && assemblyComp.componentManufacturer && (
-                            <div className="text-sm text-muted-foreground mt-1">
-                              {assemblyComp.componentManufacturer} • {assemblyComp.componentPartNumber}
+                      return (
+                        <tr key={assemblyComp.id || index} className="hover:bg-muted/30">
+                          <td className="p-2">
+                            <div className="flex items-center gap-2">
+                              <span className={`font-medium ${isDeleted ? 'text-muted-foreground line-through' : ''}`}>
+                                {assemblyComp.componentName || 'רכיב לא ידוע'}
+                              </span>
+                              {isDeleted && (
+                                <Badge variant="destructive" className="text-xs px-1 py-0">
+                                  נמחק
+                                </Badge>
+                              )}
                             </div>
-                          )}
-                        </div>
-
-                        <div className="text-left ml-4">
-                          <div className="text-sm text-muted-foreground">כמות</div>
-                          <div className="font-medium">{assemblyComp.quantity}</div>
-
-                          {component && (
-                            <>
-                              <div className="text-sm text-muted-foreground mt-2">מחיר יחידה</div>
-                              <div className="font-mono text-sm">
-                                ₪{component.unitCostNIS?.toLocaleString('he-IL', { minimumFractionDigits: 2 })}
-                              </div>
-
-                              <div className="text-sm text-muted-foreground mt-2">סה"כ</div>
-                              <div className="font-mono font-semibold">
-                                ₪{(component.unitCostNIS * assemblyComp.quantity).toLocaleString('he-IL', { minimumFractionDigits: 2 })}
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })
+                          </td>
+                          <td className="p-2 text-muted-foreground">
+                            {component ? (
+                              <span>{component.manufacturer} • {component.manufacturerPN}</span>
+                            ) : assemblyComp.componentManufacturer ? (
+                              <span>{assemblyComp.componentManufacturer} • {assemblyComp.componentPartNumber}</span>
+                            ) : (
+                              <span>—</span>
+                            )}
+                          </td>
+                          <td className="p-2 text-center font-medium">
+                            {assemblyComp.quantity}
+                          </td>
+                          <td className="p-2 font-mono text-left">
+                            {component ? (
+                              `₪${component.unitCostNIS?.toLocaleString('he-IL', { minimumFractionDigits: 2 })}`
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </td>
+                          <td className="p-2 font-mono font-semibold text-left">
+                            {component ? (
+                              `₪${(component.unitCostNIS * assemblyComp.quantity).toLocaleString('he-IL', { minimumFractionDigits: 2 })}`
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               )}
             </div>
           </div>

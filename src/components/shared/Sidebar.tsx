@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import { Button } from '../ui/button'
+import { logger } from '@/lib/logger'
 
 export function Sidebar() {
   const { uiState, setActiveView, toggleSidebar, currentQuotation, setCurrentQuotation } = useCPQ()
@@ -95,7 +96,7 @@ export function Sidebar() {
           setLogoUrl(result.data.logoUrl)
         }
       } catch (error) {
-        console.error('Error loading logo:', error)
+        logger.error('Error loading logo:', error)
       }
     }
     loadLogo()

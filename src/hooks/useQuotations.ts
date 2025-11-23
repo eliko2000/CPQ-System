@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
 import { DbQuotation, DbQuotationSystem, DbQuotationItem } from '../types'
+import { logger } from '../lib/logger'
 
 export function useQuotations() {
   const [quotations, setQuotations] = useState<DbQuotation[]>([])
@@ -71,7 +72,7 @@ export function useQuotations() {
   const updateQuotation = async (id: string, updates: Partial<DbQuotation>) => {
     try {
       setError(null)
-      console.log('useQuotations - updateQuotation called:', { id, updates })
+      logger.debug('useQuotations - updateQuotation called:', { id, updates })
 
       const { data, error } = await supabase
         .from('quotations')
@@ -82,7 +83,7 @@ export function useQuotations() {
 
       if (error) throw error
 
-      console.log('useQuotations - Database updated, returned data:', data)
+      logger.debug('useQuotations - Database updated, returned data:', data)
 
       // Only update the changed fields, preserve nested quotation_systems
       setQuotations(prev => {
@@ -90,12 +91,12 @@ export function useQuotations() {
           if (quot.id === id) {
             // Merge only the updated fields, don't overwrite nested data
             const merged = { ...quot, ...updates }
-            console.log('useQuotations - Merging quotation:', { old: quot, updates, merged })
+            logger.debug('useQuotations - Merging quotation:', { old: quot, updates, merged })
             return merged
           }
           return quot
         })
-        console.log('useQuotations - State updated with new quotations array')
+        logger.debug('useQuotations - State updated with new quotations array')
         return updated
       })
       return data

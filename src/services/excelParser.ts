@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx';
 import type { AIExtractionResult, AIExtractedComponent } from './claudeAI';
 import { getComponentCategories } from '../constants/settings';
+import { logger } from '@/lib/logger';
 
 /**
  * Metadata specific to Excel file parsing
@@ -623,7 +624,7 @@ export async function parseExcelFile(file: File): Promise<AIExtractionResult> {
     };
 
   } catch (error) {
-    console.error('Excel parsing error:', error);
+    logger.error('Excel parsing error:', error);
 
     return {
       success: false,

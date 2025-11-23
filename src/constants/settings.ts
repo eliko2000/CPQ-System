@@ -7,6 +7,7 @@
  */
 
 import { loadSetting } from '@/services/settingsService'
+import { logger } from '@/lib/logger'
 
 // ============ Component Categories ============
 
@@ -148,7 +149,7 @@ export function getComponentCategories(): string[] {
       }
     }
   } catch (error) {
-    console.error('Error loading component categories from cache:', error);
+    logger.error('Error loading component categories from cache:', error);
   }
   return [...DEFAULT_COMPONENT_CATEGORIES];
 }
@@ -173,7 +174,7 @@ export function getDefaultVisibleColumns(tableType: TableType): string[] {
 
   // Guard against undefined columns (invalid table type)
   if (!columns) {
-    console.warn(`Invalid table type: "${tableType}". Returning empty array.`);
+    logger.warn(`Invalid table type: "${tableType}". Returning empty array.`);
     return [];
   }
 
@@ -188,7 +189,7 @@ export function getTableColumnSettings(tableType: TableType): string[] {
   try {
     // Guard against invalid table types
     if (!TABLE_COLUMN_DEFINITIONS[tableType]) {
-      console.warn(`Invalid table type: "${tableType}". Returning empty array.`);
+      logger.warn(`Invalid table type: "${tableType}". Returning empty array.`);
       return [];
     }
 
@@ -210,7 +211,7 @@ export function getTableColumnSettings(tableType: TableType): string[] {
       }
     }
   } catch (error) {
-    console.error('Error loading table column settings from cache:', error);
+    logger.error('Error loading table column settings from cache:', error);
   }
   return getDefaultVisibleColumns(tableType);
 }

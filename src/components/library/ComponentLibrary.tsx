@@ -23,6 +23,7 @@ import { EnhancedComponentGrid } from './EnhancedComponentGrid'
 import { SupplierQuoteImport } from '../supplier-quotes/SupplierQuoteImport'
 import { useComponents } from '../../hooks/useComponents'
 import { toast } from 'sonner'
+import { logger } from '@/lib/logger'
 
 export function ComponentLibrary() {
   const { components, assemblies, updateComponent, deleteComponent, deleteAssembly, setModal, modalState, closeModal } = useCPQ()
@@ -41,18 +42,18 @@ export function ComponentLibrary() {
   // Handle inline component updates
   const handleComponentUpdate = useCallback(async (componentId: string, field: string, value: any) => {
     try {
-      console.log('🎯 ComponentLibrary.handleComponentUpdate called:', { componentId, field, value })
+      logger.debug('🎯 ComponentLibrary.handleComponentUpdate called:', { componentId, field, value })
       const component = components.find(c => c.id === componentId)
       if (component) {
-        console.log('🎯 Found component:', component)
-        console.log('🎯 Creating update object:', { [field]: value })
+        logger.debug('🎯 Found component:', component)
+        logger.debug('🎯 Creating update object:', { [field]: value })
         await updateComponent(componentId, { [field]: value })
-        console.log('🎯 Update completed successfully')
+        logger.debug('🎯 Update completed successfully')
       } else {
-        console.error('❌ Component not found:', componentId)
+        logger.error('❌ Component not found:', componentId)
       }
     } catch (error) {
-      console.error('❌ Failed to update component:', error)
+      logger.error('❌ Failed to update component:', error)
     }
   }, [components, updateComponent])
 

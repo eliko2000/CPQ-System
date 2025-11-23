@@ -30,6 +30,7 @@ import { DEFAULT_COMPONENT_CATEGORIES, TABLE_COLUMN_DEFINITIONS, getDefaultVisib
 import { CategoryMigrationDialog } from '../ui/CategoryMigrationDialog'
 import { useCPQ } from '@/contexts/CPQContext'
 import { loadSetting, saveSetting, migrateLocalStorageToSupabase } from '@/services/settingsService'
+import { logger } from '@/lib/logger'
 
 interface SettingsData {
   general: {
@@ -556,7 +557,7 @@ function PricingSettings() {
           setPricingSettings(result.data)
         }
       } catch (error) {
-        console.error('Error loading pricing settings:', error)
+        logger.error('Error loading pricing settings:', error)
       } finally {
         setIsLoading(false)
       }
@@ -571,7 +572,7 @@ function PricingSettings() {
       // Dispatch event to notify other components
       window.dispatchEvent(new CustomEvent('cpq-settings-updated'))
     } catch (error) {
-      console.error('Error saving pricing settings:', error)
+      logger.error('Error saving pricing settings:', error)
     }
   }
 
@@ -730,7 +731,7 @@ function QuotationSettings() {
           setLogoUrl(result.data.logoUrl);
         }
       } catch (error) {
-        console.error('Error loading logo:', error);
+        logger.error('Error loading logo:', error);
       } finally {
         setIsLoading(false);
       }
@@ -771,7 +772,7 @@ function QuotationSettings() {
         alert('שגיאה בהעלאת הלוגו: ' + (result.error || 'Unknown error'));
       }
     } catch (error) {
-      console.error('Error uploading logo:', error);
+      logger.error('Error uploading logo:', error);
       alert('שגיאה בהעלאת הלוגו');
     } finally {
       setIsUploading(false);
@@ -796,7 +797,7 @@ function QuotationSettings() {
       // Dispatch event to notify other components
       window.dispatchEvent(new CustomEvent('cpq-logo-updated', { detail: { logoUrl: null } }));
     } catch (error) {
-      console.error('Error removing logo:', error);
+      logger.error('Error removing logo:', error);
       alert('שגיאה במחיקת הלוגו');
     }
   };
@@ -1226,7 +1227,7 @@ function ComponentCategoriesSettings() {
           setCategories([...DEFAULT_COMPONENT_CATEGORIES])
         }
       } catch (error) {
-        console.error('Error loading categories:', error)
+        logger.error('Error loading categories:', error)
         setCategories([...DEFAULT_COMPONENT_CATEGORIES])
       } finally {
         setIsLoading(false)
@@ -1241,7 +1242,7 @@ function ComponentCategoriesSettings() {
       await saveSetting('componentCategories', { categories: updatedCategories })
       notifyCategoriesUpdated()
     } catch (error) {
-      console.error('Error saving categories:', error)
+      logger.error('Error saving categories:', error)
     }
   }
 
@@ -1297,7 +1298,7 @@ function ComponentCategoriesSettings() {
 
       setEditingCategory(null)
     } catch (error) {
-      console.error('Error renaming category:', error)
+      logger.error('Error renaming category:', error)
       alert('שגיאה בשינוי שם הקטגוריה. אנא נסה שוב.')
     } finally {
       setIsSavingRename(false)
@@ -1335,7 +1336,7 @@ function ComponentCategoriesSettings() {
       // Close dialog
       setMigrationDialog({ isOpen: false, categoryToDelete: '', componentCount: 0 })
     } catch (error) {
-      console.error('Error migrating components:', error)
+      logger.error('Error migrating components:', error)
       alert('שגיאה בהעברת הרכיבים. אנא נסה שוב.')
     }
   }
@@ -1527,7 +1528,7 @@ function TableColumnsSettings() {
           })
         }
       } catch (error) {
-        console.error('Error loading table settings:', error)
+        logger.error('Error loading table settings:', error)
       } finally {
         setIsLoading(false)
       }
@@ -1560,7 +1561,7 @@ function TableColumnsSettings() {
       // Notify grids that table column settings have changed
       window.dispatchEvent(new CustomEvent('cpq-settings-updated'))
     } catch (error) {
-      console.error('Error saving table column settings:', error)
+      logger.error('Error saving table column settings:', error)
     }
   }
 
@@ -1579,7 +1580,7 @@ function TableColumnsSettings() {
       // Notify grids that table column settings have changed
       window.dispatchEvent(new CustomEvent('cpq-settings-updated'))
     } catch (error) {
-      console.error('Error saving table column settings:', error)
+      logger.error('Error saving table column settings:', error)
     }
   }
 

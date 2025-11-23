@@ -1,4 +1,5 @@
 import { IFilterComp, IFilterParams, IDoesFilterPassParams } from 'ag-grid-community'
+import { logger } from '@/lib/logger'
 
 export class CustomSetFilter implements IFilterComp {
   private filterValues: string[] = []
@@ -43,7 +44,7 @@ export class CustomSetFilter implements IFilterComp {
           getValue: (field: string) => params.node.data?.[field]
         } as any)
       } catch (e) {
-        console.error('Error getting value:', e)
+        logger.error('Error getting value:', e)
       }
     }
 

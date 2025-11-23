@@ -4,6 +4,7 @@ import { IntelligentDocumentUpload } from './IntelligentDocumentUpload';
 import { AIExtractionPreview } from './AIExtractionPreview';
 import type { AIExtractionResult } from '../../services/claudeAI';
 import type { Component } from '../../types';
+import { logger } from '@/lib/logger'
 
 interface ComponentAIImportProps {
   isOpen: boolean;
@@ -41,7 +42,7 @@ export const ComponentAIImport: React.FC<ComponentAIImportProps> = ({
         handleClose();
       }, 1500);
     } catch (error) {
-      console.error('Import failed:', error);
+      logger.error('Import failed:', error);
       // Reset to preview to allow retry
       setStep('preview');
     }

@@ -19,6 +19,7 @@ import { QuotationStatisticsPanelSimplified } from './QuotationStatisticsPanelSi
 import { AssemblyDetailModal } from './AssemblyDetailModal'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 import { detectOriginalCurrency, convertToAllCurrencies, type ExchangeRates } from '../../utils/currencyConversion'
+import { logger } from '@/lib/logger'
 import 'ag-grid-community/styles/ag-grid.css'
 import 'ag-grid-community/styles/ag-theme-alpine.css'
 
@@ -187,7 +188,7 @@ export function QuotationEditor() {
     filterState: {}
   })
 
-  console.log('🔍 QuotationEditor config loaded:', config)
+  logger.debug('🔍 QuotationEditor config loaded:', config)
 
   // Make components available globally for the LibrarySearchEditor
   useEffect(() => {
@@ -275,7 +276,7 @@ export function QuotationEditor() {
       setCurrentQuotation(updatedQuotation)
       updateQuotation(currentQuotation.id, { systems: updatedQuotation.systems })
     } catch (error) {
-      console.error('Failed to save system:', error)
+      logger.error('Failed to save system:', error)
       alert('שגיאה בהוספת מערכת. נסה שוב.')
     }
   }, [currentQuotation, setCurrentQuotation, updateQuotation, quotationsHook])
@@ -311,7 +312,7 @@ export function QuotationEditor() {
     )
 
     // DEBUG: Log component prices being used
-    console.log('💰 [CURRENCY-ADD] Adding component to quotation:', {
+    logger.debug('💰 [CURRENCY-ADD] Adding component to quotation:', {
       componentName: component.name,
       componentFromLibrary: {
         unitCostILS: component.unitCostNIS,
@@ -398,7 +399,7 @@ export function QuotationEditor() {
       updateQuotation(currentQuotation.id, { items: renumberedItems })
       setShowComponentSelector(false)
     } catch (error) {
-      console.error('Failed to save item:', error)
+      logger.error('Failed to save item:', error)
       alert('שגיאה בהוספת פריט. נסה שוב.')
     }
   }, [currentQuotation, selectedSystemId, setCurrentQuotation, updateQuotation, quotationsHook])
@@ -480,7 +481,7 @@ export function QuotationEditor() {
       updateQuotation(currentQuotation.id, { items: renumberedItems })
       setShowComponentSelector(false)
     } catch (error) {
-      console.error('Failed to add assembly:', error)
+      logger.error('Failed to add assembly:', error)
       alert('שגיאה בהוספת הרכבה. נסה שוב.')
     }
   }, [currentQuotation, selectedSystemId, setCurrentQuotation, updateQuotation, quotationsHook])
@@ -493,7 +494,7 @@ export function QuotationEditor() {
     try {
       await quotationsHook.deleteQuotationItem(itemId)
     } catch (error) {
-      console.error('Failed to delete item:', error)
+      logger.error('Failed to delete item:', error)
     }
 
     // Remove from local state
@@ -527,7 +528,7 @@ export function QuotationEditor() {
         notes: updates.notes
       })
     } catch (error) {
-      console.error('Failed to update item:', error)
+      logger.error('Failed to update item:', error)
     }
 
     // Update local state
@@ -563,7 +564,7 @@ export function QuotationEditor() {
         eurToIlsRate: parameters.eurToIlsRate
       }
 
-      console.log('🔄 Exchange rates changed, recalculating item prices:', {
+      logger.debug('🔄 Exchange rates changed, recalculating item prices:', {
         oldRates: {
           usdToIlsRate: currentQuotation.parameters.usdToIlsRate,
           eurToIlsRate: currentQuotation.parameters.eurToIlsRate
@@ -582,7 +583,7 @@ export function QuotationEditor() {
           item.originalCurrency // Use stored original currency if available
         )
 
-        console.log(`  📦 ${item.componentName}:`, {
+        logger.debug(`  📦 ${item.componentName}:`, {
           originalCurrency,
           originalAmount,
           storedOriginalCurrency: item.originalCurrency,
@@ -624,11 +625,11 @@ export function QuotationEditor() {
 
   // Handle project selection
   const handleProjectSelect = useCallback(async (project: any) => {
-    console.log('🔵 handleProjectSelect called with project:', project)
-    console.log('🔵 Current quotation:', currentQuotation)
+    logger.debug('🔵 handleProjectSelect called with project:', project)
+    logger.debug('🔵 Current quotation:', currentQuotation)
 
     if (!currentQuotation) {
-      console.error('❌ No current quotation!')
+      logger.error('❌ No current quotation!')
       return
     }
 
@@ -639,15 +640,15 @@ export function QuotationEditor() {
         project_name: project.projectName,
         customer_name: project.companyName
       }
-      console.log('🔵 Preparing database updates:', updates)
+      logger.debug('🔵 Preparing database updates:', updates)
 
       // Update in database using the Supabase hook directly
-      console.log('🔵 Calling quotationsHook.updateQuotation...')
+      logger.debug('🔵 Calling quotationsHook.updateQuotation...')
       await quotationsHook.updateQuotation(currentQuotation.id, updates)
-      console.log('✅ Database update completed successfully')
+      logger.debug('✅ Database update completed successfully')
 
       // Update local state after successful database update
-      console.log('🔵 Updating local CPQ context state...')
+      logger.debug('🔵 Updating local CPQ context state...')
       updateQuotation(currentQuotation.id, {
         projectId: project.id,
         projectName: project.projectName,
@@ -661,14 +662,14 @@ export function QuotationEditor() {
         projectName: project.projectName,
         customerName: project.companyName
       })
-      console.log('✅ Local state updated')
+      logger.debug('✅ Local state updated')
 
       // Show success message
       const { toast } = await import('sonner')
       toast.success('הפרויקט עודכן בהצלחה')
-      console.log('✅ Success toast shown')
+      logger.debug('✅ Success toast shown')
     } catch (error) {
-      console.error('❌ Failed to update project:', error)
+      logger.error('❌ Failed to update project:', error)
       const { toast } = await import('sonner')
       toast.error('שגיאה בעדכון פרויקט')
     }
@@ -676,12 +677,12 @@ export function QuotationEditor() {
 
   // Handle column menu click
   const handleColumnMenuClick = useCallback((columnId: string) => {
-    console.log('Column menu clicked:', columnId)
+    logger.debug('Column menu clicked:', columnId)
   }, [])
 
   // Handle filter click
   const handleFilterClick = useCallback((columnId: string) => {
-    console.log('Filter clicked:', columnId)
+    logger.debug('Filter clicked:', columnId)
   }, [])
 
   // Get unique values for a specific field for filtering
@@ -1148,7 +1149,7 @@ export function QuotationEditor() {
                     setCurrentQuotation(updatedQuotation)
                     updateQuotation(currentQuotation.id, { systems: updatedSystems, items: renumberedItems })
                   } catch (error) {
-                    console.error('Failed to delete system:', error)
+                    logger.error('Failed to delete system:', error)
                     alert('שגיאה במחיקת מערכת. נסה שוב.')
                   }
                 }}
@@ -1208,8 +1209,8 @@ export function QuotationEditor() {
     // Default column order if not configured
     const defaultOrder = ['actions', 'displayNumber', 'componentName', 'quantity', 'unitPriceILS', 'totalPriceUSD', 'totalPriceILS', 'customerPriceILS']
 
-    console.log('🔍 config.visibleColumns:', config.visibleColumns)
-    console.log('🔍 config.columnOrder:', config.columnOrder)
+    logger.debug('🔍 config.visibleColumns:', config.visibleColumns)
+    logger.debug('🔍 config.columnOrder:', config.columnOrder)
 
     // Use saved order if exists and not empty, otherwise use default
     const effectiveOrder = (config.columnOrder && config.columnOrder.length > 0)
@@ -1221,7 +1222,7 @@ export function QuotationEditor() {
       ? (config.visibleColumns.includes('actions') ? config.visibleColumns : ['actions', ...config.visibleColumns])
       : defaultOrder
 
-    console.log('🔍 ensuredVisibleColumns:', ensuredVisibleColumns)
+    logger.debug('🔍 ensuredVisibleColumns:', ensuredVisibleColumns)
 
     const visible = columnDefs.filter(col => ensuredVisibleColumns.includes(col.field!))
 
@@ -1234,8 +1235,8 @@ export function QuotationEditor() {
       .filter(fieldId => visible.some(col => col.field === fieldId))
       .map(fieldId => visible.find(col => col.field === fieldId)!)
 
-    console.log('🔍 effectiveOrder was:', effectiveOrder)
-    console.log('🔍 Final ordered columns:', ordered.map(c => c.field))
+    logger.debug('🔍 effectiveOrder was:', effectiveOrder)
+    logger.debug('🔍 Final ordered columns:', ordered.map(c => c.field))
 
     // AG Grid with enableRtl={true} does NOT reverse the array - just the visual layout
     // So we use the column order as-is
@@ -1401,7 +1402,7 @@ export function QuotationEditor() {
 
   // Calculate statistics
   const statistics = useMemo(() => {
-    console.log('🔍 STATISTICS CHECK:', {
+    logger.debug('🔍 STATISTICS CHECK:', {
       hasQuotation: !!currentQuotation,
       hasCalculations: !!calculations,
       itemsCount: currentQuotation?.items?.length || 0,
@@ -1420,7 +1421,7 @@ export function QuotationEditor() {
     try {
       return calculateQuotationStatistics(quotationWithCalcs)
     } catch (error) {
-      console.error('Failed to calculate statistics:', error)
+      logger.error('Failed to calculate statistics:', error)
       return null
     }
   }, [currentQuotation, calculations])

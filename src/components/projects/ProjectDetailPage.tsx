@@ -20,6 +20,7 @@ import { StatusCellEditor, QUOTATION_STATUS_OPTIONS } from '../grid/StatusCellEd
 import { DbProject, DbQuotation, ProjectFormData, ProjectStatus } from '../../types'
 import { toast } from 'sonner'
 import { supabase } from '../../supabaseClient'
+import { logger } from '@/lib/logger'
 
 import 'ag-grid-community/styles/ag-grid.css'
 import 'ag-grid-community/styles/ag-theme-alpine.css'
@@ -96,7 +97,7 @@ export function ProjectDetailPage({ projectId, onBack, onViewQuotation, onCreate
       setProject(projectData)
       setQuotations(quotationsData)
     } catch (error) {
-      console.error('Failed to load project:', error)
+      logger.error('Failed to load project:', error)
       toast.error('שגיאה בטעינת הפרויקט')
     } finally {
       setLoading(false)
@@ -157,7 +158,7 @@ export function ProjectDetailPage({ projectId, onBack, onViewQuotation, onCreate
       cellEditorParams: {
         options: QUOTATION_STATUS_OPTIONS,
         onStatusChange: async (id: string, newStatus: string) => {
-          console.log('ProjectDetailPage - onStatusChange called:', { id, newStatus })
+          logger.debug('ProjectDetailPage - onStatusChange called:', { id, newStatus })
           const { error } = await supabase
             .from('quotations')
             .update({ status: newStatus })
@@ -230,7 +231,7 @@ export function ProjectDetailPage({ projectId, onBack, onViewQuotation, onCreate
       toast.success('הפרויקט עודכן בהצלחה')
       setIsEditFormOpen(false)
     } catch (error) {
-      console.error('Failed to update project:', error)
+      logger.error('Failed to update project:', error)
       throw error
     }
   }

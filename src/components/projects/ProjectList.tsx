@@ -14,6 +14,7 @@ import { ProjectFormModal } from './ProjectFormModal'
 import { ProjectSummary, ProjectFormData, ProjectStatus } from '../../types'
 import { ConfirmDialog } from '../ui/ConfirmDialog'
 import { toast } from 'sonner'
+import { logger } from '@/lib/logger'
 
 import 'ag-grid-community/styles/ag-grid.css'
 import 'ag-grid-community/styles/ag-theme-alpine.css'
@@ -127,11 +128,11 @@ export function ProjectList({ onViewProject }: ProjectListProps = {}) {
 
   // Handle column menu and filter clicks
   const handleColumnMenuClick = useCallback((columnId: string) => {
-    console.log('Column menu clicked:', columnId)
+    logger.debug('Column menu clicked:', columnId)
   }, [])
 
   const handleFilterClick = useCallback((columnId: string) => {
-    console.log('Filter clicked:', columnId)
+    logger.debug('Filter clicked:', columnId)
   }, [])
 
   // Column definitions with CustomHeader for enhanced filtering
@@ -189,7 +190,7 @@ export function ProjectList({ onViewProject }: ProjectListProps = {}) {
       cellEditorParams: {
         options: PROJECT_STATUS_OPTIONS,
         onStatusChange: async (id: string, newStatus: string) => {
-          console.log('ProjectList - onStatusChange called:', { id, newStatus })
+          logger.debug('ProjectList - onStatusChange called:', { id, newStatus })
           await updateProject(id, { status: newStatus as any })
         }
       },
@@ -289,7 +290,7 @@ export function ProjectList({ onViewProject }: ProjectListProps = {}) {
       setIsFormOpen(false)
       setEditingProject(null)
     } catch (error) {
-      console.error('Failed to save project:', error)
+      logger.error('Failed to save project:', error)
       throw error
     }
   }
@@ -323,7 +324,7 @@ export function ProjectList({ onViewProject }: ProjectListProps = {}) {
         await deleteProject(deleteConfirm.projectId)
         toast.success('הפרויקט נמחק בהצלחה')
       } catch (error) {
-        console.error('Failed to delete project:', error)
+        logger.error('Failed to delete project:', error)
         toast.error('שגיאה במחיקת הפרויקט')
       }
       setDeleteConfirm({ isOpen: false, projectId: null, projectName: '' })
@@ -343,7 +344,7 @@ export function ProjectList({ onViewProject }: ProjectListProps = {}) {
 
   // Handle cell value changed
   const handleCellValueChanged = useCallback((event: any) => {
-    console.log('🟢 onCellValueChanged fired:', {
+    logger.debug('🟢 onCellValueChanged fired:', {
       field: event.colDef.field,
       oldValue: event.oldValue,
       newValue: event.newValue,

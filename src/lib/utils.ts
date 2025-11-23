@@ -93,6 +93,7 @@ export function convertDbQuotationToQuotationProject(dbQuotation: DbQuotation): 
         itemOrder,
         displayNumber: `${systemOrder}.${itemOrder}`,
         componentId: dbItem.component_id,
+        assemblyId: dbItem.assembly_id, // CRITICAL: Preserve assembly link for assembly items
         componentName: dbItem.item_name,
         componentCategory: dbItem.component?.category || 'כללי',
         itemType: dbItem.item_type || 'hardware',

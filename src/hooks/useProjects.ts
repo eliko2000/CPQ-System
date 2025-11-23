@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
 import { DbProject, ProjectSummary, ProjectFormData, DbQuotation } from '../types'
+import { logger } from '../lib/logger'
 
 export function useProjects() {
   const [projects, setProjects] = useState<ProjectSummary[]>([])
@@ -117,7 +118,7 @@ export function useProjects() {
           .eq('project_id', id)
 
         if (quotationError) {
-          console.error('Failed to cascade updates to quotations:', quotationError)
+          logger.error('Failed to cascade updates to quotations:', quotationError)
           // Don't throw - project update succeeded, quotation sync is secondary
         }
       }

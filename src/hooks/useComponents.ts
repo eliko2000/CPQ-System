@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
 import { DbComponent, Component } from '../types'
+import { logger } from '../lib/logger'
 
 // Transform UI Component to DB format
 // Only includes fields that are actually present in the input (for partial updates)
@@ -30,7 +31,7 @@ function componentToDb(component: Partial<Component>): Partial<DbComponent> {
 
 // Transform DB format to UI Component
 function dbToComponent(dbComp: DbComponent): Component {
-  console.log('📥 dbToComponent converting:', {
+  logger.debug('📥 dbToComponent converting:', {
     id: dbComp.id,
     name: dbComp.name,
     component_type: dbComp.component_type,
@@ -110,7 +111,7 @@ function dbToComponent(dbComp: DbComponent): Component {
     updatedAt: dbComp.updated_at
   }
 
-  console.log('📥 dbToComponent result:', {
+  logger.debug('📥 dbToComponent result:', {
     id: result.id,
     name: result.name,
     componentType: result.componentType,
@@ -185,11 +186,11 @@ export function useComponents() {
       setError(null)
 
       // Debug logging
-      console.log('🔍 updateComponent called with:', { id, updates })
+      logger.debug('🔍 updateComponent called with:', { id, updates })
 
       // Transform to DB format
       const dbUpdates = componentToDb(updates)
-      console.log('🔍 Transformed to DB format:', dbUpdates)
+      logger.debug('🔍 Transformed to DB format:', dbUpdates)
 
       const { data, error } = await supabase
         .from('components')
@@ -200,7 +201,7 @@ export function useComponents() {
 
       if (error) throw error
 
-      console.log('✅ Database updated successfully:', data)
+      logger.info('✅ Database updated successfully:', data)
 
       // Update state with DB format
       setComponents(prev =>
@@ -208,7 +209,7 @@ export function useComponents() {
       )
       return data
     } catch (err) {
-      console.error('❌ Update failed:', err)
+      logger.error('❌ Update failed:', err)
       setError(err instanceof Error ? err.message : 'Failed to update component')
       throw err
     }

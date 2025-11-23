@@ -5,6 +5,7 @@
  */
 
 import { supabase } from '@/supabaseClient'
+import { logger } from '@/lib/logger'
 
 const DEFAULT_USER_ID = 'default'
 const SETTINGS_CACHE_KEY = 'cpq-settings-cache'
@@ -30,7 +31,7 @@ export async function loadSetting<T>(settingKey: string): Promise<SettingsServic
       .maybeSingle()
 
     if (error) {
-      console.warn(`Failed to load setting "${settingKey}" from Supabase:`, error)
+      logger.warn(`Failed to load setting "${settingKey}" from Supabase:`, error)
       // Fallback to localStorage
       return loadFromLocalStorage<T>(settingKey)
     }
@@ -44,7 +45,7 @@ export async function loadSetting<T>(settingKey: string): Promise<SettingsServic
     // No data found, try localStorage
     return loadFromLocalStorage<T>(settingKey)
   } catch (error) {
-    console.error(`Error loading setting "${settingKey}":`, error)
+    logger.error(`Error loading setting "${settingKey}":`, error)
     return loadFromLocalStorage<T>(settingKey)
   }
 }
@@ -70,7 +71,7 @@ export async function saveSetting<T>(settingKey: string, settingValue: T): Promi
       )
 
     if (error) {
-      console.error(`Failed to save setting "${settingKey}" to Supabase:`, error)
+      logger.error(`Failed to save setting "${settingKey}" to Supabase:`, error)
       // Still save to localStorage as fallback
       cacheToLocalStorage(settingKey, settingValue)
       return { success: false, error: error.message }
@@ -82,7 +83,7 @@ export async function saveSetting<T>(settingKey: string, settingValue: T): Promi
 
     return { success: true, data: settingValue }
   } catch (error) {
-    console.error(`Error saving setting "${settingKey}":`, error)
+    logger.error(`Error saving setting "${settingKey}":`, error)
     // Save to localStorage as fallback
     cacheToLocalStorage(settingKey, settingValue)
     return { success: false, error: String(error) }
@@ -100,7 +101,7 @@ export async function loadAllSettings(): Promise<SettingsServiceResult<Record<st
       .eq('user_id', DEFAULT_USER_ID)
 
     if (error) {
-      console.warn('Failed to load all settings from Supabase:', error)
+      logger.warn('Failed to load all settings from Supabase:', error)
       return loadAllFromLocalStorage()
     }
 
@@ -120,7 +121,7 @@ export async function loadAllSettings(): Promise<SettingsServiceResult<Record<st
 
     return loadAllFromLocalStorage()
   } catch (error) {
-    console.error('Error loading all settings:', error)
+    logger.error('Error loading all settings:', error)
     return loadAllFromLocalStorage()
   }
 }
@@ -157,11 +158,11 @@ export async function migrateLocalStorageToSupabase(): Promise<SettingsServiceRe
 
     // Mark migration as complete
     localStorage.setItem(migrationKey, 'true')
-    console.log('Successfully migrated settings to Supabase')
+    logger.info('Successfully migrated settings to Supabase')
 
     return { success: true }
   } catch (error) {
-    console.error('Error migrating settings:', error)
+    logger.error('Error migrating settings:', error)
     return { success: false, error: String(error) }
   }
 }
@@ -178,7 +179,7 @@ export async function deleteSetting(settingKey: string): Promise<SettingsService
       .eq('setting_key', settingKey)
 
     if (error) {
-      console.error(`Failed to delete setting "${settingKey}":`, error)
+      logger.error(`Failed to delete setting "${settingKey}":`, error)
       return { success: false, error: error.message }
     }
 
@@ -187,7 +188,7 @@ export async function deleteSetting(settingKey: string): Promise<SettingsService
 
     return { success: true }
   } catch (error) {
-    console.error(`Error deleting setting "${settingKey}":`, error)
+    logger.error(`Error deleting setting "${settingKey}":`, error)
     return { success: false, error: String(error) }
   }
 }
@@ -245,7 +246,7 @@ function cacheToLocalStorage<T>(settingKey: string, settingValue: T): void {
     settings[settingKey] = settingValue
     localStorage.setItem(SETTINGS_CACHE_KEY, JSON.stringify(settings))
   } catch (error) {
-    console.error('Error caching to localStorage:', error)
+    logger.error('Error caching to localStorage:', error)
   }
 }
 
@@ -258,7 +259,7 @@ function removeFromLocalStorageCache(settingKey: string): void {
       localStorage.setItem(SETTINGS_CACHE_KEY, JSON.stringify(settings))
     }
   } catch (error) {
-    console.error('Error removing from localStorage cache:', error)
+    logger.error('Error removing from localStorage cache:', error)
   }
 }
 

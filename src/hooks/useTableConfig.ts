@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../supabaseClient'
 import { getTableColumnSettings, TableType } from '../constants/settings'
+import { logger } from '../lib/logger'
 
 export interface TableConfig {
   columnOrder: string[]
@@ -28,7 +29,7 @@ export function useTableConfig(tableName: string, defaultConfig: TableConfig) {
   // Listen for settings updates and reload visible columns
   useEffect(() => {
     const handleSettingsUpdate = () => {
-      console.log(`[useTableConfig] Settings updated, reloading visible columns for ${tableName}`)
+      logger.debug(`[useTableConfig] Settings updated, reloading visible columns for ${tableName}`)
       const newVisibleColumns = getTableColumnSettings(tableName as TableType)
       setConfig(prev => ({ ...prev, visibleColumns: newVisibleColumns }))
     }
@@ -51,7 +52,7 @@ export function useTableConfig(tableName: string, defaultConfig: TableConfig) {
 
       // Always load visible columns from settings (user_settings table)
       const visibleColumnsFromSettings = getTableColumnSettings(tableName as TableType)
-      console.log(`[useTableConfig] Loaded visible columns from settings for ${tableName}:`, visibleColumnsFromSettings)
+      logger.debug(`[useTableConfig] Loaded visible columns from settings for ${tableName}:`, visibleColumnsFromSettings)
 
       const { data, error } = await supabase
         .from('user_table_configs')
@@ -62,11 +63,11 @@ export function useTableConfig(tableName: string, defaultConfig: TableConfig) {
 
       // Log but don't throw on expected errors (no record yet)
       if (error && error.code !== 'PGRST116') {
-        console.warn(`[useTableConfig] Error loading config for ${tableName}:`, error)
+        logger.warn(`[useTableConfig] Error loading config for ${tableName}:`, error)
       }
 
       if (data?.config) {
-        console.log(`[useTableConfig] Loaded saved config for ${tableName}:`, data.config)
+        logger.debug(`[useTableConfig] Loaded saved config for ${tableName}:`, data.config)
 
         const savedConfig = data.config as SavedTableConfig
 
@@ -83,17 +84,17 @@ export function useTableConfig(tableName: string, defaultConfig: TableConfig) {
           filterState: savedConfig.filterState || {}
         }
 
-        console.log(`[useTableConfig] Merged config for ${tableName}:`, mergedConfig)
+        logger.debug(`[useTableConfig] Merged config for ${tableName}:`, mergedConfig)
         setConfig(mergedConfig)
       } else {
-        console.log(`[useTableConfig] No saved config for ${tableName}, using defaults with settings visible columns`)
+        logger.debug(`[useTableConfig] No saved config for ${tableName}, using defaults with settings visible columns`)
         setConfig({
           ...defaultConfig,
           visibleColumns: visibleColumnsFromSettings // Always from settings
         })
       }
     } catch (err) {
-      console.error('Failed to load table config:', err)
+      logger.error('Failed to load table config:', err)
       // Even on error, use settings for visible columns
       const visibleColumnsFromSettings = getTableColumnSettings(tableName as TableType)
       setConfig({
@@ -120,7 +121,7 @@ export function useTableConfig(tableName: string, defaultConfig: TableConfig) {
         // visibleColumns is intentionally excluded - it's always loaded from user_settings
       }
 
-      console.log(`[useTableConfig] Saving config for ${tableName}:`, configToSave)
+      logger.debug(`[useTableConfig] Saving config for ${tableName}:`, configToSave)
 
       const { error } = await supabase
         .from('user_table_configs')
@@ -134,12 +135,12 @@ export function useTableConfig(tableName: string, defaultConfig: TableConfig) {
         })
 
       if (error) {
-        console.error(`[useTableConfig] Error saving config:`, error)
+        logger.error(`[useTableConfig] Error saving config:`, error)
       } else {
-        console.log(`[useTableConfig] Successfully saved config for ${tableName}`)
+        logger.debug(`[useTableConfig] Successfully saved config for ${tableName}`)
       }
     } catch (err) {
-      console.error(`[useTableConfig] Failed to save config for ${tableName}:`, err)
+      logger.error(`[useTableConfig] Failed to save config for ${tableName}:`, err)
     }
   }, [config, tableName])
 

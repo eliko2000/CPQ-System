@@ -1,5 +1,6 @@
 import * as pdfjsLib from 'pdfjs-dist';
 import type { AIExtractionResult, AIExtractedComponent } from './claudeAI';
+import { logger } from '@/lib/logger';
 
 // Set up PDF.js worker - use local worker file to avoid CORS issues
 pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
@@ -560,7 +561,7 @@ export async function parsePDFFile(file: File): Promise<AIExtractionResult> {
     };
 
   } catch (error) {
-    console.error('PDF parsing error:', error);
+    logger.error('PDF parsing error:', error);
 
     return {
       success: false,

@@ -16,6 +16,7 @@ import {
 } from '../types';
 import type { AIExtractedComponent } from '../services/claudeAI';
 import { findComponentMatches, MatchResult } from '../services/componentMatcher';
+import { logger } from '../lib/logger';
 
 // ============================================
 // Transform Functions
@@ -108,7 +109,7 @@ export function useSupplierQuotes() {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch quotes';
       setError(errorMessage);
-      console.error('Error fetching supplier quotes:', err);
+      logger.error('Error fetching supplier quotes:', err);
     } finally {
       setLoading(false);
     }
@@ -130,7 +131,7 @@ export function useSupplierQuotes() {
 
       return dbToSupplierQuote(data);
     } catch (err) {
-      console.error('Error fetching quote:', err);
+      logger.error('Error fetching quote:', err);
       return null;
     }
   }, []);
@@ -163,7 +164,7 @@ export function useSupplierQuotes() {
         }))
       };
     } catch (err) {
-      console.error('Error fetching quote with components:', err);
+      logger.error('Error fetching quote with components:', err);
       return null;
     }
   }, []);
@@ -197,7 +198,7 @@ export function useSupplierQuotes() {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create quote';
       setError(errorMessage);
-      console.error('Error creating quote:', err);
+      logger.error('Error creating quote:', err);
       return null;
     }
   }, []);
@@ -235,7 +236,7 @@ export function useSupplierQuotes() {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to update quote';
       setError(errorMessage);
-      console.error('Error updating quote:', err);
+      logger.error('Error updating quote:', err);
       return null;
     }
   }, []);
@@ -261,7 +262,7 @@ export function useSupplierQuotes() {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to delete quote';
       setError(errorMessage);
-      console.error('Error deleting quote:', err);
+      logger.error('Error deleting quote:', err);
       return false;
     }
   }, []);
@@ -293,7 +294,7 @@ export function useSupplierQuotes() {
         .single();
 
       if (existing) {
-        console.log('⏭️  History entry already exists, skipping...');
+        logger.debug('⏭️  History entry already exists, skipping...');
         return null; // Already exists, skip
       }
 
@@ -319,7 +320,7 @@ export function useSupplierQuotes() {
 
       return dbToComponentQuoteHistory(data);
     } catch (err) {
-      console.error('Error adding component history:', err);
+      logger.error('Error adding component history:', err);
       return null;
     }
   }, []);
@@ -341,7 +342,7 @@ export function useSupplierQuotes() {
 
       return (data || []).map(dbToComponentQuoteHistory);
     } catch (err) {
-      console.error('Error fetching component history:', err);
+      logger.error('Error fetching component history:', err);
       return [];
     }
   }, []);
@@ -366,7 +367,7 @@ export function useSupplierQuotes() {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to search quotes';
       setError(errorMessage);
-      console.error('Error searching quotes:', err);
+      logger.error('Error searching quotes:', err);
       return [];
     } finally {
       setLoading(false);
@@ -416,7 +417,7 @@ export function useSupplierQuotes() {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to filter quotes';
       setError(errorMessage);
-      console.error('Error filtering quotes:', err);
+      logger.error('Error filtering quotes:', err);
       return [];
     } finally {
       setLoading(false);
@@ -440,7 +441,7 @@ export function useSupplierQuotes() {
 
       return matchResults;
     } catch (err) {
-      console.error('Error processing quote with matching:', err);
+      logger.error('Error processing quote with matching:', err);
       return [];
     }
   }, []);

@@ -15,6 +15,7 @@ import type {
   QuotationStatistics
 } from '../types';
 import { isRobotComponent } from '../services/componentTypeClassifier';
+import { logger } from '@/lib/logger';
 
 // ============ Main Statistics Function ============
 
@@ -34,7 +35,7 @@ export function calculateQuotationStatistics(
   const totalILS = calculations.subtotalILS;
 
   // DEBUG: Log calculations to understand the issue
-  console.log('📊 Statistics Debug:', {
+  logger.debug('📊 Statistics Debug:', {
     totalILS,
     totalHardwareILS: calculations.totalHardwareILS,
     totalSoftwareILS: calculations.totalSoftwareILS,
@@ -157,7 +158,7 @@ function calculateProfitByType(
     const profit = customerPrice - cost;
     const margin = customerPrice > 0 ? (profit / customerPrice) * 100 : 0;
 
-    console.log('💰 Profit Calc Debug:', {
+    logger.debug('💰 Profit Calc Debug:', {
       itemCount: typeItems.length,
       cost,
       customerPrice,

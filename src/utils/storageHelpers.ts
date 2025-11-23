@@ -5,6 +5,7 @@
  */
 
 import { supabase } from '../supabaseClient';
+import { logger } from '@/lib/logger';
 
 /**
  * Get a downloadable URL for a file in Supabase Storage
@@ -18,7 +19,7 @@ export async function getDownloadUrl(filePath: string, bucketName: string = 'sup
       : filePath;
 
     if (!pathOnly) {
-      console.error('Invalid file path:', filePath);
+      logger.error('Invalid file path:', filePath);
       return null;
     }
 
@@ -28,13 +29,13 @@ export async function getDownloadUrl(filePath: string, bucketName: string = 'sup
       .createSignedUrl(pathOnly, 3600);
 
     if (error) {
-      console.error('Error creating signed URL:', error);
+      logger.error('Error creating signed URL:', error);
       return null;
     }
 
     return data.signedUrl;
   } catch (error) {
-    console.error('Error in getDownloadUrl:', error);
+    logger.error('Error in getDownloadUrl:', error);
     return null;
   }
 }
@@ -58,7 +59,7 @@ export async function downloadFile(filePath: string, fileName: string, bucketNam
     link.click();
     document.body.removeChild(link);
   } catch (error) {
-    console.error('Error downloading file:', error);
+    logger.error('Error downloading file:', error);
     throw error;
   }
 }
@@ -81,7 +82,7 @@ export async function uploadFile(
       });
 
     if (error) {
-      console.error('Error uploading file:', error);
+      logger.error('Error uploading file:', error);
       return { success: false, error: error.message };
     }
 
@@ -92,7 +93,7 @@ export async function uploadFile(
 
     return { success: true, url: publicUrl };
   } catch (error) {
-    console.error('Error in uploadFile:', error);
+    logger.error('Error in uploadFile:', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error'
@@ -113,13 +114,13 @@ export async function deleteFile(
       .remove([path]);
 
     if (error) {
-      console.error('Error deleting file:', error);
+      logger.error('Error deleting file:', error);
       return { success: false, error: error.message };
     }
 
     return { success: true };
   } catch (error) {
-    console.error('Error in deleteFile:', error);
+    logger.error('Error in deleteFile:', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error'

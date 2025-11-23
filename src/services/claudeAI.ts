@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import * as XLSX from 'xlsx';
 import type { Component, ExtractedItem } from '../types';
 import { getComponentCategories } from '../constants/settings';
+import { logger } from '@/lib/logger';
 
 // Get API key from environment
 const ANTHROPIC_API_KEY = import.meta.env.VITE_ANTHROPIC_API_KEY;
@@ -151,7 +152,7 @@ async function excelToText(file: File): Promise<string> {
 
     return textRepresentation;
   } catch (error) {
-    console.error('Error converting Excel to text:', error);
+    logger.error('Error converting Excel to text:', error);
     throw new Error(`Failed to read Excel file: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
@@ -277,9 +278,9 @@ function parseClaudeResponse(responseText: string): AIExtractionResult {
       rawResponse: responseText,
     };
   } catch (error) {
-    console.error('Failed to parse Claude response:', error);
-    console.error('Raw response (first 500 chars):', responseText.substring(0, 500));
-    console.error('Raw response (last 500 chars):', responseText.substring(Math.max(0, responseText.length - 500)));
+    logger.error('Failed to parse Claude response:', error);
+    logger.error('Raw response (first 500 chars):', responseText.substring(0, 500));
+    logger.error('Raw response (last 500 chars):', responseText.substring(Math.max(0, responseText.length - 500)));
 
     return {
       success: false,
@@ -332,7 +333,7 @@ async function extractFromExcelFile(file: File): Promise<AIExtractionResult> {
 
     // Check if response was truncated
     if (message.stop_reason === 'max_tokens') {
-      console.warn('Claude response was truncated due to max_tokens limit');
+      logger.warn('Claude response was truncated due to max_tokens limit');
       return {
         success: false,
         components: [],
@@ -353,7 +354,7 @@ async function extractFromExcelFile(file: File): Promise<AIExtractionResult> {
 
     return result;
   } catch (error) {
-    console.error('Excel extraction error:', error);
+    logger.error('Excel extraction error:', error);
 
     return {
       success: false,
@@ -459,7 +460,7 @@ export async function extractComponentsFromDocument(file: File): Promise<AIExtra
 
     // Check if response was truncated
     if (message.stop_reason === 'max_tokens') {
-      console.warn('Claude response was truncated due to max_tokens limit');
+      logger.warn('Claude response was truncated due to max_tokens limit');
       return {
         success: false,
         components: [],
@@ -473,7 +474,7 @@ export async function extractComponentsFromDocument(file: File): Promise<AIExtra
     // Parse and return result
     return parseClaudeResponse(responseText);
   } catch (error) {
-    console.error('Claude AI extraction error:', error);
+    logger.error('Claude AI extraction error:', error);
 
     // Check for authentication errors
     if (error instanceof Error && (

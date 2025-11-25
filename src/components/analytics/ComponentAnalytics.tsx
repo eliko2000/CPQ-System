@@ -19,7 +19,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Legend
 } from 'recharts';
 import type { ComponentAnalytics } from '../../utils/analyticsCalculations';
 import { formatCurrencyILS } from '../../utils/analyticsCalculations';
@@ -40,21 +39,29 @@ export function ComponentAnalytics({ data }: ComponentAnalyticsProps) {
     '#FFC658', // Gold
     '#8DD1E1', // Sky blue
     '#FF6B9D', // Pink
-    '#A4DE6C'  // Lime
+    '#A4DE6C', // Lime
   ];
 
   // Colors for type ratio (match quotation statistics)
   const TYPE_COLORS = {
     hardware: '#3b82f6', // blue-500
     software: '#22c55e', // green-500
-    labor: '#f97316'     // orange-500
+    labor: '#f97316', // orange-500
   };
 
   // Transform type ratio for progress bars
   const typeRatioData = [
-    { name: 'חומרה', value: data.typeRatio.hardware, color: TYPE_COLORS.hardware },
-    { name: 'תוכנה', value: data.typeRatio.software, color: TYPE_COLORS.software },
-    { name: 'עבודה', value: data.typeRatio.labor, color: TYPE_COLORS.labor }
+    {
+      name: 'חומרה',
+      value: data.typeRatio.hardware,
+      color: TYPE_COLORS.hardware,
+    },
+    {
+      name: 'תוכנה',
+      value: data.typeRatio.software,
+      color: TYPE_COLORS.software,
+    },
+    { name: 'עבודה', value: data.typeRatio.labor, color: TYPE_COLORS.labor },
   ].filter(item => item.value > 0); // Only show non-zero values
 
   // Custom tooltip for charts
@@ -87,7 +94,9 @@ export function ComponentAnalytics({ data }: ComponentAnalyticsProps) {
         </CardHeader>
         <CardContent>
           {data.topComponents.length === 0 ? (
-            <p className="text-center text-muted-foreground py-8">אין נתונים להצגה</p>
+            <p className="text-center text-muted-foreground py-8">
+              אין נתונים להצגה
+            </p>
           ) : (
             <ResponsiveContainer width="100%" height={400}>
               <BarChart
@@ -118,7 +127,9 @@ export function ComponentAnalytics({ data }: ComponentAnalyticsProps) {
         </CardHeader>
         <CardContent>
           {data.usageByCategory.length === 0 ? (
-            <p className="text-center text-muted-foreground py-8">אין נתונים להצגה</p>
+            <p className="text-center text-muted-foreground py-8">
+              אין נתונים להצגה
+            </p>
           ) : (
             <ResponsiveContainer width="100%" height={350}>
               <PieChart>
@@ -129,11 +140,19 @@ export function ComponentAnalytics({ data }: ComponentAnalyticsProps) {
                   cx="50%"
                   cy="50%"
                   outerRadius={110}
-                  label={(entry) => `${entry.category} (${entry.count})`}
+                  label={(props: any) => {
+                    const payload = props.payload || {};
+                    return payload.category
+                      ? `${payload.category} (${payload.count})`
+                      : '';
+                  }}
                   labelLine={{ stroke: '#888', strokeWidth: 1 }}
                 >
                   {data.usageByCategory.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={CATEGORY_COLORS[index % CATEGORY_COLORS.length]} />
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={CATEGORY_COLORS[index % CATEGORY_COLORS.length]}
+                    />
                   ))}
                 </Pie>
                 <Tooltip content={<CustomTooltip />} />
@@ -150,21 +169,25 @@ export function ComponentAnalytics({ data }: ComponentAnalyticsProps) {
         </CardHeader>
         <CardContent>
           {typeRatioData.length === 0 ? (
-            <p className="text-center text-muted-foreground py-8">אין נתונים להצגה</p>
+            <p className="text-center text-muted-foreground py-8">
+              אין נתונים להצגה
+            </p>
           ) : (
             <div className="space-y-4">
-              {typeRatioData.map((item) => (
+              {typeRatioData.map(item => (
                 <div key={item.name}>
                   <div className="flex justify-between mb-1">
                     <span className="text-sm font-medium">{item.name}</span>
-                    <span className="text-sm text-muted-foreground">{item.value.toFixed(1)}%</span>
+                    <span className="text-sm text-muted-foreground">
+                      {item.value.toFixed(1)}%
+                    </span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-3">
                     <div
                       className="h-3 rounded-full transition-all duration-500"
                       style={{
                         width: `${Math.min(item.value, 100)}%`,
-                        backgroundColor: item.color
+                        backgroundColor: item.color,
                       }}
                     />
                   </div>

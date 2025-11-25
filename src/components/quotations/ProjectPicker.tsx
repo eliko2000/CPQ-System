@@ -1,62 +1,72 @@
-import { Search, FolderOpen, X } from 'lucide-react'
-import { useProjects } from '../../hooks/useProjects'
-import { ProjectSummary } from '../../types'
-import { Button } from '../ui/button'
-import { Input } from '../ui/input'
-import { Badge } from '../ui/badge'
+import { useState, useEffect, useMemo } from 'react';
+import { Search, FolderOpen, X } from 'lucide-react';
+import { useProjects } from '../../hooks/useProjects';
+import { ProjectSummary } from '../../types';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Badge } from '../ui/badge';
 
 interface ProjectPickerProps {
-  isOpen: boolean
-  onClose: () => void
-  onSelect: (project: ProjectSummary) => void
-  currentProjectId?: string | null
+  isOpen: boolean;
+  onClose: () => void;
+  onSelect: (project: ProjectSummary) => void;
+  currentProjectId?: string | null;
 }
 
-export function ProjectPicker({ isOpen, onClose, onSelect, currentProjectId }: ProjectPickerProps) {
-  const { projects, loading } = useProjects()
-  const [searchTerm, setSearchTerm] = useState('')
+export function ProjectPicker({
+  isOpen,
+  onClose,
+  onSelect,
+  currentProjectId,
+}: ProjectPickerProps) {
+  const { projects, loading } = useProjects();
+  const [searchTerm, setSearchTerm] = useState('');
 
   // Reset search when opened
   useEffect(() => {
     if (isOpen) {
-      setSearchTerm('')
+      setSearchTerm('');
     }
-  }, [isOpen])
+  }, [isOpen]);
 
   // Filter projects based on search
   const filteredProjects = useMemo(() => {
-    if (!searchTerm) return projects
+    if (!searchTerm) return projects;
 
-    const lowerSearch = searchTerm.toLowerCase()
-    return projects.filter(project =>
-      project.projectName.toLowerCase().includes(lowerSearch) ||
-      project.companyName.toLowerCase().includes(lowerSearch) ||
-      project.description?.toLowerCase().includes(lowerSearch)
-    )
-  }, [projects, searchTerm])
+    const lowerSearch = searchTerm.toLowerCase();
+    return projects.filter(
+      project =>
+        project.projectName.toLowerCase().includes(lowerSearch) ||
+        project.companyName.toLowerCase().includes(lowerSearch) ||
+        project.description?.toLowerCase().includes(lowerSearch)
+    );
+  }, [projects, searchTerm]);
 
   // Status labels
   const statusLabels = {
     active: 'פעיל',
     'on-hold': 'בהמתנה',
     completed: 'הושלם',
-    cancelled: 'בוטל'
-  }
+    cancelled: 'בוטל',
+  };
 
   const statusColors = {
     active: 'bg-green-100 text-green-800',
     'on-hold': 'bg-yellow-100 text-yellow-800',
     completed: 'bg-blue-100 text-blue-800',
-    cancelled: 'bg-gray-100 text-gray-800'
-  }
+    cancelled: 'bg-gray-100 text-gray-800',
+  };
 
-  if (!isOpen) return null
+  if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={onClose}>
+    <div
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+      onClick={onClose}
+    >
       <div
         className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[80vh] flex flex-col"
-        onClick={(e) => e.stopPropagation()}
+        onClick={e => e.stopPropagation()}
         dir="rtl"
       >
         {/* Header */}
@@ -78,7 +88,7 @@ export function ProjectPicker({ isOpen, onClose, onSelect, currentProjectId }: P
               type="text"
               placeholder="חפש לפי שם פרויקט, חברה או תיאור..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={e => setSearchTerm(e.target.value)}
               className="pr-10"
               autoFocus
             />
@@ -95,17 +105,19 @@ export function ProjectPicker({ isOpen, onClose, onSelect, currentProjectId }: P
             <div className="text-center py-8">
               <FolderOpen className="h-12 w-12 mx-auto text-gray-400 mb-4" />
               <p className="text-gray-500">
-                {searchTerm ? 'לא נמצאו פרויקטים תואמים' : 'אין פרויקטים זמינים'}
+                {searchTerm
+                  ? 'לא נמצאו פרויקטים תואמים'
+                  : 'אין פרויקטים זמינים'}
               </p>
             </div>
           ) : (
             <div className="space-y-2">
-              {filteredProjects.map((project) => (
+              {filteredProjects.map(project => (
                 <button
                   key={project.id}
                   onClick={() => {
-                    onSelect(project)
-                    onClose()
+                    onSelect(project);
+                    onClose();
                   }}
                   className={`w-full text-right p-4 rounded-lg border-2 transition-all hover:border-blue-500 hover:bg-blue-50 ${
                     currentProjectId === project.id
@@ -116,18 +128,29 @@ export function ProjectPicker({ isOpen, onClose, onSelect, currentProjectId }: P
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-semibold text-lg truncate">{project.projectName}</h3>
+                        <h3 className="font-semibold text-lg truncate">
+                          {project.projectName}
+                        </h3>
                         <Badge className={statusColors[project.status]}>
                           {statusLabels[project.status]}
                         </Badge>
                       </div>
-                      <p className="text-sm text-gray-600 mb-1">{project.companyName}</p>
+                      <p className="text-sm text-gray-600 mb-1">
+                        {project.companyName}
+                      </p>
                       {project.description && (
-                        <p className="text-xs text-gray-500 line-clamp-2">{project.description}</p>
+                        <p className="text-xs text-gray-500 line-clamp-2">
+                          {project.description}
+                        </p>
                       )}
                       <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
                         <span>הצעות מחיר: {project.quotationCount}</span>
-                        <span>נוצר: {new Date(project.createdAt).toLocaleDateString('he-IL')}</span>
+                        <span>
+                          נוצר:{' '}
+                          {new Date(project.createdAt).toLocaleDateString(
+                            'he-IL'
+                          )}
+                        </span>
                       </div>
                     </div>
                     {currentProjectId === project.id && (
@@ -155,5 +178,5 @@ export function ProjectPicker({ isOpen, onClose, onSelect, currentProjectId }: P
         </div>
       </div>
     </div>
-  )
+  );
 }

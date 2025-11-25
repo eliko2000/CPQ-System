@@ -10,6 +10,7 @@
 ## 🐛 Bug Description
 
 **Error Message:**
+
 ```
 404 {"type":"error","error":{"type":"not_found_error","message":"model: claude-3-5-sonnet-20241022"},"request_id":"req_011CUsTtmCuCa5TmoE2jAD7Q"}
 ```
@@ -24,11 +25,13 @@ The AI import feature was failing with a 404 error because the code was using an
 ### Problem: Outdated Model Name
 
 The code was using:
+
 ```typescript
-model: 'claude-3-5-sonnet-20241022'
+model: 'claude-3-5-sonnet-20241022';
 ```
 
 **Why it failed:**
+
 - Anthropic has updated their model lineup
 - Claude 3.5 Sonnet has been superseded by newer models
 - The specific snapshot `20241022` is no longer available via the API
@@ -38,12 +41,12 @@ model: 'claude-3-5-sonnet-20241022'
 
 According to official documentation:
 
-| Model | API Identifier | Status | Use Case |
-|-------|---------------|--------|----------|
-| **Claude Sonnet 4.5** | `claude-sonnet-4-5` or `claude-sonnet-4-5-20250929` | Latest | Best balance of intelligence, speed, cost |
-| **Claude Sonnet 4** | `claude-sonnet-4-0` or `claude-sonnet-4-20250514` | Legacy | Previous generation |
-| **Claude Sonnet 3.7** | `claude-3-7-sonnet-latest` or `claude-3-7-sonnet-20250219` | Legacy | Stable vision model |
-| ~~Claude 3.5 Sonnet~~ | ~~`claude-3-5-sonnet-*`~~ | Deprecated | No longer available |
+| Model                 | API Identifier                                             | Status     | Use Case                                  |
+| --------------------- | ---------------------------------------------------------- | ---------- | ----------------------------------------- |
+| **Claude Sonnet 4.5** | `claude-sonnet-4-5` or `claude-sonnet-4-5-20250929`        | Latest     | Best balance of intelligence, speed, cost |
+| **Claude Sonnet 4**   | `claude-sonnet-4-0` or `claude-sonnet-4-20250514`          | Legacy     | Previous generation                       |
+| **Claude Sonnet 3.7** | `claude-3-7-sonnet-latest` or `claude-3-7-sonnet-20250219` | Legacy     | Stable vision model                       |
+| ~~Claude 3.5 Sonnet~~ | ~~`claude-3-5-sonnet-*`~~                                  | Deprecated | No longer available                       |
 
 ---
 
@@ -76,20 +79,20 @@ const message = await anthropic.messages.create({
 
 ### Alternative Options Considered
 
-| Option | Pros | Cons | Decision |
-|--------|------|------|----------|
-| **Claude Sonnet 4.5** | Latest model, best performance | May not support all vision features yet | Not chosen (needs testing) |
-| **Claude 3.7 Sonnet** ✅ | Stable, proven vision support | Slightly older | **CHOSEN** - Safe choice |
-| Specific snapshot | Version pinning | Harder to maintain | Not chosen (aliases better) |
+| Option                   | Pros                           | Cons                                    | Decision                    |
+| ------------------------ | ------------------------------ | --------------------------------------- | --------------------------- |
+| **Claude Sonnet 4.5**    | Latest model, best performance | May not support all vision features yet | Not chosen (needs testing)  |
+| **Claude 3.7 Sonnet** ✅ | Stable, proven vision support  | Slightly older                          | **CHOSEN** - Safe choice    |
+| Specific snapshot        | Version pinning                | Harder to maintain                      | Not chosen (aliases better) |
 
 ---
 
 ## 📝 Files Modified
 
-| File | Changes |
-|------|---------|
-| `src/services/claudeAI.ts` | Updated model name from `claude-3-5-sonnet-20241022` to `claude-3-7-sonnet-latest` |
-| `AI_IMPORT_SETUP.md` | Updated documentation to reflect Claude 3.7 Sonnet |
+| File                                      | Changes                                                                            |
+| ----------------------------------------- | ---------------------------------------------------------------------------------- |
+| `src/services/claudeAI.ts`                | Updated model name from `claude-3-5-sonnet-20241022` to `claude-3-7-sonnet-latest` |
+| `../user-guides/GUIDE_AI_IMPORT_SETUP.md` | Updated documentation to reflect Claude 3.7 Sonnet                                 |
 
 ---
 
@@ -98,6 +101,7 @@ const message = await anthropic.messages.create({
 ### Manual Testing:
 
 **Test Case: Document Extraction**
+
 1. ✅ Restart dev server
 2. ✅ Navigate to Component Library
 3. ✅ Click "ייבוא חכם" (Smart Import)
@@ -117,20 +121,24 @@ const message = await anthropic.messages.create({
 ## 📊 Impact Assessment
 
 ### User Impact
+
 - **Before:** 100% failure rate - feature completely broken
 - **After:** Feature functional with improved model
 
 ### Performance
+
 - **Speed:** Similar (~5-15 seconds per document)
 - **Accuracy:** Expected to be equal or better (3.7 > 3.5)
 - **Cost:** ~$0.005-0.015 per document (unchanged)
 
 ### Data Integrity
+
 - ✅ No impact - extraction logic unchanged
 - ✅ Same JSON structure returned
 - ✅ Component data mapping unchanged
 
 ### Pricing Calculations
+
 - ✅ No impact - feature is for data import only
 
 ---
@@ -140,19 +148,25 @@ const message = await anthropic.messages.create({
 ### For Future Model Updates:
 
 1. **Use Aliases Instead of Specific Snapshots**
+
    ```typescript
    // Good: Uses latest stable version automatically
-   model: 'claude-3-7-sonnet-latest'
+   model: 'claude-3-7-sonnet-latest';
 
    // Avoid: Hardcoded snapshot can become outdated
-   model: 'claude-3-5-sonnet-20241022'
+   model: 'claude-3-5-sonnet-20241022';
    ```
 
 2. **Better Error Handling for Model Not Found**
+
    ```typescript
-   if (error.message.includes('not_found_error') && error.message.includes('model')) {
+   if (
+     error.message.includes('not_found_error') &&
+     error.message.includes('model')
+   ) {
      return {
-       error: 'The AI model is temporarily unavailable. Please try again or contact support.'
+       error:
+         'The AI model is temporarily unavailable. Please try again or contact support.',
      };
    }
    ```
@@ -169,33 +183,38 @@ const message = await anthropic.messages.create({
 ### Option 1: Upgrade to Claude Sonnet 4.5 (Recommended)
 
 **Benefits:**
+
 - Latest model with best performance
 - Improved accuracy and speed
 - Future-proof
 
 **Testing Required:**
+
 - Verify vision capabilities work
 - Test with various document types
 - Validate JSON output structure
 - Check pricing impact
 
 **Implementation:**
+
 ```typescript
-model: 'claude-sonnet-4-5' // or 'claude-sonnet-4-5-20250929'
+model: 'claude-sonnet-4-5'; // or 'claude-sonnet-4-5-20250929'
 ```
 
 ### Option 2: Make Model Configurable
 
 **Implementation:**
+
 ```typescript
 // .env.local
-VITE_CLAUDE_MODEL=claude-3-7-sonnet-latest
+VITE_CLAUDE_MODEL = claude - 3 - 7 - sonnet - latest;
 
 // claudeAI.ts
-model: import.meta.env.VITE_CLAUDE_MODEL || 'claude-3-7-sonnet-latest'
+model: import.meta.env.VITE_CLAUDE_MODEL || 'claude-3-7-sonnet-latest';
 ```
 
 **Benefits:**
+
 - Easy model switching
 - A/B testing capabilities
 - User choice for cost/performance trade-off
@@ -215,7 +234,7 @@ model: import.meta.env.VITE_CLAUDE_MODEL || 'claude-3-7-sonnet-latest'
 ## 📚 Related Documentation
 
 - [Anthropic Models Overview](https://docs.claude.com/en/docs/about-claude/models)
-- `AI_IMPORT_SETUP.md` - Feature documentation
+- `../user-guides/GUIDE_AI_IMPORT_SETUP.md` - Feature documentation
 - `BUGFIX_AUTH_ERROR.md` - Previous bug fix
 
 ---
@@ -233,4 +252,4 @@ The feature should now work correctly with the updated model. Users need to rest
 
 ---
 
-*Last updated: 2025-11-07*
+_Last updated: 2025-11-07_

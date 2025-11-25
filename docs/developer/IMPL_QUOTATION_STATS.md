@@ -11,11 +11,13 @@ The Quotation Statistics feature has been successfully implemented, providing co
 ### 1. Backend Statistics Engine (Already Complete)
 
 #### Files:
+
 - ✅ `src/utils/quotationStatistics.ts` (306 lines)
 - ✅ `src/services/componentTypeClassifier.ts` (302 lines)
 - ✅ `src/types.ts` - QuotationStatistics interface
 
 #### Capabilities:
+
 - Calculate HW/SW/Labor percentages
 - Generate HW:Engineering:Commissioning ratios (e.g., "65:20:15")
 - Robot component detection and analysis
@@ -30,6 +32,7 @@ The Quotation Statistics feature has been successfully implemented, providing co
 #### File: `src/components/quotations/QuotationStatisticsPanel.tsx`
 
 **Features:**
+
 - ✅ Visual breakdown with percentage bars
 - ✅ HW:Eng:Comm ratio prominently displayed
 - ✅ Quotation type badge (material-heavy/labor-heavy/balanced)
@@ -41,6 +44,7 @@ The Quotation Statistics feature has been successfully implemented, providing co
 - ✅ Real-time updates when quotation changes
 
 **Visual Elements:**
+
 - Color-coded percentage bars (blue/green/orange for HW/SW/Labor)
 - Gradient backgrounds for emphasis
 - Warning badges for unusual ratios
@@ -50,6 +54,7 @@ The Quotation Statistics feature has been successfully implemented, providing co
 ### 3. QuotationEditor Integration (Newly Implemented)
 
 #### Changes to `src/components/quotations/QuotationEditor.tsx`:
+
 - ✅ Import `calculateQuotationStatistics`
 - ✅ Import `QuotationStatisticsPanel` component
 - ✅ Add `statistics` useMemo hook (auto-recalculates on changes)
@@ -58,6 +63,7 @@ The Quotation Statistics feature has been successfully implemented, providing co
 
 **Real-Time Behavior:**
 The statistics automatically update when:
+
 - Items are added/removed
 - Quantities change
 - Prices are modified
@@ -69,6 +75,7 @@ The statistics automatically update when:
 #### File: `src/utils/__tests__/quotationStatistics.test.ts`
 
 **Test Coverage (17 tests, all passing ✅):**
+
 - Hardware-heavy quotations
 - Labor-heavy quotations
 - Balanced quotations
@@ -115,7 +122,7 @@ import {
   getDominantCategory,
   getQuotationType,
   getQuotationSummaryText,
-  validateStatistics
+  validateStatistics,
 } from '@/utils/quotationStatistics';
 
 // Get dominant category
@@ -150,20 +157,20 @@ import { QuotationStatisticsPanel } from '@/components/quotations/QuotationStati
 ```typescript
 interface QuotationStatistics {
   // Cost breakdown percentages
-  hardwarePercent: number;        // % of total that is hardware
-  softwarePercent: number;        // % of total that is software
-  laborPercent: number;           // % of total that is labor
+  hardwarePercent: number; // % of total that is hardware
+  softwarePercent: number; // % of total that is software
+  laborPercent: number; // % of total that is labor
 
   // Labor breakdown percentages
-  engineeringPercent: number;     // % of total that is engineering
-  commissioningPercent: number;   // % of total that is commissioning
+  engineeringPercent: number; // % of total that is engineering
+  commissioningPercent: number; // % of total that is commissioning
 
   // Material vs Labor ratio
-  materialPercent: number;        // (HW + SW) / Total
-  laborOnlyPercent: number;       // Labor / Total
+  materialPercent: number; // (HW + SW) / Total
+  laborOnlyPercent: number; // Labor / Total
 
   // Key ratios
-  hwEngineeringCommissioningRatio: string;  // "65:20:10" format
+  hwEngineeringCommissioningRatio: string; // "65:20:10" format
 
   // Robot-specific analysis (if applicable)
   robotComponents?: {
@@ -195,13 +202,13 @@ interface QuotationStatistics {
 
 The system automatically detects and warns about unusual ratios:
 
-| Warning | Condition | Message |
-|---------|-----------|---------|
-| High Labor | laborPercent > 70% | "אחוז עבודה גבוה מאוד (>70%)" |
-| High Hardware | hardwarePercent > 85% | "אחוז חומרה גבוה מאוד (>85%)" |
-| High Software | softwarePercent > 40% | "אחוז תוכנה גבוה מאוד (>40%)" |
-| Low HW Margin | hardware.margin < 15% | "מרווח חומרה נמוך (<15%)" |
-| Low Labor Margin | labor.margin < 10% | "מרווח עבודה נמוך (<10%)" |
+| Warning          | Condition             | Message                       |
+| ---------------- | --------------------- | ----------------------------- |
+| High Labor       | laborPercent > 70%    | "אחוז עבודה גבוה מאוד (>70%)" |
+| High Hardware    | hardwarePercent > 85% | "אחוז חומרה גבוה מאוד (>85%)" |
+| High Software    | softwarePercent > 40% | "אחוז תוכנה גבוה מאוד (>40%)" |
+| Low HW Margin    | hardware.margin < 15% | "מרווח חומרה נמוך (<15%)"     |
+| Low Labor Margin | labor.margin < 10%    | "מרווח עבודה נמוך (<10%)"     |
 
 ---
 
@@ -228,21 +235,25 @@ The system automatically classifies quotations:
 The system automatically detects robot-related components using bilingual keywords:
 
 **English Keywords:**
+
 - robot, robotic, arm, cobot, collaborative robot
 - industrial robot, pick and place, palletizing robot
 - welding robot, assembly robot, scara, delta robot
 - articulated robot, cartesian robot, gantry
 
 **Brand Names:**
+
 - ABB, Fanuc, KUKA, Yaskawa, Motoman, Stäubli
 - Universal Robots (UR3, UR5, UR10, UR16, UR20)
 - Dobot, Epson, Denso, Kawasaki, Nachi
 
 **Hebrew Keywords:**
+
 - רובוט, רובוטיקה, זרוע רובוטית
 - רובוט תעשייתי, רובוט שיתופי, קובוט
 
 When robot components are detected, the panel displays:
+
 - Total robot cost in ILS
 - Percentage of total quotation
 - Number of robot items
@@ -252,12 +263,14 @@ When robot components are detected, the panel displays:
 ## Performance Considerations
 
 ### Optimization:
+
 - ✅ Statistics calculated using `useMemo` (only recalculates when needed)
 - ✅ Minimal computational overhead (~1-2ms for typical quotations)
 - ✅ No external dependencies required
 - ✅ Pure CSS visualizations (no heavy chart libraries)
 
 ### Memory:
+
 - Statistics object: ~500 bytes
 - Component overhead: ~2KB
 - Negligible impact on performance
@@ -280,6 +293,7 @@ npm test:coverage
 ```
 
 ### Test Results:
+
 ```
 ✓ src/utils/__tests__/quotationStatistics.test.ts (17 tests)
   Test Files  1 passed (1)
@@ -292,19 +306,23 @@ npm test:coverage
 ## Future Enhancements (Optional)
 
 ### Priority 1: PDF Export Integration
+
 **Status:** Pending
 **Effort:** Medium (2-3 hours)
 
 Add statistics section to PDF quotations:
+
 - Include HW:Eng:Comm ratio
 - Show component type breakdown
 - Display robot metrics if applicable
 
 ### Priority 2: Chart Visualizations
+
 **Status:** Pending
 **Effort:** Low (1-2 hours)
 
 Install chart library (recharts) and add:
+
 - Pie chart for HW/SW/Labor split
 - Bar chart for profit comparison
 - Donut chart for material vs labor
@@ -314,10 +332,12 @@ npm install recharts
 ```
 
 ### Priority 3: Analytics Dashboard
+
 **Status:** Future
 **Effort:** High (1-2 days)
 
 Create dashboard to compare multiple quotations:
+
 - Average ratios across all projects
 - Trends over time
 - Best/worst performing quotations
@@ -328,15 +348,19 @@ Create dashboard to compare multiple quotations:
 ## Troubleshooting
 
 ### Issue: Statistics not appearing
+
 **Solution:** Ensure quotation has `calculations` object. Run calculations first.
 
 ### Issue: Percentages don't add to 100%
+
 **Solution:** Check `validateStatistics()` output. Likely rounding or calculation error.
 
 ### Issue: Robot detection not working
+
 **Solution:** Ensure component names include robot keywords. Check `isRobotComponent()` function.
 
 ### Issue: Panel not updating
+
 **Solution:** Verify `useMemo` dependencies include `currentQuotation` and `calculations`.
 
 ---
@@ -344,26 +368,33 @@ Create dashboard to compare multiple quotations:
 ## API Reference
 
 ### calculateQuotationStatistics(project: QuotationProject): QuotationStatistics
+
 Calculates comprehensive statistics for a quotation.
 
 **Throws:** Error if `project.calculations` is missing
 
 ### getDominantCategory(stats: QuotationStatistics): { name, nameHe, percent }
+
 Returns the category with the highest percentage.
 
 ### getQuotationType(stats: QuotationStatistics): 'material-heavy' | 'labor-heavy' | 'balanced'
+
 Classifies quotation based on material vs labor ratio.
 
 ### getQuotationSummaryText(stats: QuotationStatistics): string
+
 Returns Hebrew summary text for display.
 
 ### validateStatistics(stats: QuotationStatistics): { valid, errors }
+
 Validates that percentages and counts are correct.
 
 ### formatStatisticsForExport(stats: QuotationStatistics): Record<string, any>
+
 Formats statistics for CSV/Excel export.
 
 ### compareQuotationStatistics(current, previous): { deltas }
+
 Calculates differences between two quotation statistics.
 
 ---
@@ -371,11 +402,13 @@ Calculates differences between two quotation statistics.
 ## Files Modified/Created
 
 ### Created:
+
 1. `src/components/quotations/QuotationStatisticsPanel.tsx` - 300+ lines
 2. `src/utils/__tests__/quotationStatistics.test.ts` - 500+ lines
-3. `docs/QUOTATION-STATISTICS-IMPLEMENTATION.md` - This file
+3. `docs/developer/IMPL_QUOTATION_STATS.md` - This file
 
 ### Modified:
+
 1. `src/components/quotations/QuotationEditor.tsx`
    - Added import for `calculateQuotationStatistics`
    - Added import for `QuotationStatisticsPanel`
@@ -396,6 +429,7 @@ Calculates differences between two quotation statistics.
 ⏳ **Charts**: Optional enhancement
 
 The Quotation Statistics feature is **production-ready** and provides real-time business intelligence for quotation analysis. Users can now see at a glance:
+
 - Whether a quotation is material-heavy, labor-heavy, or balanced
 - Exact HW:Engineering:Commissioning ratios
 - Robot project detection and metrics

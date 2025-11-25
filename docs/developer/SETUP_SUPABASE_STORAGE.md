@@ -70,6 +70,7 @@ USING (
 ```
 
 **Or use the UI:**
+
 1. Go to **Storage** → **supplier-quotes** → **Policies**
 2. Click **"New Policy"**
 3. Use template: **"Allow authenticated users full access"**
@@ -130,7 +131,7 @@ async function uploadQuoteFile(file: File): Promise<string | null> {
       .from('supplier-quotes')
       .upload(filePath, file, {
         cacheControl: '3600',
-        upsert: false
+        upsert: false,
       });
 
     if (error) throw error;
@@ -251,20 +252,24 @@ GROUP BY metadata->>'mimetype';
 ## 🚨 Troubleshooting
 
 ### Issue: "bucket not found"
+
 - Verify bucket name is exactly `supplier-quotes`
 - Check bucket exists in Storage dashboard
 
 ### Issue: "permission denied"
+
 - Check RLS policies are created
 - Verify user is authenticated
 - Check policy conditions match your use case
 
 ### Issue: "file too large"
+
 - Check bucket file size limit
 - Compress file before upload
 - Split large files if needed
 
 ### Issue: "invalid mime type"
+
 - Check file type is in allowed list
 - Verify file is not corrupted
 - Try uploading with correct extension
@@ -272,6 +277,7 @@ GROUP BY metadata->>'mimetype';
 ## 🎓 Next Steps
 
 After setup, the app will:
+
 1. ✅ Upload quote files to Supabase Storage
 2. ✅ Store file URLs in `supplier_quotes` table
 3. ✅ Download files when viewing quote details

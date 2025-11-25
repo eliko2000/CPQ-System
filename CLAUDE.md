@@ -12,6 +12,20 @@
 8. [Business Logic](#business-logic)
 9. [Multi-Currency System](#multi-currency-system)
 10. [Testing](#testing)
+11. [Documentation Guidelines](#documentation-guidelines)
+
+---
+
+## Documentation Guidelines
+
+### Naming Convention
+
+All documentation files should use **UPPERCASE** naming with standardized prefixes to ensure cohesiveness and easy scanning:
+
+- **User Guides**: `GUIDE_` (e.g., `GUIDE_FILE_IMPORT.md`)
+- **Developer Docs**: `DEV_`, `SETUP_`, `IMPL_` (e.g., `DEV_PARSERS_GUIDE.md`, `SETUP_TABLE_CONFIG.md`, `IMPL_ANALYTICS.md`)
+- **Planning**: `PRD_`, `PLAN_` (e.g., `PRD_CORE_SYSTEM.md`, `PLAN_ASSEMBLIES.md`)
+- **Reports**: `REPORT_`, `BUGFIX_`, `BACKLOG_` (e.g., `REPORT_TEST_SUMMARY.md`, `BUGFIX_AUTH_ERROR.md`)
 
 ---
 
@@ -89,12 +103,12 @@ The file import system provides intelligent multi-format document processing wit
 
 ### Supported Formats
 
-| Format | Extensions | Parser | Speed | Accuracy | Cost |
-|--------|-----------|---------|-------|----------|------|
-| Excel  | .xlsx, .xls | Native | Very Fast | High | Free |
-| CSV    | .csv | Native | Very Fast | High | Free |
-| PDF    | .pdf | Text Extraction | Fast | Medium | Free |
-| Images | .jpg, .png, .gif, .webp | AI Vision | Slow (10-15s) | Very High | API Cost |
+| Format | Extensions              | Parser          | Speed         | Accuracy  | Cost     |
+| ------ | ----------------------- | --------------- | ------------- | --------- | -------- |
+| Excel  | .xlsx, .xls             | Native          | Very Fast     | High      | Free     |
+| CSV    | .csv                    | Native          | Very Fast     | High      | Free     |
+| PDF    | .pdf                    | Text Extraction | Fast          | Medium    | Free     |
+| Images | .jpg, .png, .gif, .webp | AI Vision       | Slow (10-15s) | Very High | API Cost |
 
 ### Architecture
 
@@ -131,6 +145,7 @@ if (result.success) {
 High-performance parser for Excel and CSV files with smart column detection.
 
 **Features**:
+
 - Automatic column header detection (English + Hebrew)
 - Support for multiple naming conventions
 - Currency detection and parsing
@@ -142,14 +157,14 @@ High-performance parser for Excel and CSV files with smart column detection.
 
 The parser recognizes common column headers in both English and Hebrew:
 
-| Field | Recognized Headers |
-|-------|-------------------|
-| Name | name, שם, product, item, description, תיאור, פריט, מוצר |
-| Manufacturer | manufacturer, יצרן, brand, supplier, ספק |
-| Part Number | part number, קטלוגי, p/n, pn, מק"ט, catalog |
-| Price | price, מחיר, unit price, cost, מחיר יחידה |
-| Category | category, קטגוריה, type, סוג |
-| Quantity | quantity, כמות, qty, כמ |
+| Field        | Recognized Headers                                      |
+| ------------ | ------------------------------------------------------- |
+| Name         | name, שם, product, item, description, תיאור, פריט, מוצר |
+| Manufacturer | manufacturer, יצרן, brand, supplier, ספק                |
+| Part Number  | part number, קטלוגי, p/n, pn, מק"ט, catalog             |
+| Price        | price, מחיר, unit price, cost, מחיר יחידה               |
+| Category     | category, קטגוריה, type, סוג                            |
+| Quantity     | quantity, כמות, qty, כמ                                 |
 
 **Example**:
 
@@ -187,6 +202,7 @@ const result = await parseExcelFile(excelFile);
 **Price Parsing**:
 
 The Excel parser handles various price formats:
+
 - Currency symbols: $, €, ₪
 - Thousands separators: 1,234.56 or 1.234,56
 - Currency text: USD, EUR, NIS, ILS, שקל
@@ -199,6 +215,7 @@ The Excel parser handles various price formats:
 Text-based PDF parser with pattern matching for structured data extraction.
 
 **Features**:
+
 - Text extraction from PDF documents
 - Tabular structure detection
 - Pattern matching for part numbers and prices
@@ -219,6 +236,7 @@ Text-based PDF parser with pattern matching for structured data extraction.
    - Lower confidence scores
 
 **Limitations**:
+
 - Cannot process scanned PDFs (image-based)
 - Lower accuracy for complex layouts
 - Confidence typically 30-70%
@@ -262,6 +280,7 @@ const result = await parsePDFFile(pdfFile);
 Claude Vision API integration for image-based document processing.
 
 **Features**:
+
 - Processes images and screenshots
 - Handles complex layouts and tables
 - OCR for scanned documents
@@ -269,6 +288,7 @@ Claude Vision API integration for image-based document processing.
 - Highest accuracy for complex documents
 
 **Use Cases**:
+
 - Scanned quotations
 - PDF screenshots
 - Photos of price lists
@@ -276,6 +296,7 @@ Claude Vision API integration for image-based document processing.
 - Handwritten notes (limited)
 
 **Cost Consideration**:
+
 - Uses Anthropic API credits
 - ~$0.01-0.05 per document depending on size
 - Best accuracy for complex documents
@@ -340,13 +361,14 @@ interface AIExtractedComponent {
 
 Confidence scores indicate extraction quality:
 
-| Score Range | Label | Meaning | Action |
-|-------------|-------|---------|--------|
-| 0.8 - 1.0 | High | All required fields present | Auto-approve |
-| 0.6 - 0.79 | Medium | Most fields present | Review recommended |
-| 0.0 - 0.59 | Low | Missing critical data | Manual review required |
+| Score Range | Label  | Meaning                     | Action                 |
+| ----------- | ------ | --------------------------- | ---------------------- |
+| 0.8 - 1.0   | High   | All required fields present | Auto-approve           |
+| 0.6 - 0.79  | Medium | Most fields present         | Review recommended     |
+| 0.0 - 0.59  | Low    | Missing critical data       | Manual review required |
 
 **Calculation Factors**:
+
 - Name present: +30 points
 - Manufacturer P/N: +20 points
 - Manufacturer: +15 points
@@ -356,6 +378,7 @@ Confidence scores indicate extraction quality:
 - Description: +2 points
 
 **Parser-Specific Adjustments**:
+
 - Excel: Full confidence (0-1.0)
 - PDF: Capped at 0.9 due to text extraction uncertainty
 - AI Vision: Full confidence based on Claude's response
@@ -462,12 +485,12 @@ interface QuotationProject {
 
 ```typescript
 interface QuotationParameters {
-  usdToIlsRate: number;      // Exchange rate
-  eurToIlsRate: number;      // Exchange rate
-  markupPercent: number;     // Default markup
-  dayWorkCost: number;       // Labor cost per day
-  profitPercent: number;     // Target profit
-  riskPercent: number;       // Risk buffer
+  usdToIlsRate: number; // Exchange rate
+  eurToIlsRate: number; // Exchange rate
+  markupPercent: number; // Default markup
+  dayWorkCost: number; // Labor cost per day
+  profitPercent: number; // Target profit
+  riskPercent: number; // Risk buffer
   paymentTerms?: string;
   deliveryTime?: string;
   includeVAT: boolean;
@@ -482,6 +505,7 @@ interface QuotationParameters {
 ### Tables
 
 #### components
+
 ```sql
 CREATE TABLE components (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -505,6 +529,7 @@ CREATE TABLE components (
 ```
 
 #### quotations
+
 ```sql
 CREATE TABLE quotations (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -620,6 +645,7 @@ The CPQ system supports multi-currency pricing (NIS/ILS, USD, EUR) with intellig
 ### Currency Tracking Fields
 
 #### Components Table
+
 ```sql
 ALTER TABLE components
 ADD COLUMN currency TEXT CHECK (currency IN ('NIS', 'USD', 'EUR')) DEFAULT 'NIS',
@@ -627,6 +653,7 @@ ADD COLUMN original_cost DECIMAL(12,2);
 ```
 
 #### Quotation Items Table
+
 ```sql
 ALTER TABLE quotation_items
 ADD COLUMN original_currency TEXT CHECK (original_currency IN ('NIS', 'USD', 'EUR')),
@@ -640,11 +667,13 @@ ADD COLUMN original_cost DECIMAL(12,2);
 **File**: `src/hooks/useComponents.ts`
 
 Each component in the library stores:
+
 - `currency`: The original currency (NIS, USD, or EUR)
 - `originalCost`: The price in the original currency
 - `unitCostNIS`, `unitCostUSD`, `unitCostEUR`: Converted prices
 
 **Example**:
+
 ```typescript
 // Component stored with USD as original currency
 {
@@ -662,11 +691,13 @@ Each component in the library stores:
 **File**: `src/lib/utils.ts` (convertDbQuotationToQuotationProject)
 
 When components are added to a quotation, they preserve original currency:
+
 - `originalCurrency`: Copied from component's currency
 - `originalCost`: Copied from component's originalCost
 - Prices are stored in all three currencies
 
 **Example**:
+
 ```typescript
 // Quotation item maintains original currency
 {
@@ -684,11 +715,13 @@ When components are added to a quotation, they preserve original currency:
 **File**: `src/components/quotations/QuotationEditor.tsx` (updateParameters)
 
 When exchange rates change in a quotation:
+
 1. System reads each item's `originalCurrency` and `originalCost`
 2. Keeps the original currency value fixed
 3. Recalculates other currencies using new rates
 
 **Example**:
+
 ```typescript
 // Initial state (USD/ILS = 3.7)
 Item: $2,500 USD = ₪9,250 ILS
@@ -707,17 +740,17 @@ When loading components from the database, the system detects original currency:
 ```typescript
 // 1. If DB has explicit currency tracking, use it
 if (dbComp.currency && dbComp.original_cost) {
-  currency = dbComp.currency
-  originalCost = dbComp.original_cost
+  currency = dbComp.currency;
+  originalCost = dbComp.original_cost;
 }
 
 // 2. Otherwise, detect from price ratios
 if (usd > 0 && ils > 0) {
-  const ratio = ils / usd
+  const ratio = ils / usd;
   if (ratio >= 3 && ratio <= 5) {
     // ILS looks like conversion from USD
-    currency = 'USD'
-    originalCost = usd
+    currency = 'USD';
+    originalCost = usd;
   }
 }
 ```
@@ -739,24 +772,25 @@ convertToAllCurrencies(
 ```
 
 **Logic**:
+
 ```typescript
 switch (originalCurrency) {
   case 'USD':
-    unitCostUSD = amount;                    // Keep original
-    unitCostNIS = amount * usdToIlsRate;     // Convert to ILS
-    unitCostEUR = amount * usdToEurRate;     // Convert to EUR
+    unitCostUSD = amount; // Keep original
+    unitCostNIS = amount * usdToIlsRate; // Convert to ILS
+    unitCostEUR = amount * usdToEurRate; // Convert to EUR
     break;
 
   case 'EUR':
-    unitCostEUR = amount;                    // Keep original
-    unitCostNIS = amount * eurToIlsRate;     // Convert to ILS
-    unitCostUSD = amount / usdToEurRate;     // Convert to USD
+    unitCostEUR = amount; // Keep original
+    unitCostNIS = amount * eurToIlsRate; // Convert to ILS
+    unitCostUSD = amount / usdToEurRate; // Convert to USD
     break;
 
   case 'NIS':
-    unitCostNIS = amount;                    // Keep original
-    unitCostUSD = amount / usdToIlsRate;     // Convert to USD
-    unitCostEUR = amount / eurToIlsRate;     // Convert to EUR
+    unitCostNIS = amount; // Keep original
+    unitCostUSD = amount / usdToIlsRate; // Convert to USD
+    unitCostEUR = amount / eurToIlsRate; // Convert to EUR
     break;
 }
 ```
@@ -769,19 +803,19 @@ When loading quotations from the database:
 
 ```typescript
 // CRITICAL: Use original_currency and original_cost fields
-const originalCurrency = dbItem.original_currency || 'NIS'
-const originalCost = dbItem.original_cost || dbItem.unit_cost || 0
+const originalCurrency = dbItem.original_currency || 'NIS';
+const originalCost = dbItem.original_cost || dbItem.unit_cost || 0;
 
 // Convert from original currency to all currencies
 if (originalCurrency === 'USD') {
-  unitPriceUSD = originalCost              // Keep USD original
-  unitPriceILS = originalCost * usdRate    // Convert to ILS
+  unitPriceUSD = originalCost; // Keep USD original
+  unitPriceILS = originalCost * usdRate; // Convert to ILS
 } else if (originalCurrency === 'EUR') {
-  unitPriceEUR = originalCost              // Keep EUR original
-  unitPriceILS = originalCost * eurRate    // Convert to ILS
+  unitPriceEUR = originalCost; // Keep EUR original
+  unitPriceILS = originalCost * eurRate; // Convert to ILS
 } else {
-  unitPriceILS = originalCost              // Keep ILS original
-  unitPriceUSD = originalCost / usdRate    // Convert to USD
+  unitPriceILS = originalCost; // Keep ILS original
+  unitPriceUSD = originalCost / usdRate; // Convert to USD
 }
 
 // CRITICAL: Preserve original currency and cost in QuotationItem
@@ -789,13 +823,14 @@ items.push({
   // ... other fields ...
   unitPriceUSD,
   unitPriceILS,
-  originalCurrency: originalCurrency,  // Must be included!
-  originalCost: originalCost,          // Must be included!
+  originalCurrency: originalCurrency, // Must be included!
+  originalCost: originalCost, // Must be included!
   // ... rest of fields ...
-})
+});
 ```
 
 **Why This Matters**:
+
 - Without `originalCurrency` and `originalCost` in the QuotationItem object, exchange rate recalculation won't know which currency to preserve
 - This was a critical bug that caused all USD prices to change when USD/ILS rate changed
 
@@ -804,43 +839,47 @@ items.push({
 When user changes exchange rates:
 
 ```typescript
-const updateParameters = useCallback((parameters) => {
-  // Check if exchange rates changed
-  const ratesChanged =
-    parameters.usdToIlsRate !== currentQuotation.parameters.usdToIlsRate ||
-    parameters.eurToIlsRate !== currentQuotation.parameters.eurToIlsRate
+const updateParameters = useCallback(
+  parameters => {
+    // Check if exchange rates changed
+    const ratesChanged =
+      parameters.usdToIlsRate !== currentQuotation.parameters.usdToIlsRate ||
+      parameters.eurToIlsRate !== currentQuotation.parameters.eurToIlsRate;
 
-  if (ratesChanged) {
-    // Recalculate each item's prices with new exchange rates
-    updatedItems = currentQuotation.items.map(item => {
-      // Use stored original currency (CRITICAL!)
-      const originalCurrency = item.originalCurrency || 'NIS'
-      const originalAmount = item.originalCost || 0
+    if (ratesChanged) {
+      // Recalculate each item's prices with new exchange rates
+      updatedItems = currentQuotation.items.map(item => {
+        // Use stored original currency (CRITICAL!)
+        const originalCurrency = item.originalCurrency || 'NIS';
+        const originalAmount = item.originalCost || 0;
 
-      // Convert from ORIGINAL currency with new rates
-      const convertedPrices = convertToAllCurrencies(
-        originalAmount,
-        originalCurrency,
-        newRates
-      )
+        // Convert from ORIGINAL currency with new rates
+        const convertedPrices = convertToAllCurrencies(
+          originalAmount,
+          originalCurrency,
+          newRates
+        );
 
-      return {
-        ...item,
-        unitPriceILS: convertedPrices.unitCostNIS,
-        unitPriceUSD: convertedPrices.unitCostUSD,
-        unitPriceEUR: convertedPrices.unitCostEUR,
-        // Totals also recalculated
-        totalPriceILS: convertedPrices.unitCostNIS * item.quantity,
-        totalPriceUSD: convertedPrices.unitCostUSD * item.quantity
-      }
-    })
-  }
-}, [currentQuotation, setCurrentQuotation, updateQuotation])
+        return {
+          ...item,
+          unitPriceILS: convertedPrices.unitCostNIS,
+          unitPriceUSD: convertedPrices.unitCostUSD,
+          unitPriceEUR: convertedPrices.unitCostEUR,
+          // Totals also recalculated
+          totalPriceILS: convertedPrices.unitCostNIS * item.quantity,
+          totalPriceUSD: convertedPrices.unitCostUSD * item.quantity,
+        };
+      });
+    }
+  },
+  [currentQuotation, setCurrentQuotation, updateQuotation]
+);
 ```
 
 ### Common Bugs and Fixes
 
 #### Bug #1: Currency Data Lost on Reload
+
 **Symptom**: Quotation loads with wrong currencies after page refresh
 
 **Root Cause**: `convertDbQuotationToQuotationProject` wasn't using `original_currency` and `original_cost` from database
@@ -848,10 +887,12 @@ const updateParameters = useCallback((parameters) => {
 **Fix**: Modified `src/lib/utils.ts` lines 67-87 to read and use these fields
 
 **Files Changed**:
+
 - `src/lib/utils.ts`: Read `original_currency` and `original_cost` from DB
 - Database: Added currency tracking columns to `components` and `quotation_items` tables
 
 #### Bug #2: Exchange Rate Changes Affect Original Prices
+
 **Symptom**: Changing USD/ILS rate from 4.6 to 5.0 changes USD prices (they should stay fixed)
 
 **Root Cause**: `convertDbQuotationToQuotationProject` didn't set `originalCurrency` and `originalCost` fields in the returned QuotationItem objects
@@ -859,22 +900,24 @@ const updateParameters = useCallback((parameters) => {
 **Fix**: Modified `src/lib/utils.ts` lines 108-110 to include these fields
 
 **Before Fix**:
+
 ```typescript
 items.push({
   unitPriceUSD,
   unitPriceILS,
   // originalCurrency and originalCost missing!
-})
+});
 ```
 
 **After Fix**:
+
 ```typescript
 items.push({
   unitPriceUSD,
   unitPriceILS,
-  originalCurrency: originalCurrency,  // Added
-  originalCost: originalCost,          // Added
-})
+  originalCurrency: originalCurrency, // Added
+  originalCost: originalCost, // Added
+});
 ```
 
 ### Testing Currency Conversion
@@ -886,18 +929,19 @@ describe('convertToAllCurrencies', () => {
   it('preserves USD when converting from USD', () => {
     const result = convertToAllCurrencies(100, 'USD', {
       usdToIlsRate: 3.7,
-      eurToIlsRate: 4.0
-    })
+      eurToIlsRate: 4.0,
+    });
 
-    expect(result.unitCostUSD).toBe(100)  // Original preserved
-    expect(result.unitCostNIS).toBe(370)  // Converted
-  })
-})
+    expect(result.unitCostUSD).toBe(100); // Original preserved
+    expect(result.unitCostNIS).toBe(370); // Converted
+  });
+});
 ```
 
 ### Migration Scripts
 
 #### Add Currency Tracking to Components
+
 ```sql
 -- scripts/add-component-currency-tracking.sql
 ALTER TABLE components
@@ -920,6 +964,7 @@ END;
 ```
 
 #### Add Currency Tracking to Quotation Items
+
 ```sql
 -- scripts/add-currency-tracking.sql
 ALTER TABLE quotation_items
@@ -1017,12 +1062,14 @@ npm test excelParser.test.ts
 ### Known Test Issues
 
 **PDF Parser Tests**:
+
 - PDF parsing tests may fail in some test environments
 - Issue: `pdf-parse` requires browser-like environment
 - Workaround: Tests are written but may need jsdom or puppeteer
 - Real-world usage works correctly in browser
 
 **Test Environment**:
+
 ```javascript
 // vitest.config.ts
 export default defineConfig({
@@ -1048,9 +1095,7 @@ export default defineConfig({
 ### Parser Function Signature
 
 ```typescript
-export async function parseNewFormat(
-  file: File
-): Promise<AIExtractionResult> {
+export async function parseNewFormat(file: File): Promise<AIExtractionResult> {
   try {
     // 1. Validate file type
     // 2. Read file content
@@ -1111,11 +1156,13 @@ const result = await extractComponentsFromDocument(imageFile);
 ```
 
 **Rate Limits**:
+
 - Tier 1: 50 requests/minute
 - Tier 2: 1000 requests/minute
 - Image size limit: 5MB (will be automatically resized)
 
 **Cost Estimation**:
+
 - Images (small): ~$0.01 per document
 - Images (large): ~$0.05 per document
 - Text only: ~$0.001 per document
@@ -1127,22 +1174,26 @@ const result = await extractComponentsFromDocument(imageFile);
 ### Common Issues
 
 **1. Excel Parser Returns Empty Results**
+
 - Check if file has header row
 - Verify column headers match patterns
 - Test with sample data first
 
 **2. PDF Parser Low Confidence**
+
 - PDF may be image-based (scanned)
 - Convert to image and use AI Vision
 - Check if PDF has selectable text
 
 **3. AI Vision API Errors**
+
 - Verify API key is set correctly
 - Check API key has sufficient credits
 - Ensure image size < 5MB
 - Check network connectivity
 
 **4. Component Import Fails**
+
 - Verify Supabase connection
 - Check database schema matches types
 - Ensure user has write permissions
@@ -1168,11 +1219,11 @@ if (DEBUG) {
 ### File Processing Times
 
 | File Type | Size | Typical Time | Max Recommended Size |
-|-----------|------|--------------|---------------------|
-| Excel     | 1MB  | 100-500ms   | 10MB |
-| CSV       | 1MB  | 50-200ms    | 50MB |
-| PDF       | 1MB  | 300-2000ms  | 5MB |
-| Image     | 1MB  | 8-15s       | 5MB |
+| --------- | ---- | ------------ | -------------------- |
+| Excel     | 1MB  | 100-500ms    | 10MB                 |
+| CSV       | 1MB  | 50-200ms     | 50MB                 |
+| PDF       | 1MB  | 300-2000ms   | 5MB                  |
+| Image     | 1MB  | 8-15s        | 5MB                  |
 
 ### Optimization Tips
 
@@ -1194,41 +1245,33 @@ const EXCEL_TYPES = [
   'application/vnd.ms-excel',
 ];
 
-const CSV_TYPES = [
-  'text/csv',
-  'application/csv',
-];
+const CSV_TYPES = ['text/csv', 'application/csv'];
 
-const PDF_TYPES = [
-  'application/pdf',
-];
+const PDF_TYPES = ['application/pdf'];
 
-const IMAGE_TYPES = [
-  'image/jpeg',
-  'image/png',
-  'image/gif',
-  'image/webp',
-];
+const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 ```
 
 ### Regex Patterns
 
 **Price Patterns**:
+
 ```typescript
 const PRICE_PATTERNS = [
-  /\$\s*([0-9,]+\.?\d*)/g,           // $1,234.56
-  /([0-9,]+\.?\d*)\s*USD/gi,         // 1234.56 USD
-  /€\s*([0-9,]+\.?\d*)/g,            // €1,234.56
-  /₪\s*([0-9,]+\.?\d*)/g,            // ₪1,234.56
+  /\$\s*([0-9,]+\.?\d*)/g, // $1,234.56
+  /([0-9,]+\.?\d*)\s*USD/gi, // 1234.56 USD
+  /€\s*([0-9,]+\.?\d*)/g, // €1,234.56
+  /₪\s*([0-9,]+\.?\d*)/g, // ₪1,234.56
 ];
 ```
 
 **Part Number Patterns**:
+
 ```typescript
 const PART_NUMBER_PATTERNS = [
-  /P\/N[:\s]+([A-Z0-9-]+)/gi,        // P/N: ABC123
-  /Part\s*#[:\s]+([A-Z0-9-]+)/gi,    // Part#: ABC123
-  /מק"ט[:\s]+([A-Z0-9-]+)/gi,        // מק"ט: ABC123
+  /P\/N[:\s]+([A-Z0-9-]+)/gi, // P/N: ABC123
+  /Part\s*#[:\s]+([A-Z0-9-]+)/gi, // Part#: ABC123
+  /מק"ט[:\s]+([A-Z0-9-]+)/gi, // מק"ט: ABC123
 ];
 ```
 

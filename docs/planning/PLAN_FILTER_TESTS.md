@@ -127,6 +127,7 @@ Filter clicked: column_name
 ```
 
 **Red flags (must fix before commit)**:
+
 - ❌ `modelSet: null` (filter not set)
 - ❌ `isActive: false` (filter not active)
 - ❌ Any red errors in console
@@ -158,13 +159,13 @@ When adding new filter functionality:
 describe('Contains Filter', () => {
   it('should filter rows containing search term', () => {
     // Test implementation
-  })
-})
+  });
+});
 ```
 
 ### 2. Update Documentation
 
-- Add to `FILTER_IMPLEMENTATION.md`
+- Add to `../developer/IMPL_FILTERS.md`
 - Update this file with new test requirements
 - Add JSDoc comments to code
 
@@ -242,26 +243,26 @@ If filters break in production:
 // In browser console
 
 // 1. Check AG Grid version
-console.log(window.agGrid.VERSION)
+console.log(window.agGrid.VERSION);
 
 // 2. Check filter instance type
-const api = window.gridApi
-const filter = await api.getColumnFilterInstance('column_name')
-console.log('Filter type:', filter.constructor.name)
+const api = window.gridApi;
+const filter = await api.getColumnFilterInstance('column_name');
+console.log('Filter type:', filter.constructor.name);
 
 // 3. Check current filter model
-console.log('Filter model:', filter.getModel())
-console.log('Is active:', filter.isFilterActive())
+console.log('Filter model:', filter.getModel());
+console.log('Is active:', filter.isFilterActive());
 
 // 4. Check grid filter state
-console.log('All filters:', api.getFilterModel())
+console.log('All filters:', api.getFilterModel());
 
 // 5. Check saved config
 const { data } = await supabase
   .from('user_table_configs')
   .select('*')
-  .eq('table_name', 'quotation_data_grid')
-console.log('Saved config:', data)
+  .eq('table_name', 'quotation_data_grid');
+console.log('Saved config:', data);
 ```
 
 ---
@@ -280,6 +281,7 @@ console.log('Saved config:', data)
 **DO NOT SKIP TESTING FILTERS**
 
 The November 2024 bug showed that:
+
 1. Manual testing alone isn't enough
 2. Unit tests are critical
 3. Integration tests catch edge cases

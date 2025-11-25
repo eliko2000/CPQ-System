@@ -10,7 +10,9 @@
 ## 🐛 Issues Reported
 
 ### Issue #1: Confirmation Page in English
+
 **Problem:** After AI extraction, the confirmation/preview page shows field labels in English:
+
 - "Price"
 - "P/N"
 - "Category"
@@ -19,9 +21,11 @@
 **Impact:** Inconsistent with Hebrew app interface
 
 ### Issue #2: Missing Currency Conversion
+
 **Problem:** When AI extracts price in USD, other currencies (NIS, EUR) are not calculated
 
 **Requirements:**
+
 1. Calculate all 3 currencies based on exchange rates
 2. Mark original currency in GREEN to indicate source
 3. Exchange rates should come from settings (TODO: settings page doesn't exist yet)
@@ -33,25 +37,26 @@
 ### Fix #1: Complete Hebrew Translation of Preview Fields
 
 **Files Modified:**
+
 - `src/components/library/AIExtractionPreview.tsx`
 
 **Translations Applied:**
 
-| English | Hebrew | Context |
-|---------|--------|---------|
-| "Manufacturer:" | "יצרן:" | Display label |
-| "Manufacturer" | "יצרן" | Edit label |
-| "P/N:" | "מק\"ט:" | Display label |
-| "Part Number" | "מק\"ט" | Edit label |
-| "Category:" | "קטגוריה:" | Display label |
-| "Category" | "קטגוריה" | Edit label |
-| "Price:" | "מחירים:" | Display label (now shows all 3) |
-| "Price (NIS)" | "מחיר (₪)" | Edit label |
-| "Notes:" | "הערות:" | Notes label |
-| "Supplier:" | "ספק:" | Metadata |
-| "Date:" | "תאריך:" | Metadata |
-| "Currency:" | "מטבע:" | Metadata |
-| "Type:" | "סוג:" | Metadata |
+| English         | Hebrew     | Context                         |
+| --------------- | ---------- | ------------------------------- |
+| "Manufacturer:" | "יצרן:"    | Display label                   |
+| "Manufacturer"  | "יצרן"     | Edit label                      |
+| "P/N:"          | "מק\"ט:"   | Display label                   |
+| "Part Number"   | "מק\"ט"    | Edit label                      |
+| "Category:"     | "קטגוריה:" | Display label                   |
+| "Category"      | "קטגוריה"  | Edit label                      |
+| "Price:"        | "מחירים:"  | Display label (now shows all 3) |
+| "Price (NIS)"   | "מחיר (₪)" | Edit label                      |
+| "Notes:"        | "הערות:"   | Notes label                     |
+| "Supplier:"     | "ספק:"     | Metadata                        |
+| "Date:"         | "תאריך:"   | Metadata                        |
+| "Currency:"     | "מטבע:"    | Metadata                        |
+| "Type:"         | "סוג:"     | Metadata                        |
 
 **Result:** ✅ **100% Hebrew confirmation screen**
 
@@ -94,6 +99,7 @@
 ```
 
 **Visual Example:**
+
 - Original price from quotation (USD): **$100.00** ← GREEN
 - Calculated NIS: ₪360.00 ← Black
 - Calculated EUR: €110.00 ← Black
@@ -103,6 +109,7 @@
 ### Fix #3: Automatic Currency Conversion
 
 **File Modified:**
+
 - `src/services/claudeAI.ts`
 
 **Implementation:**
@@ -151,11 +158,11 @@ export function aiComponentToComponent(
 
 **Conversion Logic:**
 
-| Original Currency | Conversions Applied |
-|-------------------|---------------------|
-| **USD** (Green) | NIS = USD × 3.6<br>EUR = USD × 1.1 |
-| **EUR** (Green) | NIS = EUR × 4.0<br>USD = EUR / 1.1 |
-| **NIS** (Green) | USD = NIS / 3.6<br>EUR = NIS / 4.0 |
+| Original Currency | Conversions Applied                |
+| ----------------- | ---------------------------------- |
+| **USD** (Green)   | NIS = USD × 3.6<br>EUR = USD × 1.1 |
+| **EUR** (Green)   | NIS = EUR × 4.0<br>USD = EUR / 1.1 |
+| **NIS** (Green)   | USD = NIS / 3.6<br>EUR = NIS / 4.0 |
 
 ---
 
@@ -164,15 +171,17 @@ export function aiComponentToComponent(
 ### Example: Quotation with $100 component
 
 **Step 1: AI Extracts Price**
+
 ```json
 {
   "name": "NANO Camera",
-  "unitPriceUSD": 100.00,
+  "unitPriceUSD": 100.0,
   "currency": "USD"
 }
 ```
 
 **Step 2: Currency Conversion**
+
 ```javascript
 unitCostUSD = 100.00  // Original (will be GREEN)
 unitCostNIS = 100 × 3.6 = 360.00  // Calculated
@@ -181,12 +190,14 @@ currency = "USD" // Marker for original
 ```
 
 **Step 3: Display in Confirmation**
+
 ```
 מחירים:
 $100.00 (GREEN)  ₪360.00  €110.00
 ```
 
 **Step 4: Save to Database**
+
 - All 3 prices saved
 - `currency` field = "USD" (indicates original)
 - Component cards will show the same green highlighting
@@ -196,6 +207,7 @@ $100.00 (GREEN)  ₪360.00  €110.00
 ## 🎨 Visual Changes
 
 ### Before Fix:
+
 ```
 Price: $100.00
 P/N: ABC-123
@@ -204,6 +216,7 @@ Manufacturer: Mech-Mind
 ```
 
 ### After Fix:
+
 ```
 מחירים: $100.00  ₪360.00  €110.00
          ^GREEN   ^BLACK   ^BLACK
@@ -216,10 +229,10 @@ Manufacturer: Mech-Mind
 
 ## 📝 Files Modified
 
-| File | Lines Changed | Changes |
-|------|---------------|---------|
-| `src/components/library/AIExtractionPreview.tsx` | ~40 | Hebrew labels + multi-currency display + green highlighting |
-| `src/services/claudeAI.ts` | ~70 | Currency conversion logic with exchange rates |
+| File                                             | Lines Changed | Changes                                                     |
+| ------------------------------------------------ | ------------- | ----------------------------------------------------------- |
+| `src/components/library/AIExtractionPreview.tsx` | ~40           | Hebrew labels + multi-currency display + green highlighting |
+| `src/services/claudeAI.ts`                       | ~70           | Currency conversion logic with exchange rates               |
 
 **Total:** 2 files, ~110 lines modified
 
@@ -228,7 +241,9 @@ Manufacturer: Mech-Mind
 ## ⚙️ Exchange Rate Configuration
 
 ### Current Implementation:
+
 **Hardcoded default rates** in `claudeAI.ts`:
+
 ```typescript
 const DEFAULT_EXCHANGE_RATES = {
   USD_TO_ILS: 3.6,
@@ -238,6 +253,7 @@ const DEFAULT_EXCHANGE_RATES = {
 ```
 
 ### Future Enhancement (TODO):
+
 **Settings Page with configurable rates:**
 
 ```typescript
@@ -263,6 +279,7 @@ const component = aiComponentToComponent(extracted, supplier, date, rates);
 ### Manual Testing:
 
 **Test Case 1: USD Price** ✅
+
 1. Upload quotation with USD prices
 2. Verify:
    - USD price is GREEN
@@ -271,6 +288,7 @@ const component = aiComponentToComponent(extracted, supplier, date, rates);
    - Labels in Hebrew
 
 **Test Case 2: NIS Price** ✅
+
 1. Upload Israeli supplier quotation with NIS prices
 2. Verify:
    - NIS price is GREEN
@@ -278,6 +296,7 @@ const component = aiComponentToComponent(extracted, supplier, date, rates);
    - EUR calculated correctly (NIS / 4.0)
 
 **Test Case 3: EUR Price** ✅
+
 1. Upload European quotation with EUR prices
 2. Verify:
    - EUR price is GREEN
@@ -285,6 +304,7 @@ const component = aiComponentToComponent(extracted, supplier, date, rates);
    - USD calculated correctly (EUR / 1.1)
 
 **Test Case 4: Hebrew Labels** ✅
+
 1. Check all field labels are in Hebrew
 2. Verify edit mode labels are Hebrew
 3. Check metadata section labels
@@ -294,15 +314,18 @@ const component = aiComponentToComponent(extracted, supplier, date, rates);
 ## 🎯 Impact Assessment
 
 ### User Experience
+
 - **Before:** English labels, single currency only
 - **After:** Hebrew labels, all 3 currencies with clear original indicator
 
 ### Data Accuracy
+
 - ✅ **Improved:** Automatic currency conversion based on rates
 - ✅ **Traceable:** Green indicator shows which price is original
 - ✅ **Consistent:** Matches existing component card behavior
 
 ### Pricing Integrity
+
 - ✅ **Maintained:** Original price preserved in `currency` field
 - ✅ **Calculated:** Derived prices clearly distinguishable from original
 - ✅ **Auditable:** Can trace back to source currency
@@ -312,11 +335,13 @@ const component = aiComponentToComponent(extracted, supplier, date, rates);
 ## 💡 Recommendations
 
 ### Immediate (Optional):
+
 1. **Create Settings Page** for exchange rate configuration
 2. **Add rate update date** to show when rates were last updated
 3. **API integration** to fetch live exchange rates (e.g., exchangerate-api.com)
 
 ### Future Enhancements:
+
 1. **Historical rates** - Save rate used at time of component creation
 2. **Rate alerts** - Notify when exchange rates change significantly
 3. **Multi-currency support** in quotations - Use component's original currency
@@ -327,11 +352,13 @@ const component = aiComponentToComponent(extracted, supplier, date, rates);
 ## 📚 Documentation Updates Needed
 
 ### User Documentation:
+
 - Explain green price indicator means "original from supplier"
 - Document default exchange rates
 - Guide on when/how to update rates (once Settings page exists)
 
 ### Developer Documentation:
+
 - Exchange rate configuration location
 - How to modify default rates
 - Currency conversion algorithm
@@ -359,19 +386,21 @@ const component = aiComponentToComponent(extracted, supplier, date, rates);
 2. ✅ **Currency Conversion** - Automatic conversion with green original indicator
 
 **Exchange Rates:**
+
 - Currently using default hardcoded rates
 - Ready for Settings page integration (future enhancement)
 - Easy to modify in `src/services/claudeAI.ts`
 
 **Visual Improvements:**
+
 - Multi-currency display shows all 3 prices
 - Green color highlights original supplier price
 - Consistent with existing component card UI
 
 ---
 
-*Last updated: 2025-11-07*
-*Bug fix time: ~30 minutes*
-*Status: ✅ **READY TO TEST**
+_Last updated: 2025-11-07_
+_Bug fix time: ~30 minutes_
+\*Status: ✅ **READY TO TEST**
 
 **Test with real quotations to verify currency conversion accuracy!**

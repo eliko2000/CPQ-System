@@ -1,6 +1,9 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@supabase/supabase-js';
+import { config } from './lib/config';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://placeholder.supabase.co'
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'placeholder-key'
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+// Use validated configuration from config.ts
+// This ensures we never initialize Supabase with invalid credentials
+export const supabase = createClient(
+  config.supabase.url,
+  config.supabase.anonKey
+);

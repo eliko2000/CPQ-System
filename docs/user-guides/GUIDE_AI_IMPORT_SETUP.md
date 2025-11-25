@@ -9,18 +9,21 @@ This feature enables intelligent extraction of component data from supplier quot
 ## Features
 
 ✨ **Intelligent Document Analysis**
+
 - Understands context and column meanings automatically
 - Handles mixed English/Hebrew documents
 - Recognizes various price formats and currencies
 - Extracts manufacturer names, part numbers, categories, prices
 
 🎯 **Flexible Input Formats**
+
 - Images: JPEG, PNG, GIF, WebP
 - Screenshots of Excel/PDF documents
 - Photos of printed price lists
 - Scanned quotations
 
 🔍 **Smart Validation**
+
 - AI confidence scores for each extraction
 - Interactive preview and editing before import
 - Category suggestion based on component description
@@ -105,6 +108,7 @@ npm run dev
 ### Document Preparation
 
 ✅ **Good Practices:**
+
 - Use high-resolution images (1920x1080 or higher)
 - Ensure text is clearly readable
 - Take photos straight-on (not at an angle)
@@ -112,6 +116,7 @@ npm run dev
 - Crop to just the table/list area
 
 ❌ **Avoid:**
+
 - Blurry or low-resolution images
 - Heavily skewed or rotated photos
 - Poor lighting or heavy shadows
@@ -134,17 +139,17 @@ Since PDF direct upload is not yet supported:
 
 The AI can extract:
 
-| Field | Examples | Notes |
-|-------|----------|-------|
-| **Name** | "Proximity Sensor", "חיישן קרבה" | Component/product name |
-| **Manufacturer** | "Siemens", "Festo", "SMC" | Brand name |
-| **Part Number** | "6ES7131-4BD01", "P/N: ABC-123" | Catalog number, P/N, מק"ט |
-| **Category** | "Sensors", "PLCs", "חיישנים" | Auto-categorized |
-| **Supplier** | "RS Components", "דיגיקי" | Vendor name |
-| **Price (NIS)** | "₪1,500", "1500 ש״ח" | Israeli Shekels |
-| **Price (USD)** | "$399.99", "399.99 USD" | US Dollars |
-| **Price (EUR)** | "€350", "350 EUR" | Euros |
-| **Notes** | "Lead time 6 weeks" | Any additional info |
+| Field            | Examples                         | Notes                     |
+| ---------------- | -------------------------------- | ------------------------- |
+| **Name**         | "Proximity Sensor", "חיישן קרבה" | Component/product name    |
+| **Manufacturer** | "Siemens", "Festo", "SMC"        | Brand name                |
+| **Part Number**  | "6ES7131-4BD01", "P/N: ABC-123"  | Catalog number, P/N, מק"ט |
+| **Category**     | "Sensors", "PLCs", "חיישנים"     | Auto-categorized          |
+| **Supplier**     | "RS Components", "דיגיקי"        | Vendor name               |
+| **Price (NIS)**  | "₪1,500", "1500 ש״ח"             | Israeli Shekels           |
+| **Price (USD)**  | "$399.99", "399.99 USD"          | US Dollars                |
+| **Price (EUR)**  | "€350", "350 EUR"                | Euros                     |
+| **Notes**        | "Lead time 6 weeks"              | Any additional info       |
 
 ---
 
@@ -159,12 +164,12 @@ The AI can extract:
 
 ### Example Usage Costs
 
-| Monthly Usage | Estimated Cost |
-|--------------|----------------|
-| 10 documents | ~$0.10 |
-| 100 documents | ~$1.00 |
-| 500 documents | ~$5.00 |
-| 1,000 documents | ~$10.00 |
+| Monthly Usage   | Estimated Cost |
+| --------------- | -------------- |
+| 10 documents    | ~$0.10         |
+| 100 documents   | ~$1.00         |
+| 500 documents   | ~$5.00         |
+| 1,000 documents | ~$10.00        |
 
 💡 **Very affordable** for typical CPQ system usage!
 
@@ -175,6 +180,7 @@ The AI can extract:
 ### Issue: "Claude API key not configured"
 
 **Solution:**
+
 1. Check `.env.local` file exists in project root
 2. Verify `VITE_ANTHROPIC_API_KEY` is set correctly
 3. Ensure API key starts with `sk-ant-`
@@ -183,12 +189,14 @@ The AI can extract:
 ### Issue: "Failed to extract data from document"
 
 **Possible causes:**
+
 - Poor image quality → Try higher resolution
 - API key invalid → Check Anthropic console
 - Rate limit exceeded → Wait a few minutes
 - Network issues → Check internet connection
 
 **Solutions:**
+
 1. Try a clearer image
 2. Verify API key is active in Anthropic console
 3. Check browser console for detailed error messages
@@ -196,6 +204,7 @@ The AI can extract:
 ### Issue: Low confidence scores or incorrect extraction
 
 **Solutions:**
+
 - Use higher resolution images
 - Ensure text is clearly readable
 - Try cropping to just the relevant table
@@ -204,6 +213,7 @@ The AI can extract:
 ### Issue: Categories not matching
 
 **Solution:**
+
 - Categories are auto-suggested by AI
 - You can manually edit in the preview screen
 - Categories available:
@@ -246,14 +256,14 @@ ComponentLibrary (Main UI)
 
 ### Files Created
 
-| File | Purpose |
-|------|---------|
-| `src/services/claudeAI.ts` | Claude API integration & prompts |
-| `src/components/library/IntelligentDocumentUpload.tsx` | File upload component |
-| `src/components/library/AIExtractionPreview.tsx` | Preview & validation UI |
-| `src/components/library/ComponentAIImport.tsx` | Modal orchestrator |
-| `src/components/ui/dialog.tsx` | Dialog component (Radix UI) |
-| `src/components/ui/select.tsx` | Select component (Radix UI) |
+| File                                                   | Purpose                          |
+| ------------------------------------------------------ | -------------------------------- |
+| `src/services/claudeAI.ts`                             | Claude API integration & prompts |
+| `src/components/library/IntelligentDocumentUpload.tsx` | File upload component            |
+| `src/components/library/AIExtractionPreview.tsx`       | Preview & validation UI          |
+| `src/components/library/ComponentAIImport.tsx`         | Modal orchestrator               |
+| `src/components/ui/dialog.tsx`                         | Dialog component (Radix UI)      |
+| `src/components/ui/select.tsx`                         | Select component (Radix UI)      |
 
 ---
 
@@ -262,8 +272,9 @@ ComponentLibrary (Main UI)
 ### Browser API Key Usage
 
 ⚠️ **Current Implementation:**
+
 ```typescript
-dangerouslyAllowBrowser: true
+dangerouslyAllowBrowser: true;
 ```
 
 This is **only for development**. The API key is exposed in browser.
@@ -277,12 +288,14 @@ User → Your Backend → Claude API → Your Backend → User
 ```
 
 **Benefits:**
+
 - API key stays secret on server
 - Rate limiting control
 - Usage monitoring
 - Cost control
 
 **Implementation Steps:**
+
 1. Create Node.js/Express backend endpoint
 2. Move Claude API call to backend
 3. Frontend calls your backend
@@ -324,6 +337,7 @@ The AI uses this prompt to understand documents:
 > "You are an expert at extracting structured component data from supplier quotations, price lists, and technical documents. Analyze this document and extract ALL component/product information. The document may be in English, Hebrew, or mixed languages..."
 
 **Extraction fields:**
+
 - name, manufacturer, manufacturerPN, category
 - supplier, quantity, prices (NIS/USD/EUR)
 - quoteDate, notes, confidence score
@@ -340,5 +354,5 @@ The AI-powered import feature saves hours of manual data entry by intelligently 
 
 ---
 
-*Last updated: 2025-11-07*
-*Feature version: 1.0.0*
+_Last updated: 2025-11-07_
+_Feature version: 1.0.0_

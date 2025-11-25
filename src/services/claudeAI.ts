@@ -3,23 +3,25 @@ import * as XLSX from 'xlsx';
 import type { Component, ExtractedItem } from '../types';
 import { getComponentCategories } from '../constants/settings';
 import { logger } from '@/lib/logger';
+import { config } from '@/lib/config';
 
-// Get API key from environment
-const ANTHROPIC_API_KEY = import.meta.env.VITE_ANTHROPIC_API_KEY;
+// Get API key from validated config
+const ANTHROPIC_API_KEY = config.anthropic.apiKey;
 
-// Validate API key
-const isValidApiKey = (key: string | undefined): boolean => {
-  return !!key && key.startsWith('sk-ant-') && key !== 'your-anthropic-api-key-here';
-};
-
-// Initialize Anthropic client only if API key is valid
+// Initialize Anthropic client only if API key is available
+// Note: This will be null if API key is not configured, which is acceptable
+// Excel and CSV parsing will still work, only AI Vision features will be disabled
 let anthropic: Anthropic | null = null;
 
-if (isValidApiKey(ANTHROPIC_API_KEY)) {
+if (ANTHROPIC_API_KEY) {
   anthropic = new Anthropic({
     apiKey: ANTHROPIC_API_KEY,
     dangerouslyAllowBrowser: true, // Only for development - move to backend in production
   });
+  logger.info('Anthropic client initialized - AI Vision features available');
+} else {
+  logger.warn('Anthropic client not initialized - AI Vision features disabled');
+  logger.warn('To enable AI Vision, set VITE_ANTHROPIC_API_KEY in .env.local');
 }
 
 // Response type from Claude
@@ -80,7 +82,9 @@ async function fileToBase64(file: File): Promise<string> {
 /**
  * Determine media type from file
  */
-function getMediaType(file: File): 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp' | 'application/pdf' {
+function getMediaType(
+  file: File
+): 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp' | 'application/pdf' {
   const type = file.type;
 
   if (type === 'image/jpeg' || type === 'image/jpg') return 'image/jpeg';
@@ -124,7 +128,7 @@ async function excelToText(file: File): Promise<string> {
       type: 'array',
       cellDates: true,
       cellNF: false,
-      cellText: false
+      cellText: false,
     });
 
     if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
@@ -144,7 +148,7 @@ async function excelToText(file: File): Promise<string> {
       // Convert sheet to CSV format (preserves table structure)
       const csv = XLSX.utils.sheet_to_csv(worksheet, {
         forceQuotes: false,
-        blankrows: false
+        blankrows: false,
       });
 
       textRepresentation += csv + '\n\n';
@@ -153,7 +157,9 @@ async function excelToText(file: File): Promise<string> {
     return textRepresentation;
   } catch (error) {
     logger.error('Error converting Excel to text:', error);
-    throw new Error(`Failed to read Excel file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    throw new Error(
+      `Failed to read Excel file: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
   }
 }
 
@@ -247,7 +253,9 @@ function parseClaudeResponse(responseText: string): AIExtractionResult {
     // Remove markdown code blocks if present
     let cleanedResponse = responseText.trim();
     if (cleanedResponse.startsWith('```json')) {
-      cleanedResponse = cleanedResponse.replace(/```json\n?/g, '').replace(/```\n?$/g, '');
+      cleanedResponse = cleanedResponse
+        .replace(/```json\n?/g, '')
+        .replace(/```\n?$/g, '');
     } else if (cleanedResponse.startsWith('```')) {
       cleanedResponse = cleanedResponse.replace(/```\n?/g, '');
     }
@@ -260,9 +268,14 @@ function parseClaudeResponse(responseText: string): AIExtractionResult {
     }
 
     // Calculate overall confidence
-    const avgConfidence = parsed.components.length > 0
-      ? parsed.components.reduce((sum: number, c: AIExtractedComponent) => sum + (c.confidence || 0.5), 0) / parsed.components.length
-      : 0.5;
+    const avgConfidence =
+      parsed.components.length > 0
+        ? parsed.components.reduce(
+            (sum: number, c: AIExtractedComponent) =>
+              sum + (c.confidence || 0.5),
+            0
+          ) / parsed.components.length
+        : 0.5;
 
     return {
       success: true,
@@ -279,8 +292,14 @@ function parseClaudeResponse(responseText: string): AIExtractionResult {
     };
   } catch (error) {
     logger.error('Failed to parse Claude response:', error);
-    logger.error('Raw response (first 500 chars):', responseText.substring(0, 500));
-    logger.error('Raw response (last 500 chars):', responseText.substring(Math.max(0, responseText.length - 500)));
+    logger.error(
+      'Raw response (first 500 chars):',
+      responseText.substring(0, 500)
+    );
+    logger.error(
+      'Raw response (last 500 chars):',
+      responseText.substring(Math.max(0, responseText.length - 500))
+    );
 
     return {
       success: false,
@@ -327,8 +346,8 @@ async function extractFromExcelFile(file: File): Promise<AIExtractionResult> {
 
     // Extract text from response
     const responseText = message.content
-      .filter((block) => block.type === 'text')
-      .map((block) => (block as { type: 'text'; text: string }).text)
+      .filter(block => block.type === 'text')
+      .map(block => (block as { type: 'text'; text: string }).text)
       .join('\n');
 
     // Check if response was truncated
@@ -339,7 +358,8 @@ async function extractFromExcelFile(file: File): Promise<AIExtractionResult> {
         components: [],
         metadata: { documentType: 'excel', totalItems: 0 },
         confidence: 0,
-        error: 'Excel file has too many rows. The response was truncated.\n\nTry one of these options:\n1. Split the Excel file into smaller files\n2. Remove unnecessary rows/columns\n3. Process only specific sheets',
+        error:
+          'Excel file has too many rows. The response was truncated.\n\nTry one of these options:\n1. Split the Excel file into smaller files\n2. Remove unnecessary rows/columns\n3. Process only specific sheets',
         rawResponse: responseText,
       };
     }
@@ -361,9 +381,10 @@ async function extractFromExcelFile(file: File): Promise<AIExtractionResult> {
       components: [],
       metadata: { documentType: 'excel', totalItems: 0 },
       confidence: 0,
-      error: error instanceof Error
-        ? `Failed to extract from Excel: ${error.message}`
-        : 'Unknown error occurred during Excel extraction',
+      error:
+        error instanceof Error
+          ? `Failed to extract from Excel: ${error.message}`
+          : 'Unknown error occurred during Excel extraction',
     };
   }
 }
@@ -376,7 +397,9 @@ async function extractFromExcelFile(file: File): Promise<AIExtractionResult> {
  * - PDF files (.pdf) - Vision API
  * - Image files (JPEG, PNG, GIF, WebP) - Vision API
  */
-export async function extractComponentsFromDocument(file: File): Promise<AIExtractionResult> {
+export async function extractComponentsFromDocument(
+  file: File
+): Promise<AIExtractionResult> {
   try {
     // Check if API key is configured
     if (!anthropic) {
@@ -385,7 +408,8 @@ export async function extractComponentsFromDocument(file: File): Promise<AIExtra
         components: [],
         metadata: { documentType: 'unknown', totalItems: 0 },
         confidence: 0,
-        error: 'Claude AI is not configured. Please follow these steps:\n\n1. Get your API key from https://console.anthropic.com/\n2. Add it to .env.local: VITE_ANTHROPIC_API_KEY=sk-ant-your-key\n3. Restart the dev server: npm run dev\n\nSee QUICK_START_AI_IMPORT.md for detailed instructions.',
+        error:
+          'Claude AI is not configured. Please follow these steps:\n\n1. Get your API key from https://console.anthropic.com/\n2. Add it to .env.local: VITE_ANTHROPIC_API_KEY=sk-ant-your-key\n3. Restart the dev server: npm run dev\n\nSee QUICK_START_AI_IMPORT.md for detailed instructions.',
       };
     }
 
@@ -401,7 +425,7 @@ export async function extractComponentsFromDocument(file: File): Promise<AIExtra
       'image/png',
       'image/gif',
       'image/webp',
-      'application/pdf'
+      'application/pdf',
     ];
 
     if (!validTypes.includes(file.type)) {
@@ -428,21 +452,27 @@ export async function extractComponentsFromDocument(file: File): Promise<AIExtra
           role: 'user',
           content: [
             // PDFs use 'document' type, images use 'image' type
-            isPDF ? {
-              type: 'document',
-              source: {
-                type: 'base64',
-                media_type: 'application/pdf',
-                data: base64Data,
-              },
-            } : {
-              type: 'image',
-              source: {
-                type: 'base64',
-                media_type: mediaType as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp',
-                data: base64Data,
-              },
-            },
+            isPDF
+              ? {
+                  type: 'document',
+                  source: {
+                    type: 'base64',
+                    media_type: 'application/pdf',
+                    data: base64Data,
+                  },
+                }
+              : {
+                  type: 'image',
+                  source: {
+                    type: 'base64',
+                    media_type: mediaType as
+                      | 'image/jpeg'
+                      | 'image/png'
+                      | 'image/gif'
+                      | 'image/webp',
+                    data: base64Data,
+                  },
+                },
             {
               type: 'text',
               text: createExtractionPrompt(),
@@ -454,8 +484,8 @@ export async function extractComponentsFromDocument(file: File): Promise<AIExtra
 
     // Extract text from response
     const responseText = message.content
-      .filter((block) => block.type === 'text')
-      .map((block) => (block as { type: 'text'; text: string }).text)
+      .filter(block => block.type === 'text')
+      .map(block => (block as { type: 'text'; text: string }).text)
       .join('\n');
 
     // Check if response was truncated
@@ -466,7 +496,8 @@ export async function extractComponentsFromDocument(file: File): Promise<AIExtra
         components: [],
         metadata: { documentType: 'pdf', totalItems: 0 },
         confidence: 0,
-        error: 'PDF has too many components. The response was truncated.\n\nTry one of these options:\n1. Split the PDF into smaller files\n2. Convert specific pages to images\n3. Use Excel/CSV format instead',
+        error:
+          'PDF has too many components. The response was truncated.\n\nTry one of these options:\n1. Split the PDF into smaller files\n2. Convert specific pages to images\n3. Use Excel/CSV format instead',
         rawResponse: responseText,
       };
     }
@@ -477,17 +508,19 @@ export async function extractComponentsFromDocument(file: File): Promise<AIExtra
     logger.error('Claude AI extraction error:', error);
 
     // Check for authentication errors
-    if (error instanceof Error && (
-      error.message.includes('authentication_error') ||
-      error.message.includes('invalid x-api-key') ||
-      error.message.includes('api_key')
-    )) {
+    if (
+      error instanceof Error &&
+      (error.message.includes('authentication_error') ||
+        error.message.includes('invalid x-api-key') ||
+        error.message.includes('api_key'))
+    ) {
       return {
         success: false,
         components: [],
         metadata: { documentType: 'unknown', totalItems: 0 },
         confidence: 0,
-        error: '❌ Authentication Failed\n\nYour Claude API key is invalid or not configured correctly.\n\n📋 Steps to fix:\n1. Visit https://console.anthropic.com/\n2. Generate a new API key\n3. Update .env.local:\n   VITE_ANTHROPIC_API_KEY=sk-ant-your-actual-key\n4. Restart: npm run dev\n\n💡 Tip: Make sure to copy the full key starting with "sk-ant-"',
+        error:
+          '❌ Authentication Failed\n\nYour Claude API key is invalid or not configured correctly.\n\n📋 Steps to fix:\n1. Visit https://console.anthropic.com/\n2. Generate a new API key\n3. Update .env.local:\n   VITE_ANTHROPIC_API_KEY=sk-ant-your-actual-key\n4. Restart: npm run dev\n\n💡 Tip: Make sure to copy the full key starting with "sk-ant-"',
       };
     }
 
@@ -507,7 +540,10 @@ export async function extractComponentsFromDocument(file: File): Promise<AIExtra
       components: [],
       metadata: { documentType: 'unknown', totalItems: 0 },
       confidence: 0,
-      error: error instanceof Error ? error.message : 'Unknown error during extraction',
+      error:
+        error instanceof Error
+          ? error.message
+          : 'Unknown error during extraction',
     };
   }
 }
@@ -545,8 +581,12 @@ export function aiComponentToComponent(
     unitCostUSD = aiComponent.unitPriceUSD;
 
     // Calculate other currencies
-    unitCostNIS = aiComponent.unitPriceNIS || (aiComponent.unitPriceUSD * exchangeRates.USD_TO_ILS);
-    unitCostEUR = aiComponent.unitPriceEUR || (aiComponent.unitPriceUSD * exchangeRates.EUR_TO_USD);
+    unitCostNIS =
+      aiComponent.unitPriceNIS ||
+      aiComponent.unitPriceUSD * exchangeRates.USD_TO_ILS;
+    unitCostEUR =
+      aiComponent.unitPriceEUR ||
+      aiComponent.unitPriceUSD * exchangeRates.EUR_TO_USD;
   }
   // Case 2: Price in EUR
   else if (aiComponent.unitPriceEUR) {
@@ -555,8 +595,12 @@ export function aiComponentToComponent(
     unitCostEUR = aiComponent.unitPriceEUR;
 
     // Calculate other currencies
-    unitCostNIS = aiComponent.unitPriceNIS || (aiComponent.unitPriceEUR * exchangeRates.EUR_TO_ILS);
-    unitCostUSD = aiComponent.unitPriceUSD || (aiComponent.unitPriceEUR / exchangeRates.EUR_TO_USD);
+    unitCostNIS =
+      aiComponent.unitPriceNIS ||
+      aiComponent.unitPriceEUR * exchangeRates.EUR_TO_ILS;
+    unitCostUSD =
+      aiComponent.unitPriceUSD ||
+      aiComponent.unitPriceEUR / exchangeRates.EUR_TO_USD;
   }
   // Case 3: Price in NIS (Israeli suppliers)
   else if (aiComponent.unitPriceNIS) {
@@ -565,8 +609,12 @@ export function aiComponentToComponent(
     unitCostNIS = aiComponent.unitPriceNIS;
 
     // Calculate other currencies
-    unitCostUSD = aiComponent.unitPriceUSD || (aiComponent.unitPriceNIS / exchangeRates.USD_TO_ILS);
-    unitCostEUR = aiComponent.unitPriceEUR || (aiComponent.unitPriceNIS / exchangeRates.EUR_TO_ILS);
+    unitCostUSD =
+      aiComponent.unitPriceUSD ||
+      aiComponent.unitPriceNIS / exchangeRates.USD_TO_ILS;
+    unitCostEUR =
+      aiComponent.unitPriceEUR ||
+      aiComponent.unitPriceNIS / exchangeRates.EUR_TO_ILS;
   }
   // Case 4: No price found
   else {
@@ -589,7 +637,10 @@ export function aiComponentToComponent(
     unitCostEUR,
     currency, // This indicates which currency is the ORIGINAL (will be green)
     originalCost,
-    quoteDate: aiComponent.quoteDate || defaultQuoteDate || new Date().toISOString().split('T')[0],
+    quoteDate:
+      aiComponent.quoteDate ||
+      defaultQuoteDate ||
+      new Date().toISOString().split('T')[0],
     quoteFileUrl: '', // Will be set when file is uploaded
     notes: aiComponent.notes,
   };

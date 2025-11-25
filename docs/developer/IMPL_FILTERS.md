@@ -18,8 +18,8 @@ The code was using **SetFilter format** (AG Grid Enterprise) with **TextFilter**
 
 ```typescript
 // ❌ WRONG - This doesn't work with TextFilter
-const model = { values: ['Value1', 'Value2'] }
-filterInstance.setModel(model)  // Model is rejected, returns null
+const model = { values: ['Value1', 'Value2'] };
+filterInstance.setModel(model); // Model is rejected, returns null
 ```
 
 ### Why It Happened
@@ -37,18 +37,18 @@ filterInstance.setModel(model)  // Model is rejected, returns null
 
 ### Community Edition (Free)
 
-| Filter Type | Used For | Model Format |
-|-------------|----------|--------------|
-| TextFilter | Text columns | `{ filterType: 'text', type: 'equals', filter: 'value' }` |
-| NumberFilter | Number columns | `{ filterType: 'number', type: 'equals', filter: 123 }` |
-| DateFilter | Date columns | `{ filterType: 'date', type: 'equals', dateFrom: '2024-01-01' }` |
+| Filter Type  | Used For       | Model Format                                                     |
+| ------------ | -------------- | ---------------------------------------------------------------- |
+| TextFilter   | Text columns   | `{ filterType: 'text', type: 'equals', filter: 'value' }`        |
+| NumberFilter | Number columns | `{ filterType: 'number', type: 'equals', filter: 123 }`          |
+| DateFilter   | Date columns   | `{ filterType: 'date', type: 'equals', dateFrom: '2024-01-01' }` |
 
 ### Enterprise Edition (Paid)
 
-| Filter Type | Used For | Model Format |
-|-------------|----------|--------------|
-| SetFilter | Multi-select text | `{ values: ['value1', 'value2'] }` |
-| MultiFilter | Combined filters | Complex nested structure |
+| Filter Type | Used For          | Model Format                       |
+| ----------- | ----------------- | ---------------------------------- |
+| SetFilter   | Multi-select text | `{ values: ['value1', 'value2'] }` |
+| MultiFilter | Combined filters  | Complex nested structure           |
 
 **The CPQ application uses AG Grid Community, NOT Enterprise.**
 
@@ -62,12 +62,12 @@ filterInstance.setModel(model)  // Model is rejected, returns null
 const model = {
   filterType: 'text',
   type: 'equals',
-  filter: 'Value1'
-}
+  filter: 'Value1',
+};
 
-await filterInstance.setModel(model)
-filterInstance.applyModel()
-api.onFilterChanged()
+await filterInstance.setModel(model);
+filterInstance.applyModel();
+api.onFilterChanged();
 ```
 
 ### Multiple Values Filter (TextFilter with OR)
@@ -79,13 +79,13 @@ const model = {
   conditions: [
     { filterType: 'text', type: 'equals', filter: 'Value1' },
     { filterType: 'text', type: 'equals', filter: 'Value2' },
-    { filterType: 'text', type: 'equals', filter: 'Value3' }
-  ]
-}
+    { filterType: 'text', type: 'equals', filter: 'Value3' },
+  ],
+};
 
-await filterInstance.setModel(model)
-filterInstance.applyModel()
-api.onFilterChanged()
+await filterInstance.setModel(model);
+filterInstance.applyModel();
+api.onFilterChanged();
 ```
 
 ### SetFilter (Enterprise Only)
@@ -93,11 +93,11 @@ api.onFilterChanged()
 ```typescript
 // Only use this if ag-grid-enterprise is installed!
 const model = {
-  values: ['Value1', 'Value2', 'Value3']
-}
+  values: ['Value1', 'Value2', 'Value3'],
+};
 
-await filterInstance.setModel(model)
-api.onFilterChanged()
+await filterInstance.setModel(model);
+api.onFilterChanged();
 ```
 
 ---
@@ -107,15 +107,15 @@ api.onFilterChanged()
 ### 1. Detect Filter Type First
 
 ```typescript
-const filterInstance = await api.getColumnFilterInstance(colId)
-const filterTypeName = filterInstance.constructor?.name
+const filterInstance = await api.getColumnFilterInstance(colId);
+const filterTypeName = filterInstance.constructor?.name;
 
 if (filterTypeName === 'SetFilter') {
   // Use Enterprise format
 } else if (filterTypeName === 'TextFilter') {
   // Use Community format
 } else {
-  console.warn(`Unexpected filter type: ${filterTypeName}`)
+  console.warn(`Unexpected filter type: ${filterTypeName}`);
 }
 ```
 
@@ -123,29 +123,29 @@ if (filterTypeName === 'SetFilter') {
 
 ```typescript
 // ❌ WRONG - Race condition
-api.getColumnFilterInstance(colId).then(async (filter) => {
-  await filter.setModel(model)
-  api.onFilterChanged()  // May fire before setModel completes
-})
+api.getColumnFilterInstance(colId).then(async filter => {
+  await filter.setModel(model);
+  api.onFilterChanged(); // May fire before setModel completes
+});
 
 // ✅ CORRECT - Proper sequencing
-const filter = await api.getColumnFilterInstance(colId)
-await filter.setModel(model)
-filter.applyModel()  // Some filters require this
-api.onFilterChanged()  // Only after everything completes
+const filter = await api.getColumnFilterInstance(colId);
+await filter.setModel(model);
+filter.applyModel(); // Some filters require this
+api.onFilterChanged(); // Only after everything completes
 ```
 
 ### 3. Verify Filter Was Set
 
 ```typescript
-await filter.setModel(model)
+await filter.setModel(model);
 
 // Verify it worked
-const verifyModel = filter.getModel()
-const isActive = filter.isFilterActive()
+const verifyModel = filter.getModel();
+const isActive = filter.isFilterActive();
 
 if (!isActive || verifyModel === null) {
-  console.error('Filter failed to apply!')
+  console.error('Filter failed to apply!');
 }
 ```
 
@@ -153,10 +153,10 @@ if (!isActive || verifyModel === null) {
 
 ```typescript
 // ❌ WRONG - Mixed types can cause issues
-const values = [123, 'text', null]
+const values = [123, 'text', null];
 
 // ✅ CORRECT - All strings
-const values = [123, 'text', null].map(v => String(v))
+const values = [123, 'text', null].map(v => String(v));
 // Result: ['123', 'text', 'null']
 ```
 
@@ -190,8 +190,8 @@ const values = [123, 'text', null].map(v => String(v))
 
 ### Documentation
 
-- **FILTER_IMPLEMENTATION.md** (this file)
-- **CLAUDE.md** - Project overview
+- **IMPL_FILTERS.md** (this file)
+- **../../CLAUDE.md** - Project overview
 
 ---
 
@@ -219,8 +219,8 @@ Before committing filter changes, verify:
 
 ```typescript
 // This will fail silently!
-const model = { values: ['a', 'b'] }
-await textFilter.setModel(model)
+const model = { values: ['a', 'b'] };
+await textFilter.setModel(model);
 // Result: filter.getModel() returns null
 ```
 
@@ -229,17 +229,17 @@ await textFilter.setModel(model)
 ```typescript
 // This creates a race condition!
 filterInstance.setModel(model).then(() => {
-  api.onFilterChanged()  // May fire too early
-})
+  api.onFilterChanged(); // May fire too early
+});
 ```
 
 ### ❌ Not Calling applyModel()
 
 ```typescript
 // Some filters require applyModel() to activate
-await filterInstance.setModel(model)
+await filterInstance.setModel(model);
 // ❌ Missing: filterInstance.applyModel()
-api.onFilterChanged()
+api.onFilterChanged();
 ```
 
 ### ❌ Not Validating Filter Type
@@ -289,27 +289,30 @@ Filter operations are already logged to console:
 
 ```javascript
 // In browser console
-const api = window.gridApi  // Get grid API reference
-const filterModel = api.getFilterModel()
-console.log('Active filters:', filterModel)
+const api = window.gridApi; // Get grid API reference
+const filterModel = api.getFilterModel();
+console.log('Active filters:', filterModel);
 
 // Check specific column
-const filter = await api.getColumnFilterInstance('column_name')
-console.log('Filter model:', filter.getModel())
-console.log('Is active:', filter.isFilterActive())
+const filter = await api.getColumnFilterInstance('column_name');
+console.log('Filter model:', filter.getModel());
+console.log('Is active:', filter.isFilterActive());
 ```
 
 ### Common Issues
 
 **Problem**: Filter icon turns blue but table doesn't filter
+
 - **Cause**: Wrong model format
 - **Solution**: Check filter type, verify model format
 
 **Problem**: `filterModel.getModel()` returns `null`
+
 - **Cause**: Model was rejected by filter
 - **Solution**: Format doesn't match filter type
 
 **Problem**: Filter works once but breaks on reload
+
 - **Cause**: Filter state not persisting
 - **Solution**: Check `onFilterChanged` is calling `saveConfig`
 
@@ -331,6 +334,7 @@ console.log('Is active:', filter.isFilterActive())
 ## Contact
 
 If you need to modify filter functionality:
+
 1. Read this document thoroughly
 2. Review existing tests
 3. Run all tests before committing

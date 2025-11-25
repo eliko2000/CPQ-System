@@ -53,7 +53,14 @@
       "Bash(Select-String -NotMatch \"node_modules\")",
       "Bash(Select-String -NotMatch \"__tests__\")",
       "Bash(Select-String -NotMatch \".test.ts\")",
-      "Bash(cut:*)"
+      "Bash(cut:*)",
+      "Bash(Select-String -Pattern \"error|warning\")",
+      "Bash(Select-Object -First 20)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nfeat: Add GitHub Actions CI workflow for automated testing\n\n🚀 CI/CD SETUP - PHASE 3.1 COMPLETE\n\nAdded comprehensive CI pipeline that runs on every PR and push:\n\n✅ WORKFLOW FEATURES\n- Multi-version Node.js testing (18.x, 20.x)\n- Automated linting with ESLint\n- TypeScript type checking\n- Full test suite execution\n- Production build verification\n- Build artifact upload\n\n🔧 PIPELINE STEPS\n1. Checkout code\n2. Setup Node.js with npm caching\n3. Install dependencies (npm ci)\n4. Run linter (continues on error)\n5. Type check (continues on error)\n6. Run tests (continues on error)\n7. Build project (continues on error)\n8. Upload dist/ artifacts (Node 20.x only)\n\n📊 CURRENT BASELINE (pre-existing issues, not blocking)\n- Tests: 301 passing, 72 failing\n- Build: ~50 TypeScript errors\n- Lint: Passing with ~12 warnings\n\n🎯 BENEFITS\n- Catch issues before merge\n- Enforce code quality standards\n- Track improvements over time\n- Automated status checks on PRs\n\nFiles Changed:\n- .github/workflows/ci.yml (new)\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git commit:*)",
+      "Bash(git reset:*)",
+      "Bash(npx husky init)",
+      "Bash(git rm:*)"
     ],
     "deny": [],
     "ask": []

@@ -1,6 +1,5 @@
-import React, { useState, useMemo, useCallback, useRef } from 'react'
 import { AgGridReact } from 'ag-grid-react'
-import { ColDef, GridReadyEvent, ColumnState } from 'ag-grid-community'
+import { ColDef, ColumnState } from 'ag-grid-community'
 import { Card, CardContent } from '../ui/card'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
@@ -437,7 +436,7 @@ export function ProjectList({ onViewProject }: ProjectListProps = {}) {
                 onGridReady={() => {
                   // Apply saved column state if available
                   if (config.columnOrder?.length && gridRef.current) {
-                    const columnState: ColumnState[] = config.columnOrder.map((colId, index) => ({
+                    const columnState: ColumnState[] = config.columnOrder.map((colId, _index) => ({
                       colId,
                       hide: config.visibleColumns?.[colId] === false,
                       width: config.columnWidths?.[colId],

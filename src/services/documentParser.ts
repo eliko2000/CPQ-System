@@ -10,8 +10,6 @@
  */
 
 import { extractComponentsFromDocument, type AIExtractionResult } from './claudeAI';
-import { parseExcelFile } from './excelParser';
-import { parsePDFFile } from './pdfParser';
 import { logger } from '../lib/logger';
 
 /**

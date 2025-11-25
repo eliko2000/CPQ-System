@@ -16,6 +16,8 @@ import { loadDefaultQuotationParameters } from '../../utils/quotationCalculation
 import { supabase } from '../../supabaseClient'
 import { toast } from 'sonner'
 import { logger } from '@/lib/logger'
+import { SectionErrorBoundary } from '../error/ErrorBoundary'
+import { useErrorHandler } from '../../hooks/useErrorHandler'
 
 export function AppRoutes() {
   const {
@@ -28,6 +30,7 @@ export function AppRoutes() {
   } = useCPQ()
   const { getQuotation } = useQuotations()
   const { getProject } = useProjects()
+  const { handleError } = useErrorHandler()
 
   // If we have a current quotation, show quotation editor
   if (currentQuotation) {
@@ -97,8 +100,10 @@ export function AppRoutes() {
         setViewingProjectId(null)
       }
     } catch (error) {
-      logger.error('Failed to create quotation:', error)
-      toast.error('שגיאה ביצירת הצעת מחיר')
+      handleError(error, {
+        toastMessage: 'שגיאה ביצירת הצעת מחיר',
+        context: { projectId }
+      })
     }
   }
 
@@ -117,20 +122,52 @@ export function AppRoutes() {
   // Otherwise, show view based on active state
   switch (uiState.activeView) {
     case 'dashboard':
-      return <Dashboard />
+      return (
+        <SectionErrorBoundary>
+          <Dashboard />
+        </SectionErrorBoundary>
+      )
     case 'quotes':
-      return <SupplierQuotesPage />
+      return (
+        <SectionErrorBoundary>
+          <SupplierQuotesPage />
+        </SectionErrorBoundary>
+      )
     case 'quotations':
-      return <QuotationList />
+      return (
+        <SectionErrorBoundary>
+          <QuotationList />
+        </SectionErrorBoundary>
+      )
     case 'components':
-      return <ComponentLibrary />
+      return (
+        <SectionErrorBoundary>
+          <ComponentLibrary />
+        </SectionErrorBoundary>
+      )
     case 'projects':
-      return <ProjectList onViewProject={(projectId) => setViewingProjectId(projectId)} />
+      return (
+        <SectionErrorBoundary>
+          <ProjectList onViewProject={(projectId) => setViewingProjectId(projectId)} />
+        </SectionErrorBoundary>
+      )
     case 'analytics':
-      return <Analytics />
+      return (
+        <SectionErrorBoundary>
+          <Analytics />
+        </SectionErrorBoundary>
+      )
     case 'settings':
-      return <SettingsPage />
+      return (
+        <SectionErrorBoundary>
+          <SettingsPage />
+        </SectionErrorBoundary>
+      )
     default:
-      return <Dashboard />
+      return (
+        <SectionErrorBoundary>
+          <Dashboard />
+        </SectionErrorBoundary>
+      )
   }
 }

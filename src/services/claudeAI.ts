@@ -514,7 +514,7 @@ export async function extractComponentsFromDocument(file: File): Promise<AIExtra
 
 /**
  * Default exchange rates (fallback if not in settings)
- * TODO: Move to settings/configuration
+ * Note: Primary exchange rates are managed in SettingsPage component
  */
 const DEFAULT_EXCHANGE_RATES = {
   USD_TO_ILS: 3.6,

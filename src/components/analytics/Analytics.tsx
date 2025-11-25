@@ -10,7 +10,6 @@ import { CategoryFilter } from './CategoryFilter'
 import { ExportButton } from './ExportButton'
 import { Card, CardContent } from '../ui/card'
 import { AlertCircle, Loader2 } from 'lucide-react'
-import { formatMonthKey } from '../../utils/analyticsCalculations'
 
 export function Analytics() {
   const analytics = useAnalytics()
@@ -51,7 +50,7 @@ export function Analytics() {
               <h3 className="font-semibold">שגיאה בטעינת נתונים</h3>
             </div>
             <p className="text-sm text-muted-foreground">
-              {analytics.error.message || 'אירעה שגיאה בטעינת נתוני האנליטיקה'}
+              {analytics.error || 'אירעה שגיאה בטעינת נתוני האנליטיקה'}
             </p>
           </CardContent>
         </Card>
@@ -108,7 +107,7 @@ export function Analytics() {
       {/* Filters */}
       <div className="flex gap-4">
         <DateRangeFilter
-          currentRange={analytics.dateRangeType}
+          currentRange={analytics.dateRangeType === 'custom' ? 'all' : analytics.dateRangeType}
           onRangeChange={analytics.setDateRange}
           dateRange={analytics.dateRange}
         />

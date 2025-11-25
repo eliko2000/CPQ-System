@@ -11,7 +11,7 @@
 import type {
   QuotationProject,
   QuotationItem,
-  QuotationCalculations,
+  // QuotationCalculations, // unused
   QuotationStatistics
 } from '../types';
 import { isRobotComponent } from '../services/componentTypeClassifier';
@@ -140,7 +140,8 @@ function calculateProfitByType(
   items: QuotationItem[],
   project: QuotationProject
 ): QuotationStatistics['profitByType'] {
-  const { parameters, calculations } = project;
+  const { parameters } = project;
+  // calculations is unused but destructured from project for future use
 
   // Helper to calculate profit for a group
   const calculateProfit = (typeItems: QuotationItem[], itemType: 'hardware' | 'software' | 'labor') => {

@@ -9,6 +9,7 @@ import { getComponentCategories, CATEGORIES_UPDATED_EVENT } from '../../constant
 import { classifyComponent } from '../../services/componentTypeClassifier'
 import { convertToAllCurrencies, getGlobalExchangeRates, type Currency } from '../../utils/currencyConversion'
 import { classifyLaborSubtype } from '../../services/laborClassifier'
+import { useErrorHandler } from '../../hooks/useErrorHandler'
 
 interface ComponentFormProps {
   component?: Component | null
@@ -18,6 +19,7 @@ interface ComponentFormProps {
 
 export function ComponentForm({ component, isOpen, onClose }: ComponentFormProps) {
   const { addComponent, updateComponent } = useCPQ()
+  const { handleError, handleWarning, handleSuccess } = useErrorHandler()
   const [categories, setCategories] = useState<string[]>(() => getComponentCategories())
   const [formData, setFormData] = useState<ComponentFormData & { componentType: ComponentType; laborSubtype?: LaborSubtype }>({
     name: '',
@@ -111,7 +113,7 @@ export function ComponentForm({ component, isOpen, onClose }: ComponentFormProps
     }
   }, [component])
 
-  const handleInputChange = (field: keyof ComponentFormData | 'componentType', value: string | number) => {
+  const handleInputChange = (field: keyof ComponentFormData | 'componentType' | 'laborSubtype', value: string | number) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
@@ -139,19 +141,19 @@ export function ComponentForm({ component, isOpen, onClose }: ComponentFormProps
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!formData.name.trim() || !formData.manufacturer.trim() || !formData.supplier.trim()) {
-      alert('נא למלא שדות חובה: שם, יצרן וספק')
+      handleWarning('שדות חסרים', 'נא למלא שדות חובה: שם, יצרן וספק')
       return
     }
 
     if (formData.unitCostNIS <= 0) {
-      alert('מחיר חייב להיות גדול מ-0')
+      handleWarning('מחיר לא תקין', 'מחיר חייב להיות גדול מ-0')
       return
     }
 
     setIsSubmitting(true)
-    
+
     try {
       // Convert ComponentFormData to Component by adding required fields
       const componentData = {
@@ -159,18 +161,23 @@ export function ComponentForm({ component, isOpen, onClose }: ComponentFormProps
         quoteDate: new Date().toISOString().split('T')[0], // Today's date
         quoteFileUrl: '', // Empty for manual entry
       }
-      
+
       // FIXED: Check if component has an 'id' property to distinguish between editing and adding
       if (component && 'id' in component) {
         // Editing existing component - has an id
         await updateComponent(component.id, componentData)
+        handleSuccess('הרכיב עודכן בהצלחה')
       } else {
         // Adding new component (including duplicates) - no id
         await addComponent(componentData)
+        handleSuccess('הרכיב נוסף בהצלחה')
       }
       onClose()
     } catch (error) {
-      alert(`שגיאה בשמירת רכיב: ${error}`)
+      handleError(error, {
+        toastMessage: 'שגיאה בשמירת רכיב',
+        context: { componentName: formData.name }
+      })
     } finally {
       setIsSubmitting(false)
     }

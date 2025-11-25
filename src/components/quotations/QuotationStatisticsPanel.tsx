@@ -10,8 +10,7 @@
  * - Validation warnings for unusual ratios
  */
 
-import React from 'react';
-import { AlertTriangle, TrendingUp, TrendingDown, Minus, Bot } from 'lucide-react';
+import { AlertTriangle, Bot } from 'lucide-react';
 import type { QuotationStatistics } from '../../types';
 import {
   getQuotationSummaryText,
@@ -28,7 +27,6 @@ interface QuotationStatisticsPanelProps {
 export function QuotationStatisticsPanel({ statistics, className = '' }: QuotationStatisticsPanelProps) {
   const dominantCategory = getDominantCategory(statistics);
   const quotationType = getQuotationType(statistics);
-  const validation = validateStatistics(statistics);
 
   // Get badge color based on quotation type
   const getQuotationTypeBadge = () => {

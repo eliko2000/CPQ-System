@@ -1004,10 +1004,10 @@ describe('Edge Cases', () => {
 
     const revenue = calculateRevenueMetrics(quotations);
     const margin = calculateMarginAnalysis(quotations);
-    const components = calculateComponentAnalytics(quotations);
+    const _components = calculateComponentAnalytics(quotations);
     const labor = calculateLaborMetrics(quotations);
-    const trends = calculateTrends(quotations);
-    const customers = calculateCustomerMetrics(quotations);
+    const _trends = calculateTrends(quotations);
+    const _customers = calculateCustomerMetrics(quotations);
 
     expect(revenue.averageValue).toBeGreaterThan(0);
     expect(margin.averageMargin).toBeGreaterThan(0);

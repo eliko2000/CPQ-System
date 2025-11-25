@@ -1,0 +1,148 @@
+
+[7m[1m[36m RUN [39m[22m[27m [36mv1.6.1[39m [90mC:/Users/Eli/Desktop/Claude Code/CPQ-System[39m
+[2m      Coverage enabled with [22m[33mv8[39m
+
+ [32m✓[39m src/utils/__tests__/assemblyCalculations.test.ts [2m ([22m[2m36 tests[22m[2m)[22m[90m 168[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m36 passed[39m[22m[90m (36)[39m
+[2m   Start at [22m 14:16:59
+[2m   Duration [22m 6.16s[2m (transform 678ms, setup 900ms, collect 570ms, tests 168ms, environment 1.28s, prepare 1.24s)[22m
+
+[34m % [39m[2mCoverage report from [22m[33mv8[39m
+-------------------|---------|----------|---------|---------|-------------------
+File               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s 
+-------------------|---------|----------|---------|---------|-------------------
+All files          |    1.33 |    19.85 |    5.42 |    1.33 |                   
+ CPQ-System        |       0 |        0 |       0 |       0 |                   
+  ...ze-columns.js |       0 |        0 |       0 |       0 | 1-71              
+ CPQ-System/public |       0 |        0 |       0 |       0 |                   
+  ...orker.min.mjs |       0 |        0 |       0 |       0 | 1-28              
+ ...System/scripts |       0 |        0 |       0 |       0 |                   
+  ...ur-column.cjs |       0 |        0 |       0 |       0 | 1-41              
+  ...eur-column.js |       0 |        0 |       0 |       0 | 1-48              
+  ...on-column.cjs |       0 |        0 |       0 |       0 | 1-51              
+  ...migration.cjs |       0 |        0 |       0 |       0 | 1-60              
+  create-tables.js |       0 |        0 |       0 |       0 | 1-147             
+  ...ute-schema.js |       0 |        0 |       0 |       0 | 1-76              
+  ...th-logger.cjs |       0 |        0 |       0 |       0 | 1-124             
+  ...-migration.js |       0 |        0 |       0 |       0 | 1-77              
+  ...-database.cjs |       0 |        0 |       0 |       0 | 1-294             
+  ...p-database.js |       0 |        0 |       0 |       0 | 1-294             
+  test-data.cjs    |       0 |        0 |       0 |       0 | 1-89              
+  ...connection.js |       0 |        0 |       0 |       0 | 1-36              
+ CPQ-System/src    |       0 |        0 |       0 |       0 |                   
+  App.tsx          |       0 |        0 |       0 |       0 | 1-21              
+  main.tsx         |       0 |        0 |       0 |       0 | 1-10              
+  ...baseClient.ts |       0 |        0 |       0 |       0 | 1-6               
+ ...ents/analytics |       0 |        0 |       0 |       0 |                   
+  Analytics.tsx    |       0 |        0 |       0 |       0 | 1-158             
+  ...oryFilter.tsx |       0 |        0 |       0 |       0 | 1-81              
+  ...Analytics.tsx |       0 |        0 |       0 |       0 | 1-179             
+  ...ngeFilter.tsx |       0 |        0 |       0 |       0 | 1-46              
+  ExportButton.tsx |       0 |        0 |       0 |       0 | 1-398             
+  ...Analytics.tsx |       0 |        0 |       0 |       0 | 1-232             
+  ...Analytics.tsx |       0 |        0 |       0 |       0 | 1-176             
+  ...Analytics.tsx |       0 |        0 |       0 |       0 | 1-138             
+  ...sOverview.tsx |       0 |        0 |       0 |       0 | 1-145             
+ ...ents/dashboard |       0 |        0 |       0 |       0 |                   
+  Dashboard.tsx    |       0 |        0 |       0 |       0 | 1-375             
+ ...mponents/debug |       0 |        0 |       0 |       0 |                   
+  ...TestPanel.tsx |       0 |        0 |       0 |       0 | 1-151             
+  ...stemDebug.tsx |       0 |        0 |       0 |       0 | 1-128             
+ ...omponents/grid |       0 |        0 |       0 |       0 |                   
+  CustomHeader.tsx |       0 |        0 |       0 |       0 | 1-449             
+  ...mSetFilter.ts |       0 |        0 |       0 |       0 | 1-93              
+  DateFilter.tsx   |       0 |        0 |       0 |       0 | 1-243             
+  NumberFilter.tsx |       0 |        0 |       0 |       0 | 1-207             
+  SmartFilter.tsx  |       0 |        0 |       0 |       0 | 1-186             
+  ...ellEditor.tsx |       0 |        0 |       0 |       0 | 1-116             
+ ...ents/ingestion |       0 |        0 |       0 |       0 |                   
+  ...Ingestion.tsx |       0 |        0 |       0 |       0 | 1-228             
+  QuoteUpload.tsx  |       0 |        0 |       0 |       0 | 1-198             
+  ...alidation.tsx |       0 |        0 |       0 |       0 | 1-263             
+ ...onents/library |       0 |        0 |       0 |       0 |                   
+  ...onPreview.tsx |       0 |        0 |       0 |       0 | 1-640             
+  AssemblyForm.tsx |       0 |        0 |       0 |       0 | 1-359             
+  AssemblyGrid.tsx |       0 |        0 |       0 |       0 | 1-128             
+  ...tAIImport.tsx |       0 |        0 |       0 |       0 | 1-121             
+  ...onentForm.tsx |       0 |        0 |       0 |       0 | 1-502             
+  ...ntLibrary.tsx |       0 |        0 |       0 |       0 | 1-347             
+  ...onentGrid.tsx |       0 |        0 |       0 |       0 | 1-840             
+  ...entUpload.tsx |       0 |        0 |       0 |       0 | 1-369             
+ ...nents/projects |       0 |        0 |       0 |       0 |                   
+  BOMEditor.tsx    |       0 |        0 |       0 |       0 | 1-380             
+  ...etailPage.tsx |       0 |        0 |       0 |       0 | 1-409             
+  ...FormModal.tsx |       0 |        0 |       0 |       0 | 1-193             
+  ProjectList.tsx  |       0 |        0 |       0 |       0 | 1-505             
+ ...nts/quotations |       0 |        0 |       0 |       0 |                   
+  ...tailModal.tsx |       0 |        0 |       0 |       0 | 1-180             
+  ...ectPicker.tsx |       0 |        0 |       0 |       0 | 1-160             
+  ...nDataGrid.tsx |       0 |        0 |       0 |       0 | 1-893             
+  ...ionEditor.tsx |       0 |        0 |       0 |       0 | 1-1853            
+  ...ationList.tsx |       0 |        0 |       0 |       0 | 1-22              
+  ...arameters.tsx |       0 |        0 |       0 |       0 | 1-123             
+  ...ticsPanel.tsx |       0 |        0 |       0 |       0 | 1-267             
+  ...implified.tsx |       0 |        0 |       0 |       0 | 1-233             
+ ...nents/settings |       0 |        0 |       0 |       0 |                   
+  SettingsPage.tsx |       0 |        0 |       0 |       0 | 1-1679            
+ ...ponents/shared |       0 |        0 |       0 |       0 |                   
+  AppRoutes.tsx    |       0 |        0 |       0 |       0 | 1-136             
+  BOMGrid.tsx      |       0 |        0 |       0 |       0 | 1-421             
+  ...onentGrid.tsx |       0 |        0 |       0 |       0 | 1-278             
+  Header.tsx       |       0 |        0 |       0 |       0 | 1-119             
+  MainLayout.tsx   |       0 |        0 |       0 |       0 | 1-22              
+  Sidebar.tsx      |       0 |        0 |       0 |       0 | 1-218             
+ ...upplier-quotes |       0 |        0 |       0 |       0 |                   
+  ...ilsDrawer.tsx |       0 |        0 |       0 |       0 | 1-355             
+  ...oteImport.tsx |       0 |        0 |       0 |       0 | 1-443             
+  ...uotesPage.tsx |       0 |        0 |       0 |       0 | 1-357             
+ .../components/ui |       0 |        0 |       0 |       0 |                   
+  ...ionDialog.tsx |       0 |        0 |       0 |       0 | 1-102             
+  ...irmDialog.tsx |       0 |        0 |       0 |       0 | 1-79              
+  badge.tsx        |       0 |        0 |       0 |       0 | 1-36              
+  button.tsx       |       0 |        0 |       0 |       0 | 1-56              
+  card.tsx         |       0 |        0 |       0 |       0 | 1-79              
+  checkbox.tsx     |       0 |        0 |       0 |       0 | 1-28              
+  dialog.tsx       |       0 |        0 |       0 |       0 | 1-120             
+  input.tsx        |       0 |        0 |       0 |       0 | 1-42              
+  select.tsx       |       0 |        0 |       0 |       0 | 1-158             
+  tabs.tsx         |       0 |        0 |       0 |       0 | 1-53              
+ .../src/constants |       0 |        0 |       0 |       0 |                   
+  settings.ts      |       0 |        0 |       0 |       0 | 1-217             
+ ...m/src/contexts |       0 |        0 |       0 |       0 |                   
+  CPQContext.tsx   |       0 |        0 |       0 |       0 | 1-1618            
+  ThemeContext.tsx |       0 |        0 |       0 |       0 | 1-78              
+  ToastContext.tsx |       0 |        0 |       0 |       0 | 1-85              
+ ...stem/src/hooks |       0 |        0 |       0 |       0 |                   
+  useAnalytics.ts  |       0 |        0 |       0 |       0 | 1-382             
+  useAssemblies.ts |       0 |        0 |       0 |       0 | 1-392             
+  ...ickOutside.ts |       0 |        0 |       0 |       0 | 1-22              
+  useComponents.ts |       0 |        0 |       0 |       0 | 1-299             
+  useProjects.ts   |       0 |        0 |       0 |       0 | 1-288             
+  useQuotations.ts |       0 |        0 |       0 |       0 | 1-472             
+  useSupabase.ts   |       0 |        0 |       0 |       0 | 1-18              
+  ...lierQuotes.ts |       0 |        0 |       0 |       0 | 1-475             
+  ...ableConfig.ts |       0 |        0 |       0 |       0 | 1-148             
+ ...System/src/lib |   22.02 |        0 |       0 |   22.02 |                   
+  logger.ts        |   89.28 |        0 |       0 |   89.28 | 19-22,53-54       
+  utils.ts         |       0 |        0 |       0 |       0 | 1-171             
+ ...em/src/scripts |       0 |        0 |       0 |       0 |                   
+  ...erQuotesDb.ts |       0 |        0 |       0 |       0 | 1-367             
+ ...m/src/services |       0 |        0 |       0 |       0 |                   
+  claudeAI.ts      |       0 |        0 |       0 |       0 | 1-596             
+  ...entMatcher.ts |       0 |        0 |       0 |       0 | 1-435             
+  ...Classifier.ts |       0 |        0 |       0 |       0 | 1-301             
+  ...mentParser.ts |       0 |        0 |       0 |       0 | 1-239             
+  excelParser.ts   |       0 |        0 |       0 |       0 | 1-642             
+  ...Classifier.ts |       0 |        0 |       0 |       0 | 1-159             
+  pdfParser.ts     |       0 |        0 |       0 |       0 | 1-579             
+  ...ngsService.ts |       0 |        0 |       0 |       0 | 1-273             
+ ...stem/src/utils |   15.19 |    81.81 |   25.92 |   15.19 |                   
+  ...lculations.ts |       0 |        0 |       0 |       0 | 1-998             
+  ...lculations.ts |   97.91 |    96.15 |     100 |   97.91 | 153-156           
+  ...Conversion.ts |   40.36 |      100 |      20 |   40.36 | ...99-131,142-166 
+  ...lculations.ts |   20.08 |    33.33 |    7.14 |   20.08 | ...45-446,449-453 
+  ...Statistics.ts |       0 |        0 |       0 |       0 | 1-339             
+  ...ageHelpers.ts |       0 |        0 |       0 |       0 | 1-129             
+-------------------|---------|----------|---------|---------|-------------------

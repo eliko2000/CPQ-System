@@ -84,7 +84,7 @@ describe('CustomHeader Integration Tests', () => {
         uniqueValues
       }
 
-      const { container } = render(<CustomHeader {...props} />)
+      const { _container } = render(<CustomHeader {...props} />)
 
       // Step 1: Click filter button
       const filterButton = screen.getByTitle('סינון')
@@ -204,7 +204,7 @@ describe('CustomHeader Integration Tests', () => {
     })
 
     it('should clear filter state when clearing', async () => {
-      const user = userEvent.setup()
+      const _user = userEvent.setup()
 
       // Set up with an active filter
       filterModel = {

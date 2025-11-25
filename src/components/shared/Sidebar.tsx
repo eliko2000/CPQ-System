@@ -141,11 +141,10 @@ export function Sidebar() {
 
         {/* Navigation */}
         <nav className="flex-1 p-4 space-y-2">
-          {navigation.map((item, index) => {
+          {navigation.map((item, _index) => {
             const Icon = item.icon
             const isActive = uiState.activeView === item.view
             const isSettings = item.view === 'settings'
-            const isLastBeforeSettings = index === navigation.length - 2
 
             return (
               <React.Fragment key={item.name}>

@@ -81,7 +81,7 @@ describe('CustomHeader Filter Functionality', () => {
       })
 
       // Verify TextFilter model format for single value
-      const expectedModel = {
+      const _expectedModel = {
         filterType: 'text',
         type: 'equals',
         filter: 'Value1'
@@ -102,7 +102,7 @@ describe('CustomHeader Filter Functionality', () => {
       render(<CustomHeader {...props} />)
 
       // The filter should use OR operator for multiple values
-      const expectedModel = {
+      const _expectedModel = {
         filterType: 'text',
         operator: 'OR',
         conditions: [
@@ -204,7 +204,7 @@ describe('CustomHeader Filter Functionality', () => {
       render(<CustomHeader {...props} />)
 
       // SetFilter uses different format: { values: ['a', 'b'] }
-      const expectedModel = {
+      const _expectedModel = {
         values: ['Value1', 'Value2']
       }
 

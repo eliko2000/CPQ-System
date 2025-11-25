@@ -21,13 +21,11 @@ import { AssemblyGrid } from './AssemblyGrid'
 import { ConfirmDialog } from '../ui/ConfirmDialog'
 import { EnhancedComponentGrid } from './EnhancedComponentGrid'
 import { SupplierQuoteImport } from '../supplier-quotes/SupplierQuoteImport'
-import { useComponents } from '../../hooks/useComponents'
 import { toast } from 'sonner'
 import { logger } from '@/lib/logger'
 
 export function ComponentLibrary() {
   const { components, assemblies, updateComponent, deleteComponent, deleteAssembly, setModal, modalState, closeModal } = useCPQ()
-  const { addComponent } = useComponents()
   const [activeTab, setActiveTab] = useState<'components' | 'assemblies'>('components')
   const [searchTerm, setSearchTerm] = useState('')
   const [isAIImportOpen, setIsAIImportOpen] = useState(false)

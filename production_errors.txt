@@ -1,0 +1,78 @@
+src/components/analytics/ComponentAnalytics.tsx(22,3): error TS6133: 'Legend' is declared but its value is never read.
+src/components/analytics/ComponentAnalytics.tsx(132,46): error TS2339: Property 'category' does not exist on type 'PieLabelRenderProps'.
+src/components/analytics/ComponentAnalytics.tsx(132,65): error TS2339: Property 'count' does not exist on type 'PieLabelRenderProps'.
+src/components/analytics/ComponentAnalytics.tsx(135,46): error TS6133: 'entry' is declared but its value is never read.
+src/components/library/EnhancedComponentGrid.tsx(106,9): error TS2322: Type '({ headerName: string; field: string; sortable: true; filter: string; resizable: true; width: number; editable: true; cellEditor: string; onCellValueChanged: (params: ValueSetterParams<any, any>) => true; ... 10 more ...; cellEditorPopup?: undefined; } | ... 8 more ... | { ...; })[]' is not assignable to type 'ColDef<any, any>[]'.
+src/components/projects/ProjectDetailPage.tsx(80,33): error TS2304: Cannot find name 'useState'.
+src/components/projects/ProjectDetailPage.tsx(81,39): error TS2304: Cannot find name 'useState'.
+src/components/projects/ProjectDetailPage.tsx(82,33): error TS2304: Cannot find name 'useState'.
+src/components/projects/ProjectDetailPage.tsx(83,47): error TS2304: Cannot find name 'useState'.
+src/components/projects/ProjectDetailPage.tsx(106,3): error TS2304: Cannot find name 'useEffect'.
+src/components/projects/ProjectDetailPage.tsx(112,3): error TS2304: Cannot find name 'useEffect'.
+src/components/projects/ProjectDetailPage.tsx(134,22): error TS2304: Cannot find name 'useMemo'.
+src/components/projects/ProjectDetailPage.tsx(179,24): error TS7006: Parameter 'params' implicitly has an 'any' type.
+src/components/projects/ProjectDetailPage.tsx(194,24): error TS7006: Parameter 'params' implicitly has an 'any' type.
+src/components/projects/ProjectDetailPage.tsx(208,25): error TS2304: Cannot find name 'useMemo'.
+src/components/projects/ProjectDetailPage.tsx(215,31): error TS2304: Cannot find name 'useCallback'.
+src/components/projects/ProjectDetailPage.tsx(246,30): error TS2304: Cannot find name 'useCallback'.
+src/components/projects/ProjectDetailPage.tsx(253,19): error TS2304: Cannot find name 'useMemo'.
+src/components/projects/ProjectDetailPage.tsx(316,35): error TS7053: Element implicitly has an 'any' type because expression of type 'any' can't be used to index type 'Record<ProjectStatus, string>'.
+src/components/projects/ProjectDetailPage.tsx(317,20): error TS7053: Element implicitly has an 'any' type because expression of type 'any' can't be used to index type 'Record<ProjectStatus, string>'.
+src/components/projects/ProjectList.tsx(86,19): error TS2304: Cannot find name 'useRef'.
+src/components/projects/ProjectList.tsx(88,39): error TS2304: Cannot find name 'useState'.
+src/components/projects/ProjectList.tsx(89,39): error TS2304: Cannot find name 'useState'.
+src/components/projects/ProjectList.tsx(90,47): error TS2304: Cannot find name 'useState'.
+src/components/projects/ProjectList.tsx(91,45): error TS2304: Cannot find name 'useState'.
+src/components/projects/ProjectList.tsx(106,5): error TS2740: Type '{}' is missing the following properties from type 'string[]': length, pop, push, concat, and 29 more.
+src/components/projects/ProjectList.tsx(111,28): error TS2304: Cannot find name 'useMemo'.
+src/components/projects/ProjectList.tsx(123,27): error TS2304: Cannot find name 'useCallback'.
+src/components/projects/ProjectList.tsx(129,33): error TS2304: Cannot find name 'useCallback'.
+src/components/projects/ProjectList.tsx(133,29): error TS2304: Cannot find name 'useCallback'.
+src/components/projects/ProjectList.tsx(138,22): error TS2304: Cannot find name 'useMemo'.
+src/components/projects/ProjectList.tsx(247,24): error TS7006: Parameter 'params' implicitly has an 'any' type.
+src/components/projects/ProjectList.tsx(273,25): error TS2304: Cannot find name 'useMemo'.
+src/components/projects/ProjectList.tsx(298,29): error TS2304: Cannot find name 'useCallback'.
+src/components/projects/ProjectList.tsx(305,29): error TS2304: Cannot find name 'useCallback'.
+src/components/projects/ProjectList.tsx(311,31): error TS2304: Cannot find name 'useCallback'.
+src/components/projects/ProjectList.tsx(338,30): error TS2304: Cannot find name 'useCallback'.
+src/components/projects/ProjectList.tsx(345,34): error TS2304: Cannot find name 'useCallback'.
+src/components/projects/ProjectList.tsx(355,19): error TS2304: Cannot find name 'useMemo'.
+src/components/projects/ProjectList.tsx(441,53): error TS7015: Element implicitly has an 'any' type because index expression is not of type 'number'.
+src/components/projects/ProjectList.tsx(451,41): error TS7006: Parameter 'col' implicitly has an 'any' type.
+src/components/projects/ProjectList.tsx(460,57): error TS7006: Parameter 'col' implicitly has an 'any' type.
+src/components/projects/ProjectList.tsx(468,41): error TS7006: Parameter 'col' implicitly has an 'any' type.
+src/components/projects/ProjectList.tsx(471,45): error TS2740: Type 'Record<string, boolean>' is missing the following properties from type 'string[]': length, pop, push, concat, and 29 more.
+src/components/projects/ProjectList.tsx(496,9): error TS2322: Type '{ isOpen: any; title: string; message: string; confirmLabel: string; cancelLabel: string; onConfirm: () => Promise<void>; onCancel: () => void; variant: string; }' is not assignable to type 'IntrinsicAttributes & ConfirmDialogProps'.
+src/components/quotations/ProjectPicker.tsx(17,39): error TS2304: Cannot find name 'useState'.
+src/components/quotations/ProjectPicker.tsx(20,3): error TS2304: Cannot find name 'useEffect'.
+src/components/quotations/ProjectPicker.tsx(27,28): error TS2304: Cannot find name 'useMemo'.
+src/components/quotations/ProjectPicker.tsx(103,38): error TS7006: Parameter 'project' implicitly has an 'any' type.
+src/components/quotations/ProjectPicker.tsx(120,43): error TS7053: Element implicitly has an 'any' type because expression of type 'any' can't be used to index type '{ active: string; 'on-hold': string; completed: string; cancelled: string; }'.
+src/components/quotations/ProjectPicker.tsx(121,28): error TS7053: Element implicitly has an 'any' type because expression of type 'any' can't be used to index type '{ active: string; 'on-hold': string; completed: string; cancelled: string; }'.
+src/components/quotations/QuotationEditor.tsx(752,9): error TS2322: Type '({ headerName: string; field: string; width: number; cellRenderer: (props: ICellRendererParams<any, any, any>) => Element | "-"; cellClass: (params: CellClassParams<any, any>) => "ag-cell-bold" | "ag-cell-right"; ... 9 more ...; filter?: undefined; } | ... 6 more ... | { ...; })[]' is not assignable to type 'ColDef<any, any>[]'.
+src/components/quotations/QuotationStatisticsPanel.tsx(19,3): error TS6133: 'validateStatistics' is declared but its value is never read.
+src/components/settings/SettingsPage.tsx(9,3): error TS6133: 'Save' is declared but its value is never read.
+src/components/settings/SettingsPage.tsx(13,3): error TS6133: 'Check' is declared but its value is never read.
+src/components/settings/SettingsPage.tsx(14,3): error TS6133: 'AlertCircle' is declared but its value is never read.
+src/components/settings/SettingsPage.tsx(116,10): error TS6133: '_getDefaultSettings' is declared but its value is never read.
+src/components/settings/SettingsPage.tsx(190,10): error TS6133: '_validateSettings' is declared but its value is never read.
+src/components/settings/SettingsPage.tsx(231,10): error TS6133: '_applySettings' is declared but its value is never read.
+src/components/supplier-quotes/SupplierQuoteDetailsDrawer.tsx(22,3): error TS6133: 'Download' is declared but its value is never read.
+src/components/supplier-quotes/SupplierQuoteImport.tsx(42,10): error TS6133: 'uploadedFile' is declared but its value is never read.
+src/hooks/useAnalytics.ts(225,5): error TS2345: Argument of type '{ id: string; systemId: string; systemOrder: number; itemOrder: number; displayNumber: string; componentId: string | undefined; componentName: string; componentCategory: string; itemType: ComponentType; ... 13 more ...; updatedAt: string; }[]' is not assignable to parameter of type 'QuotationItem[]'.
+src/hooks/useAnalytics.ts(267,5): error TS2322: Type '{ id: string; systemId: string; systemOrder: number; itemOrder: number; displayNumber: string; componentId: string | undefined; componentName: string; componentCategory: string; itemType: ComponentType; ... 13 more ...; updatedAt: string; }[]' is not assignable to type 'QuotationItem[]'.
+src/hooks/useAssemblies.ts(11,3): error TS2724: '"../types"' has no exported member named 'Assembly_Component'. Did you mean 'AssemblyComponent'?
+src/hooks/useAssemblies.ts(11,3): error TS6196: 'Assembly_Component' is declared but never used.
+src/hooks/useAssemblies.ts(13,3): error TS2724: '"../types"' has no exported member named '_DbAssembly_Component'. Did you mean 'DbAssemblyComponent'?
+src/hooks/useAssemblies.ts(14,3): error TS2724: '"../types"' has no exported member named '_Component'. Did you mean 'Component'?
+src/hooks/useAssemblies.ts(94,33): error TS2304: Cannot find name 'AssemblyComponent'.
+src/hooks/useComponents.ts(18,5): error TS2322: Type 'LaborSubtype | null' is not assignable to type '"engineering" | "commissioning" | "installation" | undefined'.
+src/hooks/useComponents.ts(18,28): error TS2367: This comparison appears to be unintentional because the types 'LaborSubtype' and '""' have no overlap.
+src/hooks/useComponents.ts(33,10): error TS6133: 'dbToComponent' is declared but its value is never read.
+src/hooks/useQuotations.ts(400,38): error TS2345: Argument of type '{ quotation_system_id: any; component_id: any; item_name: any; manufacturer: any; manufacturer_part_number: any; quantity: any; unit_cost: any; total_cost: any; margin_percentage: any; unit_price: any; total_price: any; notes: any; sort_order: any; }' is not assignable to parameter of type 'Omit<DbQuotationItem, "id" | "created_at" | "updated_at">'.
+src/hooks/useSupplierQuotes.ts(15,3): error TS6133: 'Component' is declared but its value is never read.
+src/hooks/useSupplierQuotes.ts(431,5): error TS6133: 'quoteId' is declared but its value is never read.
+src/lib/utils.ts(100,9): error TS2322: Type '"engineering" | "commissioning" | "installation" | "programming" | undefined' is not assignable to type 'LaborSubtype | undefined'.
+src/scripts/testSupplierQuotesDb.ts(27,13): error TS6133: 'data' is declared but its value is never read.
+src/scripts/testSupplierQuotesDb.ts(53,13): error TS6133: 'data' is declared but its value is never read.
+src/scripts/testSupplierQuotesDb.ts(79,13): error TS6133: 'data' is declared but its value is never read.

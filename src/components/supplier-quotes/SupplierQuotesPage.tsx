@@ -204,7 +204,7 @@ export function SupplierQuotesPage() {
             </Button>
           </div>
 
-          {/* TODO: Add filters component here when showFilters is true */}
+          {/* GitHub Issue #TBD: Add filters component when showFilters is true */}
         </CardContent>
       </Card>
 

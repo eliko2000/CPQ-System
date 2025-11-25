@@ -7,7 +7,6 @@
  * - Robot-specific metrics
  */
 
-import React from 'react';
 import { AlertTriangle, Bot, TrendingUp } from 'lucide-react';
 import type { QuotationStatistics } from '../../types';
 

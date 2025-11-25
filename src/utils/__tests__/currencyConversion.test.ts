@@ -294,6 +294,145 @@ describe('Currency Conversion Utilities', () => {
       // EUR calculation: 100 * (0 / 4.0) = 100 * 0 = 0 (not infinity as math rounds)
       expect(result.unitCostEUR).toBe(0);
     });
+
+    it('should handle negative prices (refunds/adjustments)', () => {
+      const result = convertToAllCurrencies(-100, 'USD', mockRates);
+
+      expect(result.unitCostUSD).toBe(-100);
+      expect(result.unitCostNIS).toBe(-370); // -100 * 3.7
+      expect(result.unitCostEUR).toBe(-92.5); // -100 * (3.7 / 4.0)
+      expect(result.currency).toBe('USD');
+      expect(result.originalCost).toBe(-100);
+    });
+
+    it('should handle extreme exchange rates - very high', () => {
+      const extremeRates: ExchangeRates = {
+        usdToIlsRate: 1000,
+        eurToIlsRate: 1200
+      };
+
+      const result = convertToAllCurrencies(100, 'USD', extremeRates);
+
+      expect(result.unitCostUSD).toBe(100);
+      expect(result.unitCostNIS).toBe(100000); // 100 * 1000
+      expect(result.unitCostEUR).toBe(83.33); // 100 * (1000 / 1200)
+    });
+
+    it('should handle extreme exchange rates - very low', () => {
+      const extremeRates: ExchangeRates = {
+        usdToIlsRate: 0.01,
+        eurToIlsRate: 0.01
+      };
+
+      const result = convertToAllCurrencies(1000, 'USD', extremeRates);
+
+      expect(result.unitCostUSD).toBe(1000);
+      expect(result.unitCostNIS).toBe(10); // 1000 * 0.01
+      expect(result.unitCostEUR).toBe(1000); // 1000 * (0.01 / 0.01) = 1000 * 1
+    });
+
+    it('should handle fractional cents - precision edge case', () => {
+      const result = convertToAllCurrencies(0.001, 'USD', mockRates);
+
+      expect(result.unitCostUSD).toBe(0.001);
+      expect(result.unitCostNIS).toBe(0); // 0.001 * 3.7 = 0.0037 → 0.00
+      expect(result.unitCostEUR).toBe(0); // 0.001 * 0.925 = 0.000925 → 0.00
+    });
+
+    it('should ensure all returned values are finite numbers', () => {
+      const result = convertToAllCurrencies(100, 'USD', mockRates);
+
+      expect(Number.isFinite(result.unitCostUSD)).toBe(true);
+      expect(Number.isFinite(result.unitCostNIS)).toBe(true);
+      expect(Number.isFinite(result.unitCostEUR)).toBe(true);
+      expect(Number.isNaN(result.unitCostUSD)).toBe(false);
+      expect(Number.isNaN(result.unitCostNIS)).toBe(false);
+      expect(Number.isNaN(result.unitCostEUR)).toBe(false);
+    });
+
+    it('should handle component with undefined currency fields', () => {
+      const component = {
+        unitCostNIS: undefined,
+        unitCostUSD: undefined,
+        unitCostEUR: undefined
+      };
+
+      const result = normalizeComponentPrices(component, mockRates);
+
+      // Should default to NIS with 0
+      expect(result.currency).toBe('NIS');
+      expect(result.originalCost).toBe(0);
+      expect(result.unitCostNIS).toBe(0);
+      expect(result.unitCostUSD).toBe(0);
+      expect(result.unitCostEUR).toBe(0);
+    });
+  });
+
+  describe('Cross-currency mathematical consistency', () => {
+    it('should maintain consistency: USD -> NIS -> USD round-trip', () => {
+      const originalUSD = 100;
+
+      // Convert USD to NIS
+      const step1 = convertToAllCurrencies(originalUSD, 'USD', mockRates);
+      const nisValue = step1.unitCostNIS;
+
+      // Convert NIS back to USD
+      const step2 = convertToAllCurrencies(nisValue, 'NIS', mockRates);
+
+      // Should get back to original USD (within rounding)
+      expect(step2.unitCostUSD).toBe(100);
+    });
+
+    it('should maintain consistency: EUR -> NIS -> EUR round-trip', () => {
+      const originalEUR = 100;
+
+      // Convert EUR to NIS
+      const step1 = convertToAllCurrencies(originalEUR, 'EUR', mockRates);
+      const nisValue = step1.unitCostNIS;
+
+      // Convert NIS back to EUR
+      const step2 = convertToAllCurrencies(nisValue, 'NIS', mockRates);
+
+      // Should get back to original EUR (within rounding)
+      expect(step2.unitCostEUR).toBe(100);
+    });
+
+    it('should maintain consistency: USD -> EUR -> USD round-trip', () => {
+      const originalUSD = 100;
+
+      // Convert USD to EUR
+      const step1 = convertToAllCurrencies(originalUSD, 'USD', mockRates);
+      const eurValue = step1.unitCostEUR;
+
+      // Convert EUR back to USD
+      const step2 = convertToAllCurrencies(eurValue, 'EUR', mockRates);
+
+      // Should get back close to original USD (within rounding)
+      expect(step2.unitCostUSD).toBeCloseTo(100, 1); // Within 0.1
+    });
+
+    it('should calculate cross-rate correctly: USD/EUR via NIS', () => {
+      // USD->EUR should equal (USD->NIS) / (EUR->NIS)
+      const result = convertToAllCurrencies(100, 'USD', mockRates);
+
+      const expectedUsdToEurRate = mockRates.usdToIlsRate / mockRates.eurToIlsRate;
+      const expectedEUR = Math.round(100 * expectedUsdToEurRate * 100) / 100;
+
+      expect(result.unitCostEUR).toBe(expectedEUR);
+    });
+
+    it('should ensure EUR->USD inverse of USD->EUR', () => {
+      const usd100 = convertToAllCurrencies(100, 'USD', mockRates);
+      const eur100 = convertToAllCurrencies(100, 'EUR', mockRates);
+
+      // The EUR from $100 should roughly equal what $100 is worth in EUR space
+      // And the USD from €100 should be the inverse relationship
+      const usdToEurRate = usd100.unitCostEUR / 100; // EUR per USD
+      const eurToUsdRate = eur100.unitCostUSD / 100; // USD per EUR
+
+      // These should be inverses (within rounding)
+      expect(usdToEurRate * eurToUsdRate).toBeCloseTo(1, 2);
+    });
   });
 
   describe('Exchange Rate Change Scenarios (Regression Tests)', () => {
@@ -302,7 +441,7 @@ describe('Currency Conversion Utilities', () => {
 
     describe('ILS-native items (e.g., labor)', () => {
       it('should preserve ILS price when USD rate changes', () => {
-        const oldRates: ExchangeRates = { usdToIlsRate: 3.7, eurToIlsRate: 4.0 };
+        const _oldRates: ExchangeRates = { usdToIlsRate: 3.7, eurToIlsRate: 4.0 };
         const newRates: ExchangeRates = { usdToIlsRate: 4.0, eurToIlsRate: 4.0 };
 
         // Labor item: 1200 ILS/day, no USD/EUR
@@ -337,7 +476,7 @@ describe('Currency Conversion Utilities', () => {
       });
 
       it('should preserve ILS price for labor when EUR rate changes', () => {
-        const oldRates: ExchangeRates = { usdToIlsRate: 3.7, eurToIlsRate: 4.0 };
+        const _oldRates: ExchangeRates = { usdToIlsRate: 3.7, eurToIlsRate: 4.0 };
         const newRates: ExchangeRates = { usdToIlsRate: 3.7, eurToIlsRate: 4.5 };
 
         const laborItem = {
@@ -368,7 +507,7 @@ describe('Currency Conversion Utilities', () => {
 
     describe('USD-native items (e.g., hardware)', () => {
       it('should preserve USD price when exchange rate changes', () => {
-        const oldRates: ExchangeRates = { usdToIlsRate: 3.7, eurToIlsRate: 4.0 };
+        const _oldRates: ExchangeRates = { usdToIlsRate: 3.7, eurToIlsRate: 4.0 };
         const newRates: ExchangeRates = { usdToIlsRate: 4.0, eurToIlsRate: 4.0 };
 
         // Hardware component: $2500 USD
@@ -401,7 +540,7 @@ describe('Currency Conversion Utilities', () => {
       });
 
       it('should preserve USD price when only EUR rate changes', () => {
-        const oldRates: ExchangeRates = { usdToIlsRate: 3.7, eurToIlsRate: 4.0 };
+        const _oldRates: ExchangeRates = { usdToIlsRate: 3.7, eurToIlsRate: 4.0 };
         const newRates: ExchangeRates = { usdToIlsRate: 3.7, eurToIlsRate: 4.5 };
 
         const usdItem = {
@@ -432,7 +571,7 @@ describe('Currency Conversion Utilities', () => {
 
     describe('EUR-native items', () => {
       it('should preserve EUR price when exchange rate changes', () => {
-        const oldRates: ExchangeRates = { usdToIlsRate: 3.7, eurToIlsRate: 4.0 };
+        const _oldRates: ExchangeRates = { usdToIlsRate: 3.7, eurToIlsRate: 4.0 };
         const newRates: ExchangeRates = { usdToIlsRate: 4.0, eurToIlsRate: 4.5 };
 
         const eurItem = {
@@ -466,7 +605,7 @@ describe('Currency Conversion Utilities', () => {
 
     describe('Mixed currency quotation integration', () => {
       it('should correctly handle quotation with mixed currency items when rate changes', () => {
-        const oldRates: ExchangeRates = { usdToIlsRate: 3.7, eurToIlsRate: 4.0 };
+        const _oldRates: ExchangeRates = { usdToIlsRate: 3.7, eurToIlsRate: 4.0 };
         const newRates: ExchangeRates = { usdToIlsRate: 4.0, eurToIlsRate: 4.0 };
 
         // Simulate a quotation with mixed items

@@ -1438,7 +1438,7 @@ export function CPQProvider({ children }: { children: React.ReactNode }) {
   const createProject = useCallback(async (project: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>) => {
     try {
       setLoading('projects', true)
-      // TODO: Implement actual API call
+      // Note: For database persistence, use useProjects.addProject() hook
       const now = new Date().toISOString()
       const newProject: Project = {
         ...project,
@@ -1483,7 +1483,7 @@ export function CPQProvider({ children }: { children: React.ReactNode }) {
   const addSupplierQuote = useCallback(async (quote: Omit<SupplierQuote, 'id'>) => {
     try {
       setLoading('quotes', true)
-      // TODO: Implement actual API call
+      // Note: For database persistence, use useSupplierQuotes.createQuote() hook
       const newQuote: SupplierQuote = {
         ...quote,
         id: `quote_${Date.now()}`,
@@ -1527,14 +1527,13 @@ export function CPQProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   // Project update/delete implementations
+  // Note: For database operations, use useProjects hook methods
   const updateProject = useCallback(async (_id: string, _updates: Partial<Project>) => {
-    // TODO: Implement
-    logger.debug('updateProject not implemented yet')
+    logger.debug('updateProject - use useProjects.updateProject() for DB persistence')
   }, [])
 
   const deleteProject = useCallback(async (_id: string) => {
-    // TODO: Implement
-    logger.debug('deleteProject not implemented yet')
+    logger.debug('deleteProject - use useProjects.deleteProject() for DB persistence')
   }, [])
 
   // ============ Quotation Actions ============

@@ -294,6 +294,7 @@ export const SupplierQuoteImport: React.FC<SupplierQuoteImportProps> = ({
             manufacturerPN: comp.manufacturerPN || '',
             supplier: comp.supplier || createdQuote.supplierName || '',
             category: comp.category || 'אחר',
+            componentType: 'hardware', // Default to hardware for imported components
             description: comp.description || '',
             unitCostNIS: comp.unitCostNIS || 0,
             unitCostUSD: comp.unitCostUSD || 0,

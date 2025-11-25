@@ -2,7 +2,7 @@
 
 // ============ Component Types ============
 export type ComponentType = 'hardware' | 'software' | 'labor';
-export type LaborSubtype = 'engineering' | 'commissioning' | 'installation';
+export type LaborSubtype = 'engineering' | 'commissioning' | 'installation' | 'programming';
 
 // ============ Components (רכיבים) ============
 export interface Component {
@@ -644,7 +644,7 @@ export interface DbComponent {
   manufacturer_part_number?: string;
   category?: string;
   component_type: 'hardware' | 'software' | 'labor';
-  labor_subtype?: 'engineering' | 'commissioning' | 'installation';
+  labor_subtype?: 'engineering' | 'commissioning' | 'installation' | 'programming';
   description?: string;
   unit_cost_usd?: number;
   unit_cost_ils?: number;

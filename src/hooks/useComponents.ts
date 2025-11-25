@@ -13,9 +13,9 @@ function componentToDb(component: Partial<Component>): Partial<DbComponent> {
   if (component.manufacturerPN !== undefined) result.manufacturer_part_number = component.manufacturerPN;
   if (component.category !== undefined) result.category = component.category;
   if (component.componentType !== undefined) result.component_type = component.componentType;
-  // Handle laborSubtype: convert empty string to null, only set if component is labor type
+  // Handle laborSubtype: only set if defined
   if (component.laborSubtype !== undefined) {
-    result.labor_subtype = component.laborSubtype === '' ? null : component.laborSubtype;
+    result.labor_subtype = component.laborSubtype;
   }
   if (component.description !== undefined) result.description = component.description;
   if (component.unitCostUSD !== undefined) result.unit_cost_usd = component.unitCostUSD;

@@ -56,34 +56,34 @@ describe('documentParser', () => {
   });
 
   describe('getExtractionMethod', () => {
-    it('should detect Excel files by MIME type', () => {
+    it('should detect Excel files by MIME type and route to AI', () => {
       const file = createMockFile('data.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-      expect(getExtractionMethod(file)).toBe('excel');
+      expect(getExtractionMethod(file)).toBe('ai');
     });
 
-    it('should detect Excel files by extension', () => {
+    it('should detect Excel files by extension and route to AI', () => {
       const file = createMockFile('data.xlsx', 'application/octet-stream');
-      expect(getExtractionMethod(file)).toBe('excel');
+      expect(getExtractionMethod(file)).toBe('ai');
     });
 
-    it('should detect XLS files', () => {
+    it('should detect XLS files and route to AI', () => {
       const file = createMockFile('data.xls', 'application/vnd.ms-excel');
-      expect(getExtractionMethod(file)).toBe('excel');
+      expect(getExtractionMethod(file)).toBe('ai');
     });
 
-    it('should detect CSV files', () => {
+    it('should detect CSV files and route to AI', () => {
       const file = createMockFile('data.csv', 'text/csv');
-      expect(getExtractionMethod(file)).toBe('excel');
+      expect(getExtractionMethod(file)).toBe('ai');
     });
 
-    it('should detect PDF files by MIME type', () => {
+    it('should detect PDF files by MIME type and route to AI', () => {
       const file = createMockFile('document.pdf', 'application/pdf');
-      expect(getExtractionMethod(file)).toBe('pdf');
+      expect(getExtractionMethod(file)).toBe('ai');
     });
 
-    it('should detect PDF files by extension', () => {
+    it('should detect PDF files by extension and route to AI', () => {
       const file = createMockFile('document.pdf', 'application/octet-stream');
-      expect(getExtractionMethod(file)).toBe('pdf');
+      expect(getExtractionMethod(file)).toBe('ai');
     });
 
     it('should detect image files by MIME type', () => {
@@ -118,61 +118,68 @@ describe('documentParser', () => {
 
     it('should handle files with mixed case extensions', () => {
       const file = createMockFile('DATA.XLSX', 'application/octet-stream');
-      expect(getExtractionMethod(file)).toBe('excel');
+      expect(getExtractionMethod(file)).toBe('ai');
     });
   });
 
   describe('getExtractionMethodName', () => {
     it('should return English names when language is en', () => {
-      expect(getExtractionMethodName('excel', 'en')).toBe('Excel Parser');
-      expect(getExtractionMethodName('pdf', 'en')).toBe('PDF Parser');
-      expect(getExtractionMethodName('ai', 'en')).toBe('AI Vision');
+      expect(getExtractionMethodName('excel', 'en')).toBe('Claude AI (Excel)');
+      expect(getExtractionMethodName('pdf', 'en')).toBe('Claude AI (PDF)');
+      expect(getExtractionMethodName('ai', 'en')).toBe('Claude AI Vision');
       expect(getExtractionMethodName('unknown', 'en')).toBe('Unknown');
     });
 
     it('should return Hebrew names when language is he', () => {
-      expect(getExtractionMethodName('excel', 'he')).toBe('מנתח Excel');
-      expect(getExtractionMethodName('pdf', 'he')).toBe('מנתח PDF');
-      expect(getExtractionMethodName('ai', 'he')).toBe('AI Vision');
+      expect(getExtractionMethodName('excel', 'he')).toBe('Claude AI (Excel)');
+      expect(getExtractionMethodName('pdf', 'he')).toBe('Claude AI (PDF)');
+      expect(getExtractionMethodName('ai', 'he')).toBe('Claude AI Vision');
       expect(getExtractionMethodName('unknown', 'he')).toBe('לא ידוע');
     });
 
     it('should default to Hebrew when no language specified', () => {
-      expect(getExtractionMethodName('excel')).toBe('מנתח Excel');
+      expect(getExtractionMethodName('excel')).toBe('Claude AI (Excel)');
     });
   });
 
   describe('parseDocument - Routing', () => {
-    it('should route Excel files to parseExcelFile', async () => {
+    it('should route Excel files to Claude AI', async () => {
       const mockResult = {
         ...createMockResult(true, [{ name: 'Component 1' }]),
         metadata: {
-          documentType: 'excel',
+          documentType: undefined as any, // Will be set by parseDocument
           totalItems: 1,
         }
       };
-      vi.mocked(parseExcelFile).mockResolvedValue(mockResult);
+      vi.mocked(extractComponentsFromDocument).mockResolvedValue(mockResult);
 
       const file = createMockFile('data.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       const result = await parseDocument(file);
 
-      expect(parseExcelFile).toHaveBeenCalledWith(file);
+      expect(extractComponentsFromDocument).toHaveBeenCalledWith(file);
       expect(result.success).toBe(true);
       expect(result.metadata.documentType).toBe('excel');
     });
 
-    it('should route PDF files to parsePDFFile', async () => {
-      const mockResult = createMockResult(true, [{ name: 'Component 1' }]);
-      vi.mocked(parsePDFFile).mockResolvedValue(mockResult);
+    it('should route PDF files to Claude AI', async () => {
+      const mockResult = {
+        ...createMockResult(true, [{ name: 'Component 1' }]),
+        metadata: {
+          documentType: undefined as any,
+          totalItems: 1,
+        }
+      };
+      vi.mocked(extractComponentsFromDocument).mockResolvedValue(mockResult);
 
       const file = createMockFile('document.pdf', 'application/pdf');
       const result = await parseDocument(file);
 
-      expect(parsePDFFile).toHaveBeenCalledWith(file);
+      expect(extractComponentsFromDocument).toHaveBeenCalledWith(file);
       expect(result.success).toBe(true);
+      expect(result.metadata.documentType).toBe('pdf');
     });
 
-    it('should route image files to extractComponentsFromDocument', async () => {
+    it('should route image files to Claude AI', async () => {
       const mockResult = {
         ...createMockResult(true, [{ name: 'Component 1' }]),
         metadata: {
@@ -201,27 +208,29 @@ describe('documentParser', () => {
   });
 
   describe('parseDocument - Error Handling', () => {
-    it('should handle Excel parser errors gracefully', async () => {
-      vi.mocked(parseExcelFile).mockRejectedValue(new Error('Excel parsing failed'));
+    it('should handle Claude AI errors for Excel files gracefully', async () => {
+      vi.mocked(extractComponentsFromDocument).mockRejectedValue(new Error('AI extraction failed'));
 
       const file = createMockFile('data.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       const result = await parseDocument(file);
 
       expect(result.success).toBe(false);
       expect(result.error).toContain('Failed to parse document');
+      expect(result.metadata.documentType).toBe('ai');
     });
 
-    it('should handle PDF parser errors gracefully', async () => {
-      vi.mocked(parsePDFFile).mockRejectedValue(new Error('PDF parsing failed'));
+    it('should handle Claude AI errors for PDF files gracefully', async () => {
+      vi.mocked(extractComponentsFromDocument).mockRejectedValue(new Error('AI extraction failed'));
 
       const file = createMockFile('document.pdf', 'application/pdf');
       const result = await parseDocument(file);
 
       expect(result.success).toBe(false);
       expect(result.error).toContain('Failed to parse document');
+      expect(result.metadata.documentType).toBe('ai');
     });
 
-    it('should handle AI extraction errors gracefully', async () => {
+    it('should handle Claude AI errors for image files gracefully', async () => {
       vi.mocked(extractComponentsFromDocument).mockRejectedValue(new Error('AI extraction failed'));
 
       const file = createMockFile('image.png', 'image/png');
@@ -229,41 +238,16 @@ describe('documentParser', () => {
 
       expect(result.success).toBe(false);
       expect(result.error).toContain('Failed to parse document');
+      expect(result.metadata.documentType).toBe('ai');
     });
 
-    it('should include document type in error result', async () => {
-      vi.mocked(parseExcelFile).mockRejectedValue(new Error('Test error'));
+    it('should include extraction method in error result', async () => {
+      vi.mocked(extractComponentsFromDocument).mockRejectedValue(new Error('Test error'));
 
       const file = createMockFile('data.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       const result = await parseDocument(file);
 
-      expect(result.metadata.documentType).toBe('excel');
-    });
-  });
-
-  describe('parseDocument - Low Confidence PDF Handling', () => {
-    it('should add AI suggestion tip for low confidence PDF results', async () => {
-      const lowConfidenceResult = createMockResult(true, [{ name: 'Component 1' }]);
-      lowConfidenceResult.confidence = 0.2;
-
-      vi.mocked(parsePDFFile).mockResolvedValue(lowConfidenceResult);
-
-      const file = createMockFile('document.pdf', 'application/pdf');
-      const result = await parseDocument(file);
-
-      expect(result.error).toContain('AI extraction');
-    });
-
-    it('should not modify high confidence PDF results', async () => {
-      const highConfidenceResult = createMockResult(true, [{ name: 'Component 1' }]);
-      highConfidenceResult.confidence = 0.8;
-
-      vi.mocked(parsePDFFile).mockResolvedValue(highConfidenceResult);
-
-      const file = createMockFile('document.pdf', 'application/pdf');
-      const result = await parseDocument(file);
-
-      expect(result.confidence).toBe(0.8);
+      expect(result.metadata.documentType).toBe('ai');
     });
   });
 
@@ -279,7 +263,7 @@ describe('documentParser', () => {
         confidence: 0.8,
       };
 
-      vi.mocked(parseExcelFile).mockResolvedValue(mockResult);
+      vi.mocked(extractComponentsFromDocument).mockResolvedValue(mockResult);
 
       const file = createMockFile('data.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       const result = await parseDocument(file);
@@ -287,7 +271,26 @@ describe('documentParser', () => {
       expect(result.metadata.documentType).toBe('excel');
     });
 
-    it('should add documentType to AI results if missing', async () => {
+    it('should add documentType to PDF results if missing', async () => {
+      const mockResult: AIExtractionResult = {
+        success: true,
+        components: [],
+        metadata: {
+          documentType: undefined as any,
+          totalItems: 0,
+        },
+        confidence: 0.8,
+      };
+
+      vi.mocked(extractComponentsFromDocument).mockResolvedValue(mockResult);
+
+      const file = createMockFile('document.pdf', 'application/pdf');
+      const result = await parseDocument(file);
+
+      expect(result.metadata.documentType).toBe('pdf');
+    });
+
+    it('should add documentType to image results if missing', async () => {
       const mockResult: AIExtractionResult = {
         success: true,
         components: [],
@@ -305,44 +308,50 @@ describe('documentParser', () => {
 
       expect(result.metadata.documentType).toBe('image');
     });
+
+    it('should not override existing documentType', async () => {
+      const mockResult: AIExtractionResult = {
+        success: true,
+        components: [],
+        metadata: {
+          documentType: 'excel',
+          totalItems: 0,
+        },
+        confidence: 0.8,
+      };
+
+      vi.mocked(extractComponentsFromDocument).mockResolvedValue(mockResult);
+
+      const file = createMockFile('data.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      const result = await parseDocument(file);
+
+      expect(result.metadata.documentType).toBe('excel');
+    });
   });
 
   describe('getEstimatedProcessingTime', () => {
-    it('should estimate fast processing for Excel files', () => {
+    it('should estimate AI processing time for Excel files', () => {
       const file = createMockFile('data.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 500 * 1024);
       const time = getEstimatedProcessingTime(file);
 
-      expect(time).toBeLessThan(1000); // Less than 1 second
-      expect(time).toBeGreaterThan(0);
+      expect(time).toBeGreaterThanOrEqual(8000); // At least 8 seconds
+      expect(time).toBeLessThanOrEqual(20000); // At most 20 seconds
     });
 
-    it('should cap Excel processing time at 500ms', () => {
-      const largeFile = createMockFile('large.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 100 * 1024 * 1024);
-      const time = getEstimatedProcessingTime(largeFile);
-
-      expect(time).toBeLessThanOrEqual(500);
-    });
-
-    it('should estimate moderate processing for PDF files', () => {
+    it('should estimate AI processing time for PDF files', () => {
       const file = createMockFile('document.pdf', 'application/pdf', 1024 * 1024);
       const time = getEstimatedProcessingTime(file);
 
-      expect(time).toBeGreaterThan(300);
-      expect(time).toBeLessThan(3000);
+      expect(time).toBeGreaterThanOrEqual(8000);
+      expect(time).toBeLessThanOrEqual(20000);
     });
 
-    it('should cap PDF processing time at 2000ms', () => {
-      const largeFile = createMockFile('large.pdf', 'application/pdf', 100 * 1024 * 1024);
-      const time = getEstimatedProcessingTime(largeFile);
-
-      expect(time).toBeLessThanOrEqual(2000);
-    });
-
-    it('should estimate 10 seconds for AI processing', () => {
+    it('should estimate AI processing time for image files', () => {
       const file = createMockFile('image.png', 'image/png');
       const time = getEstimatedProcessingTime(file);
 
-      expect(time).toBe(10000);
+      expect(time).toBeGreaterThanOrEqual(8000);
+      expect(time).toBeLessThanOrEqual(20000);
     });
 
     it('should return 0 for unknown file types', () => {
@@ -352,14 +361,28 @@ describe('documentParser', () => {
       expect(time).toBe(0);
     });
 
-    it('should scale Excel processing time with file size', () => {
+    it('should scale processing time with file size', () => {
       const smallFile = createMockFile('small.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 100 * 1024);
-      const mediumFile = createMockFile('medium.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 500 * 1024);
+      const largeFile = createMockFile('large.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 10 * 1024 * 1024);
 
       const smallTime = getEstimatedProcessingTime(smallFile);
-      const mediumTime = getEstimatedProcessingTime(mediumFile);
+      const largeTime = getEstimatedProcessingTime(largeFile);
 
-      expect(mediumTime).toBeGreaterThan(smallTime);
+      expect(largeTime).toBeGreaterThan(smallTime);
+    });
+
+    it('should cap processing time at 20 seconds', () => {
+      const hugeFile = createMockFile('huge.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 100 * 1024 * 1024);
+      const time = getEstimatedProcessingTime(hugeFile);
+
+      expect(time).toBeLessThanOrEqual(20000);
+    });
+
+    it('should have minimum processing time of 8 seconds', () => {
+      const tinyFile = createMockFile('tiny.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 1024);
+      const time = getEstimatedProcessingTime(tinyFile);
+
+      expect(time).toBeGreaterThanOrEqual(8000);
     });
   });
 
@@ -451,62 +474,97 @@ describe('documentParser', () => {
   });
 
   describe('Integration Tests', () => {
-    it('should process Excel file end-to-end', async () => {
-      const mockResult = createMockResult(true, [
-        { name: 'Component 1', unitPriceUSD: 100 },
-        { name: 'Component 2', unitPriceUSD: 200 },
-      ]);
-      vi.mocked(parseExcelFile).mockResolvedValue(mockResult);
+    it('should process Excel file end-to-end with Claude AI', async () => {
+      const mockResult = {
+        ...createMockResult(true, [
+          { name: 'Component 1', unitPriceUSD: 100 },
+          { name: 'Component 2', unitPriceUSD: 200 },
+        ]),
+        metadata: {
+          documentType: undefined as any,
+          totalItems: 2,
+        }
+      };
+      vi.mocked(extractComponentsFromDocument).mockResolvedValue(mockResult);
 
       const file = createMockFile('data.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       const result = await parseDocument(file);
 
+      expect(extractComponentsFromDocument).toHaveBeenCalledWith(file);
       expect(result.success).toBe(true);
       expect(result.components).toHaveLength(2);
       expect(result.metadata.totalItems).toBe(2);
+      expect(result.metadata.documentType).toBe('excel');
     });
 
-    it('should process PDF file end-to-end', async () => {
-      const mockResult = createMockResult(true, [
-        { name: 'Component 1', manufacturerPN: 'ABC123' },
-      ]);
-      vi.mocked(parsePDFFile).mockResolvedValue(mockResult);
+    it('should process PDF file end-to-end with Claude AI', async () => {
+      const mockResult = {
+        ...createMockResult(true, [
+          { name: 'Component 1', manufacturerPN: 'ABC123' },
+        ]),
+        metadata: {
+          documentType: undefined as any,
+          totalItems: 1,
+        }
+      };
+      vi.mocked(extractComponentsFromDocument).mockResolvedValue(mockResult);
 
       const file = createMockFile('quote.pdf', 'application/pdf');
       const result = await parseDocument(file);
 
+      expect(extractComponentsFromDocument).toHaveBeenCalledWith(file);
       expect(result.success).toBe(true);
       expect(result.components).toHaveLength(1);
+      expect(result.metadata.documentType).toBe('pdf');
     });
 
-    it('should process image file end-to-end', async () => {
-      const mockResult = createMockResult(true, [
-        { name: 'Component 1', confidence: 0.95 },
-      ]);
+    it('should process image file end-to-end with Claude AI', async () => {
+      const mockResult = {
+        ...createMockResult(true, [
+          { name: 'Component 1', confidence: 0.95 },
+        ]),
+        metadata: {
+          documentType: undefined as any,
+          totalItems: 1,
+        }
+      };
       vi.mocked(extractComponentsFromDocument).mockResolvedValue(mockResult);
 
       const file = createMockFile('screenshot.png', 'image/png');
       const result = await parseDocument(file);
 
+      expect(extractComponentsFromDocument).toHaveBeenCalledWith(file);
       expect(result.success).toBe(true);
       expect(result.components).toHaveLength(1);
+      expect(result.metadata.documentType).toBe('image');
     });
   });
 
   describe('Return Value Structure Consistency', () => {
     it('should return consistent AIExtractionResult structure for all file types', async () => {
-      const mockResult = createMockResult(true, [{ name: 'Test' }]);
-
-      vi.mocked(parseExcelFile).mockResolvedValue(mockResult);
-      vi.mocked(parsePDFFile).mockResolvedValue(mockResult);
-      vi.mocked(extractComponentsFromDocument).mockResolvedValue(mockResult);
-
       const excelFile = createMockFile('data.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       const pdfFile = createMockFile('doc.pdf', 'application/pdf');
       const imageFile = createMockFile('img.png', 'image/png');
 
+      // Create fresh mock result for each call to avoid mutation issues
+      const createFreshMockResult = () => ({
+        ...createMockResult(true, [{ name: 'Test' }]),
+        metadata: {
+          documentType: undefined as any,
+          totalItems: 1,
+        }
+      });
+
+      // Mock for Excel file
+      vi.mocked(extractComponentsFromDocument).mockResolvedValueOnce(createFreshMockResult());
       const excelResult = await parseDocument(excelFile);
+
+      // Mock for PDF file
+      vi.mocked(extractComponentsFromDocument).mockResolvedValueOnce(createFreshMockResult());
       const pdfResult = await parseDocument(pdfFile);
+
+      // Mock for image file
+      vi.mocked(extractComponentsFromDocument).mockResolvedValueOnce(createFreshMockResult());
       const imageResult = await parseDocument(imageFile);
 
       // All should have the same structure
@@ -518,11 +576,14 @@ describe('documentParser', () => {
         expect(result.metadata).toHaveProperty('documentType');
         expect(result.metadata).toHaveProperty('totalItems');
       });
+
+      // Document types should be correctly set based on file extension
+      expect(excelResult.metadata.documentType).toBe('excel');
+      expect(pdfResult.metadata.documentType).toBe('pdf');
+      expect(imageResult.metadata.documentType).toBe('image');
     });
 
     it('should return consistent error structure for all file types', async () => {
-      vi.mocked(parseExcelFile).mockRejectedValue(new Error('Excel error'));
-      vi.mocked(parsePDFFile).mockRejectedValue(new Error('PDF error'));
       vi.mocked(extractComponentsFromDocument).mockRejectedValue(new Error('AI error'));
 
       const excelFile = createMockFile('data.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -539,6 +600,7 @@ describe('documentParser', () => {
         expect(result).toHaveProperty('error');
         expect(result.components).toHaveLength(0);
         expect(result.confidence).toBe(0);
+        expect(result.metadata.documentType).toBe('ai'); // Error includes extraction method
       });
     });
   });

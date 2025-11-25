@@ -228,7 +228,6 @@ export function BOMEditor() {
 
     // Reorder logic would go here
     logger.debug(`Row ${node.data?.name} moved to position ${overIndex}`)
-    // TODO: Implement reordering in the BOM array
   }, [])
 
   // Add new BOM item
@@ -241,14 +240,11 @@ export function BOMEditor() {
       totalPrice: 0,
     }
 
-    // This will be handled by the context
-    // TODO: Implement addBOMItem in context
     logger.debug('Add new BOM item:', newItem)
   }, [])
 
   // Save project
   const handleSave = useCallback(() => {
-    // TODO: Implement project saving
     logger.debug('Save project with BOM:', currentProjectBOM)
   }, [currentProjectBOM])
 

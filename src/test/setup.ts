@@ -118,7 +118,15 @@ vi.mock('lucide-react', () => ({
   Edit: () => 'Edit',
   Trash: () => 'Trash',
   PlusCircle: () => 'PlusCircle',
-  DollarSign: () => 'DollarSign'
+  DollarSign: () => 'DollarSign',
+  Sparkles: () => 'Sparkles',
+  Layers: () => 'Layers',
+  Building: () => 'Building',
+  Calendar: () => 'Calendar',
+  Eye: () => 'Eye',
+  Copy: () => 'Copy',
+  Trash2: () => 'Trash2',
+  ChevronDown: () => 'ChevronDown'
 }));
 
 // Mock AG Grid

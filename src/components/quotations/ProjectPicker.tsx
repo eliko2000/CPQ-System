@@ -1,4 +1,3 @@
-import React, { useState, useMemo, useEffect } from 'react'
 import { Search, FolderOpen, X } from 'lucide-react'
 import { useProjects } from '../../hooks/useProjects'
 import { ProjectSummary } from '../../types'

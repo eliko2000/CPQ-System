@@ -13,7 +13,6 @@
 import { supabase } from '../supabaseClient';
 import { Component, DbComponent } from '../types';
 import type { AIExtractedComponent } from './claudeAI';
-import Fuse from 'fuse.js';
 import { compareTwoStrings } from 'string-similarity';
 import Anthropic from '@anthropic-ai/sdk';
 import { logger } from '@/lib/logger';
@@ -100,6 +99,7 @@ function dbToComponent(dbComp: DbComponent): Component {
     manufacturer: dbComp.manufacturer || '',
     manufacturerPN: dbComp.manufacturer_part_number || '',
     category: dbComp.category || 'אחר',
+    componentType: 'hardware', // Default to hardware for matched components
     description: dbComp.description || '',
     unitCostNIS: dbComp.unit_cost_ils || 0,
     unitCostUSD: dbComp.unit_cost_usd || 0,

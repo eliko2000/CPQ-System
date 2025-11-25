@@ -400,15 +400,20 @@ export function useQuotations() {
               await addQuotationItem({
                 quotation_system_id: newSystem.id,
                 component_id: sourceItem.component_id,
+                assembly_id: sourceItem.assembly_id,
                 item_name: sourceItem.item_name,
                 manufacturer: sourceItem.manufacturer,
                 manufacturer_part_number: sourceItem.manufacturer_part_number,
+                item_type: sourceItem.item_type,
+                labor_subtype: sourceItem.labor_subtype,
                 quantity: sourceItem.quantity,
                 unit_cost: sourceItem.unit_cost,
                 total_cost: sourceItem.total_cost,
                 margin_percentage: sourceItem.margin_percentage,
                 unit_price: sourceItem.unit_price,
                 total_price: sourceItem.total_price,
+                original_currency: sourceItem.original_currency,
+                original_cost: sourceItem.original_cost,
                 notes: sourceItem.notes,
                 sort_order: sourceItem.sort_order
               })

@@ -113,7 +113,7 @@ interface SettingsSection {
 }
 
 // Helper functions
-function getDefaultSettings(): SettingsData {
+function _getDefaultSettings(): SettingsData {
   return {
     general: {
       systemName: 'RadiaQ AI',
@@ -187,7 +187,7 @@ function getDefaultSettings(): SettingsData {
   }
 }
 
-function validateSettings(settings: SettingsData): string[] {
+function _validateSettings(settings: SettingsData): string[] {
   const errors: string[] = []
   
   // Validate pricing settings
@@ -228,7 +228,7 @@ function isValidEmail(email: string): boolean {
   return emailRegex.test(email)
 }
 
-function applySettings(settings: SettingsData): void {
+function _applySettings(settings: SettingsData): void {
   // Apply theme
   if (settings.appearance.theme) {
     document.documentElement.setAttribute('data-theme', settings.appearance.theme)

@@ -4,7 +4,7 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Assembly, Component } from '../../types';
 import { useCPQ } from '../../contexts/CPQContext';
-import { Plus, Trash2, Search } from 'lucide-react';
+import { Trash2, Search } from 'lucide-react';
 import { calculateAssemblyPricing, formatAssemblyPricing } from '../../utils/assemblyCalculations';
 import { Badge } from '../ui/badge';
 

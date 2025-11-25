@@ -81,7 +81,7 @@ export function DateFilter({ onFilterChange, onClose, title, position, currentFi
     if (filterType === 'all') {
       onFilterChange(null)
     } else {
-      let filterModel: any = { filterType: 'date', type: filterType }
+      const filterModel: any = { filterType: 'date', type: filterType }
 
       if (filterType === 'equals' || filterType === 'before' || filterType === 'after') {
         if (!date1) {

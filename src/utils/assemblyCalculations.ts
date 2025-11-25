@@ -6,7 +6,8 @@
  * then converted using current exchange rates.
  */
 
-import type { Assembly, AssemblyComponent, AssemblyPricing, Component } from '../types';
+import type { Assembly, AssemblyComponent, AssemblyPricing } from '../types';
+// Component is unused but kept for future use
 import { getGlobalExchangeRates, type ExchangeRates } from './currencyConversion';
 
 /**

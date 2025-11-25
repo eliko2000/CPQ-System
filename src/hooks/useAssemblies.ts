@@ -8,10 +8,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import type {
   Assembly,
-  AssemblyComponent,
+  Assembly_Component,
   DbAssembly,
-  DbAssemblyComponent,
-  Component,
+  _DbAssembly_Component,
+  _Component,
 } from '../types';
 import { supabase } from '../supabaseClient';
 import { logger } from '../lib/logger';

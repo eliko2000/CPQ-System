@@ -7,7 +7,6 @@
  * TO USE: Add this component to QuotationEditor.tsx temporarily
  */
 
-import React from 'react';
 import type { QuotationProject } from '../../types';
 import { calculateQuotationStatistics } from '../../utils/quotationStatistics';
 

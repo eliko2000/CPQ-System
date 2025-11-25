@@ -55,14 +55,14 @@ CREATE INDEX IF NOT EXISTS idx_quotations_status_date ON quotations(status, crea
 -- QUOTATION_ITEMS TABLE INDEXES
 -- ============================================================
 
--- Index for quotation_id lookups (foreign key)
-CREATE INDEX IF NOT EXISTS idx_quotation_items_quotation_id ON quotation_items(quotation_id);
+-- Index for quotation_system_id lookups (foreign key)
+CREATE INDEX IF NOT EXISTS idx_quotation_items_system_id ON quotation_items(quotation_system_id);
 
 -- Index for component_id lookups (foreign key)
 CREATE INDEX IF NOT EXISTS idx_quotation_items_component_id ON quotation_items(component_id);
 
--- Index for system_id grouping
-CREATE INDEX IF NOT EXISTS idx_quotation_items_system_id ON quotation_items(system_id);
+-- Index for assembly_id lookups (foreign key)
+CREATE INDEX IF NOT EXISTS idx_quotation_items_assembly_id ON quotation_items(assembly_id);
 
 
 -- ============================================================
@@ -73,7 +73,7 @@ CREATE INDEX IF NOT EXISTS idx_quotation_items_system_id ON quotation_items(syst
 CREATE INDEX IF NOT EXISTS idx_quotation_systems_quotation_id ON quotation_systems(quotation_id);
 
 -- Index for system name searches
-CREATE INDEX IF NOT EXISTS idx_quotation_systems_name ON quotation_systems(name);
+CREATE INDEX IF NOT EXISTS idx_quotation_systems_name ON quotation_systems(system_name);
 
 
 -- ============================================================
@@ -99,9 +99,6 @@ CREATE INDEX IF NOT EXISTS idx_projects_created_at ON projects(created_at DESC);
 
 -- Index for assembly name searches
 CREATE INDEX IF NOT EXISTS idx_assemblies_name ON assemblies(name);
-
--- Index for category filtering
-CREATE INDEX IF NOT EXISTS idx_assemblies_category ON assemblies(category);
 
 -- Index for created_at sorting
 CREATE INDEX IF NOT EXISTS idx_assemblies_created_at ON assemblies(created_at DESC);

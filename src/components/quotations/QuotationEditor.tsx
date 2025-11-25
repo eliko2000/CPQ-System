@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, memo } from 'react';
 import { AgGridReact } from 'ag-grid-react';
 import {
   ColDef,
@@ -52,8 +52,8 @@ import { logger } from '@/lib/logger';
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
 
-// Custom cell renderer for system headers (bold)
-const SystemHeaderRenderer = (props: ICellRendererParams) => {
+// Custom cell renderer for system headers (bold) - Memoized to prevent unnecessary re-renders
+const SystemHeaderRenderer = memo((props: ICellRendererParams) => {
   if (props.data?.isSystemGroup) {
     return (
       <div className="font-bold text-blue-700 bg-blue-50 px-2 py-1 rounded">
@@ -62,10 +62,11 @@ const SystemHeaderRenderer = (props: ICellRendererParams) => {
     );
   }
   return props.value;
-};
+});
+SystemHeaderRenderer.displayName = 'SystemHeaderRenderer';
 
-// Custom cell renderer for currency values
-const CurrencyRenderer = (props: ICellRendererParams) => {
+// Custom cell renderer for currency values - Memoized for performance
+const CurrencyRenderer = memo((props: ICellRendererParams) => {
   const value = props.value;
   if (value == null) return '-';
 
@@ -76,17 +77,19 @@ const CurrencyRenderer = (props: ICellRendererParams) => {
   }).format(value);
 
   return <span className="font-mono text-sm">{formatted}</span>;
-};
+});
+CurrencyRenderer.displayName = 'CurrencyRenderer';
 
-// Custom cell renderer for USD currency
-const USDCurrencyRenderer = (props: ICellRendererParams) => {
+// Custom cell renderer for USD currency - Memoized for performance
+const USDCurrencyRenderer = memo((props: ICellRendererParams) => {
   const value = props.value;
   if (value == null) return '-';
 
   return (
     <span className="font-mono text-sm">${value?.toFixed(2) || '0.00'}</span>
   );
-};
+});
+USDCurrencyRenderer.displayName = 'USDCurrencyRenderer';
 
 // Simple text editor for system names
 class SystemNameEditor {

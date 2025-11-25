@@ -2,11 +2,28 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import { fileURLToPath, URL } from 'node:url';
+import viteCompression from 'vite-plugin-compression';
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   return {
-    plugins: [react()],
+    plugins: [
+      react(),
+      // Gzip compression for production builds
+      viteCompression({
+        algorithm: 'gzip',
+        ext: '.gz',
+        threshold: 10240, // Only compress files larger than 10KB
+        deleteOriginFile: false,
+      }),
+      // Brotli compression for modern browsers
+      viteCompression({
+        algorithm: 'brotliCompress',
+        ext: '.br',
+        threshold: 10240,
+        deleteOriginFile: false,
+      }),
+    ],
     server: {
       port: 3001, // Different from Kurate's port 3000
       host: '0.0.0.0',
@@ -97,13 +114,67 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: 'dist',
       sourcemap: true,
+      chunkSizeWarningLimit: 600, // Increase slightly to avoid warnings for ag-grid
+
+      // Asset optimization
+      assetsInlineLimit: 4096, // Inline assets smaller than 4KB as base64
+      cssCodeSplit: true, // Split CSS into separate files per chunk
+      minify: 'esbuild', // Fast minification with esbuild
+
       rollupOptions: {
         output: {
-          manualChunks: {
-            vendor: ['react', 'react-dom'],
-            agGrid: ['ag-grid-community', 'ag-grid-react'],
-            supabase: ['@supabase/supabase-js'],
-            radix: ['@radix-ui/react-slot', '@radix-ui/react-dialog'],
+          manualChunks: id => {
+            // Core React vendors
+            if (
+              id.includes('node_modules/react') ||
+              id.includes('node_modules/react-dom')
+            ) {
+              return 'vendor';
+            }
+
+            // AG Grid (large library)
+            if (id.includes('ag-grid')) {
+              return 'agGrid';
+            }
+
+            // Supabase client
+            if (id.includes('@supabase/supabase-js')) {
+              return 'supabase';
+            }
+
+            // Radix UI components
+            if (id.includes('@radix-ui')) {
+              return 'radix';
+            }
+
+            // PDF and Excel parsing libraries
+            if (
+              id.includes('xlsx') ||
+              id.includes('exceljs') ||
+              id.includes('pdf-parse') ||
+              id.includes('pdfjs-dist')
+            ) {
+              return 'parsers';
+            }
+
+            // Charts and analytics
+            if (id.includes('recharts') || id.includes('d3')) {
+              return 'charts';
+            }
+
+            // Route-based splitting for heavy components
+            if (id.includes('/components/analytics/')) {
+              return 'route-analytics';
+            }
+            if (id.includes('/components/quotations/QuotationEditor')) {
+              return 'route-quotation-editor';
+            }
+            if (id.includes('/components/library/')) {
+              return 'route-library';
+            }
+            if (id.includes('/components/projects/')) {
+              return 'route-projects';
+            }
           },
         },
       },

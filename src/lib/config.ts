@@ -24,11 +24,21 @@ export interface Config {
   anthropic: {
     apiKey: string | null; // Optional - null if not provided
   };
+  app: {
+    name: string;
+    version: string;
+    env: Environment;
+  };
   env: Environment;
   isDevelopment: boolean;
   isProduction: boolean;
   devMode: boolean;
   apiUrl: string;
+  features: {
+    aiImport: boolean;
+    analytics: boolean;
+    debugMode: boolean;
+  };
 }
 
 /**
@@ -113,6 +123,18 @@ function validateConfig(): Config {
     const devMode = getOptionalEnv('VITE_DEV_MODE', 'false') === 'true';
     const apiUrl = getOptionalEnv('VITE_API_URL', 'http://localhost:3001');
 
+    // Application metadata
+    const appName = getOptionalEnv('VITE_APP_NAME', 'CPQ System');
+    const appVersion = getOptionalEnv('VITE_APP_VERSION', '1.0.0');
+
+    // Feature flags
+    const aiImportEnabled =
+      getOptionalEnv('VITE_ENABLE_AI_IMPORT', 'true') === 'true';
+    const analyticsEnabled =
+      getOptionalEnv('VITE_ENABLE_ANALYTICS', 'false') === 'true';
+    const debugModeEnabled =
+      getOptionalEnv('VITE_DEBUG_MODE', 'false') === 'true';
+
     const config: Config = {
       supabase: {
         url: supabaseUrl,
@@ -121,15 +143,29 @@ function validateConfig(): Config {
       anthropic: {
         apiKey: anthropicApiKey,
       },
+      app: {
+        name: appName,
+        version: appVersion,
+        env,
+      },
       env,
       isDevelopment: env === 'development',
       isProduction: env === 'production',
       devMode,
       apiUrl,
+      features: {
+        aiImport: aiImportEnabled,
+        analytics: analyticsEnabled,
+        debugMode: debugModeEnabled,
+      },
     };
 
+    logger.info(`✅ ${appName} v${appVersion}`);
     logger.info(`Environment: ${env}`);
     logger.info(`Development mode: ${devMode}`);
+    logger.info(`AI Import: ${aiImportEnabled ? 'Enabled' : 'Disabled'}`);
+    logger.info(`Analytics: ${analyticsEnabled ? 'Enabled' : 'Disabled'}`);
+    logger.info(`Debug Mode: ${debugModeEnabled ? 'Enabled' : 'Disabled'}`);
     logger.info('Environment configuration validated successfully');
 
     return config;

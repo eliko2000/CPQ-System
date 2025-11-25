@@ -75,38 +75,113 @@ The application will be available at `http://localhost:5173`
 
 ### Environment Variables
 
-Create a `.env.local` file based on `.env.example`:
+#### Quick Setup
 
-```bash
-# Copy the example file
-cp .env.example .env.local
+1. **Copy the template file:**
 
-# Edit .env.local with your actual keys
-```
+   ```bash
+   cp .env.example .env.local
+   ```
 
-Required variables:
+2. **Edit `.env.local` with your actual credentials:**
+   - Open `.env.local` in your text editor
+   - Replace placeholder values with your real API keys
+   - Save the file
+
+3. **Start the application:**
+   ```bash
+   npm run dev
+   ```
+
+#### Required Variables
+
+The application will **not start** without these required environment variables:
 
 ```env
-# Supabase Configuration (Required)
-# Get these from https://supabase.com/dashboard > Project Settings > API
+# Supabase Configuration (REQUIRED)
+# Get these from: https://supabase.com/dashboard > Project Settings > API
 VITE_SUPABASE_URL=https://your-project-id.supabase.co
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key_here
+```
 
-# Anthropic API (Optional - for AI Vision features)
-# Get from https://console.anthropic.com
+#### Optional Variables
+
+These variables are optional - the app will work without them, but with limited features:
+
+```env
+# Anthropic API (OPTIONAL - for AI Vision features)
+# Get from: https://console.anthropic.com
+# Note: Excel and CSV parsing work WITHOUT this key
+# Only needed for image-based document processing
 VITE_ANTHROPIC_API_KEY=sk-ant-api03-your_api_key_here
 
-# Development Configuration
+# Application Configuration (OPTIONAL)
+VITE_APP_NAME=CPQ System
+VITE_APP_VERSION=1.0.0
+VITE_APP_ENV=development
+
+# Feature Flags (OPTIONAL)
+VITE_ENABLE_AI_IMPORT=true
+VITE_ENABLE_ANALYTICS=false
+VITE_DEBUG_MODE=false
+
+# Development Configuration (OPTIONAL)
 VITE_DEV_MODE=true
 VITE_API_URL=http://localhost:3001
 ```
 
-**⚠️ Security Notes:**
+**Feature Flags Explained:**
+
+- `VITE_ENABLE_AI_IMPORT`: Enable/disable AI-powered document import (requires Anthropic API key)
+- `VITE_ENABLE_ANALYTICS`: Enable/disable analytics tracking
+- `VITE_DEBUG_MODE`: Enable verbose logging and debug tools (use in development only)
+
+#### Environment Validation
+
+The application includes automatic environment validation:
+
+- **Missing required variables**: App shows clear error message with instructions
+- **Invalid values**: Detects placeholder/example values and rejects them
+- **Optional variables**: App continues with features disabled if not provided
+
+Example error if required variable is missing:
+
+```
+Error: Missing or invalid required environment variable: VITE_SUPABASE_URL
+
+Please check your .env.local file:
+1. Copy .env.example to .env.local if you haven't already
+2. Fill in the actual value for VITE_SUPABASE_URL
+3. Restart the development server
+
+See README.md for setup instructions.
+```
+
+#### Security Best Practices
+
+**Critical Security Notes:**
+
 - `.env.local` is gitignored and should **NEVER** be committed
-- Use `.env.example` as a template (safe to commit)
+- `.env.example` contains only placeholders (safe to commit)
 - **NEVER** use `SUPABASE_SERVICE_ROLE_KEY` in client-side code
-- Service role keys should only be used in backend/server environments
-- Rotate all API keys if accidentally exposed
+- Service role keys bypass Row Level Security - only use server-side
+- Rotate all API keys immediately if accidentally exposed
+
+**Key Management:**
+
+- Use different API keys for dev/staging/production
+- Set up billing alerts in Anthropic console
+- Monitor API usage regularly
+- Keep credentials in password manager
+- Never share keys via email or chat
+
+**What to do if keys are exposed:**
+
+1. Immediately rotate the exposed keys in respective dashboards
+2. Check git history for committed keys: `git log -p | grep -i "VITE_"`
+3. If keys are in git history, use `git filter-branch` or BFG Repo-Cleaner
+4. Update `.env.local` with new keys
+5. Notify team members to update their local environments
 
 ### Build for Production
 
@@ -124,7 +199,7 @@ npm run preview
 
 ### User Guides
 
-- **[File Import User Guide](USER_GUIDE_FILE_IMPORT.md)** - Complete guide for importing components from documents
+- **[File Import User Guide](docs/user-guides/GUIDE_FILE_IMPORT.md)** - Complete guide for importing components from documents
   - Supported file formats
   - Step-by-step import workflow
   - Tips for best results
@@ -139,7 +214,7 @@ npm run preview
   - Database schema
   - Testing guide
 
-- **[Developer Guide - Parsers](DEVELOPER_GUIDE_PARSERS.md)** - Technical reference for parser system
+- **[Developer Guide - Parsers](docs/developer/DEV_PARSERS_GUIDE.md)** - Technical reference for parser system
   - API reference
   - Implementation details
   - Testing guide
@@ -215,12 +290,12 @@ CPQ-System/
 
 ### Supported Formats
 
-| Format | Extensions | Processing Time | Accuracy | Cost |
-|--------|-----------|----------------|----------|------|
-| **Excel** | .xlsx, .xls | < 1 second | 90-95% | Free |
-| **CSV** | .csv | < 1 second | 90-95% | Free |
-| **PDF** | .pdf | 1-3 seconds | 50-70% | Free |
-| **Images** | .jpg, .png, .gif, .webp | 10-15 seconds | 85-95% | ~$0.01-0.05/document |
+| Format     | Extensions              | Processing Time | Accuracy | Cost                 |
+| ---------- | ----------------------- | --------------- | -------- | -------------------- |
+| **Excel**  | .xlsx, .xls             | < 1 second      | 90-95%   | Free                 |
+| **CSV**    | .csv                    | < 1 second      | 90-95%   | Free                 |
+| **PDF**    | .pdf                    | 1-3 seconds     | 50-70%   | Free                 |
+| **Images** | .jpg, .png, .gif, .webp | 10-15 seconds   | 85-95%   | ~$0.01-0.05/document |
 
 ### Features
 
@@ -238,7 +313,7 @@ CPQ-System/
 4. Review extracted components
 5. Edit if needed and import
 
-See [USER_GUIDE_FILE_IMPORT.md](USER_GUIDE_FILE_IMPORT.md) for detailed instructions.
+See [GUIDE_FILE_IMPORT.md](docs/user-guides/GUIDE_FILE_IMPORT.md) for detailed instructions.
 
 ---
 
@@ -325,7 +400,7 @@ npm run test:ui
 
 ### Writing Tests
 
-See [DEVELOPER_GUIDE_PARSERS.md](DEVELOPER_GUIDE_PARSERS.md) for testing guidelines.
+See [DEV_PARSERS_GUIDE.md](docs/developer/DEV_PARSERS_GUIDE.md) for testing guidelines.
 
 ---
 
@@ -365,6 +440,7 @@ Set environment variables for production:
 ### Tables
 
 #### components
+
 Stores all component information including pricing and supplier data.
 
 ```sql
@@ -380,6 +456,7 @@ Stores all component information including pricing and supplier data.
 ```
 
 #### quotations
+
 Main quotation projects.
 
 ```sql
@@ -394,6 +471,7 @@ Main quotation projects.
 ```
 
 #### quotation_systems
+
 Systems within quotations.
 
 ```sql
@@ -406,6 +484,7 @@ Systems within quotations.
 ```
 
 #### quotation_items
+
 Line items within systems.
 
 ```sql
@@ -428,6 +507,7 @@ Line items within systems.
 **Issue**: File import not working
 
 **Solution**:
+
 - Check file format is supported
 - Verify file size (< 10MB for Excel, < 5MB for images)
 - Clear browser cache and reload
@@ -435,6 +515,7 @@ Line items within systems.
 **Issue**: AI Vision errors
 
 **Solution**:
+
 - Verify `VITE_ANTHROPIC_API_KEY` is set in `.env.local`
 - Check API key has sufficient credits
 - Ensure image size < 5MB
@@ -442,6 +523,7 @@ Line items within systems.
 **Issue**: Database connection errors
 
 **Solution**:
+
 - Verify Supabase credentials in `.env.local`
 - Check internet connection
 - Verify Supabase project is active
@@ -449,13 +531,14 @@ Line items within systems.
 **Issue**: PDF parsing fails
 
 **Solution**:
+
 - Ensure PDF has selectable text (not scanned)
 - Try converting to image and use AI Vision
 - Check PDF file is not corrupted
 
 ### Getting Help
 
-1. Check [USER_GUIDE_FILE_IMPORT.md](USER_GUIDE_FILE_IMPORT.md)
+1. Check [GUIDE_FILE_IMPORT.md](docs/user-guides/GUIDE_FILE_IMPORT.md)
 2. Review [CLAUDE.md](CLAUDE.md) technical documentation
 3. Contact system administrator
 
@@ -465,12 +548,12 @@ Line items within systems.
 
 ### Benchmarks
 
-| Operation | File Size | Time | Notes |
-|-----------|-----------|------|-------|
-| Excel Import | 1MB (1000 rows) | < 500ms | Fastest method |
-| CSV Import | 5MB (10000 rows) | 1-2s | Very efficient |
-| PDF Import | 1MB (5 pages) | 1-2s | Text-based only |
-| AI Vision | 2MB image | 10-15s | Network dependent |
+| Operation    | File Size        | Time    | Notes             |
+| ------------ | ---------------- | ------- | ----------------- |
+| Excel Import | 1MB (1000 rows)  | < 500ms | Fastest method    |
+| CSV Import   | 5MB (10000 rows) | 1-2s    | Very efficient    |
+| PDF Import   | 1MB (5 pages)    | 1-2s    | Text-based only   |
+| AI Vision    | 2MB image        | 10-15s  | Network dependent |
 
 ### Optimization Tips
 

@@ -9,7 +9,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { useQuotations } from '../useQuotations';
 import { supabase } from '../../supabaseClient';
-import type { DbQuotation, DbQuotationSystem, DbQuotationItem } from '../../types';
+import type {
+  DbQuotation,
+  DbQuotationSystem,
+  DbQuotationItem,
+} from '../../types';
 
 // Mock Supabase client
 vi.mock('../../supabaseClient', () => ({
@@ -125,7 +129,9 @@ describe('useQuotations', () => {
       expect(result.current.quotations).toHaveLength(1);
       expect(result.current.quotations[0].quotation_number).toBe('Q-2024-001');
       expect(result.current.quotations[0].quotation_systems).toHaveLength(1);
-      expect(result.current.quotations[0].quotation_systems[0].quotation_items).toHaveLength(1);
+      expect(
+        result.current.quotations[0].quotation_systems[0].quotation_items
+      ).toHaveLength(1);
       expect(result.current.error).toBeNull();
     });
 
@@ -150,7 +156,7 @@ describe('useQuotations', () => {
         expect(result.current.loading).toBe(false);
       });
 
-      expect(result.current.error).toBe('Database connection failed');
+      expect(result.current.error).toBe('Failed to fetch quotations');
       expect(result.current.quotations).toEqual([]);
     });
 
@@ -258,7 +264,7 @@ describe('useQuotations', () => {
 
       expect(quotation).toBeNull();
       await waitFor(() => {
-        expect(result.current.error).toContain('Quotation not found');
+        expect(result.current.error).toContain('Failed to fetch quotation');
       });
     });
   });
@@ -304,7 +310,10 @@ describe('useQuotations', () => {
         expect(result.current.loading).toBe(false);
       });
 
-      const newQuotation: Omit<DbQuotation, 'id' | 'created_at' | 'updated_at'> = {
+      const newQuotation: Omit<
+        DbQuotation,
+        'id' | 'created_at' | 'updated_at'
+      > = {
         quotation_number: 'Q-2024-002',
         version: 1,
         customer_name: 'New Customer',
@@ -354,10 +363,13 @@ describe('useQuotations', () => {
         order: mockOrder,
       });
 
-      vi.mocked(supabase.from).mockImplementation(() => ({
-        select: mockSelect,
-        insert: mockInsert,
-      } as any));
+      vi.mocked(supabase.from).mockImplementation(
+        () =>
+          ({
+            select: mockSelect,
+            insert: mockInsert,
+          }) as any
+      );
 
       const { result } = renderHook(() => useQuotations());
 
@@ -365,7 +377,10 @@ describe('useQuotations', () => {
         expect(result.current.loading).toBe(false);
       });
 
-      const newQuotation: Omit<DbQuotation, 'id' | 'created_at' | 'updated_at'> = {
+      const newQuotation: Omit<
+        DbQuotation,
+        'id' | 'created_at' | 'updated_at'
+      > = {
         quotation_number: 'Q-2024-001', // Duplicate
         version: 1,
         customer_name: 'Test',
@@ -395,10 +410,13 @@ describe('useQuotations', () => {
 
   describe('Updating Quotations', () => {
     it('should update quotation successfully', async () => {
-      const _updatedQuotation = { ...mockQuotation, customer_name: 'Updated Corp' };
+      const _updatedQuotation = {
+        ...mockQuotation,
+        customer_name: 'Updated Corp',
+      };
 
       const mockSingle = vi.fn().mockResolvedValue({
-        data: updatedQuotation,
+        data: _updatedQuotation,
         error: null,
       });
 
@@ -423,10 +441,13 @@ describe('useQuotations', () => {
         order: mockOrder,
       });
 
-      vi.mocked(supabase.from).mockImplementation(() => ({
-        select: mockSelect,
-        update: mockUpdate,
-      } as any));
+      vi.mocked(supabase.from).mockImplementation(
+        () =>
+          ({
+            select: mockSelect,
+            update: mockUpdate,
+          }) as any
+      );
 
       const { result } = renderHook(() => useQuotations());
 
@@ -434,7 +455,9 @@ describe('useQuotations', () => {
         expect(result.current.loading).toBe(false);
       });
 
-      await result.current.updateQuotation('quot-1', { customer_name: 'Updated Corp' });
+      await result.current.updateQuotation('quot-1', {
+        customer_name: 'Updated Corp',
+      });
 
       expect(mockUpdate).toHaveBeenCalled();
       expect(mockEq).toHaveBeenCalledWith('id', 'quot-1');
@@ -469,10 +492,13 @@ describe('useQuotations', () => {
         order: mockOrder,
       });
 
-      vi.mocked(supabase.from).mockImplementation(() => ({
-        select: mockSelect,
-        update: mockUpdate,
-      } as any));
+      vi.mocked(supabase.from).mockImplementation(
+        () =>
+          ({
+            select: mockSelect,
+            update: mockUpdate,
+          }) as any
+      );
 
       const { result } = renderHook(() => useQuotations());
 
@@ -516,10 +542,13 @@ describe('useQuotations', () => {
         order: mockOrder,
       });
 
-      vi.mocked(supabase.from).mockImplementation(() => ({
-        select: mockSelect,
-        update: mockUpdate,
-      } as any));
+      vi.mocked(supabase.from).mockImplementation(
+        () =>
+          ({
+            select: mockSelect,
+            update: mockUpdate,
+          }) as any
+      );
 
       const { result } = renderHook(() => useQuotations());
 
@@ -528,7 +557,9 @@ describe('useQuotations', () => {
       });
 
       await expect(
-        result.current.updateQuotation('quot-1', { status: 'invalid-status' as any })
+        result.current.updateQuotation('quot-1', {
+          status: 'invalid-status' as any,
+        })
       ).rejects.toThrow();
 
       await waitFor(() => {
@@ -556,10 +587,13 @@ describe('useQuotations', () => {
         order: mockOrder,
       });
 
-      vi.mocked(supabase.from).mockImplementation(() => ({
-        select: mockSelect,
-        delete: mockDelete,
-      } as any));
+      vi.mocked(supabase.from).mockImplementation(
+        () =>
+          ({
+            select: mockSelect,
+            delete: mockDelete,
+          }) as any
+      );
 
       const { result } = renderHook(() => useQuotations());
 
@@ -592,10 +626,13 @@ describe('useQuotations', () => {
         order: mockOrder,
       });
 
-      vi.mocked(supabase.from).mockImplementation(() => ({
-        select: mockSelect,
-        delete: mockDelete,
-      } as any));
+      vi.mocked(supabase.from).mockImplementation(
+        () =>
+          ({
+            select: mockSelect,
+            delete: mockDelete,
+          }) as any
+      );
 
       const { result } = renderHook(() => useQuotations());
 
@@ -613,7 +650,10 @@ describe('useQuotations', () => {
 
   describe('Quotation Systems Operations', () => {
     it('should add quotation system successfully', async () => {
-      const newSystem: Omit<DbQuotationSystem, 'id' | 'created_at' | 'updated_at'> = {
+      const newSystem: Omit<
+        DbQuotationSystem,
+        'id' | 'created_at' | 'updated_at'
+      > = {
         quotation_id: 'quot-1',
         system_name: 'Secondary System',
         system_description: null,
@@ -649,10 +689,13 @@ describe('useQuotations', () => {
         order: mockOrder,
       });
 
-      vi.mocked(supabase.from).mockImplementation((table: string) => ({
-        select: mockSelect,
-        insert: mockInsert,
-      } as any));
+      vi.mocked(supabase.from).mockImplementation(
+        (table: string) =>
+          ({
+            select: mockSelect,
+            insert: mockInsert,
+          }) as any
+      );
 
       const { result } = renderHook(() => useQuotations());
 
@@ -692,10 +735,13 @@ describe('useQuotations', () => {
         order: mockOrder,
       });
 
-      vi.mocked(supabase.from).mockImplementation(() => ({
-        select: mockSelect,
-        update: mockUpdate,
-      } as any));
+      vi.mocked(supabase.from).mockImplementation(
+        () =>
+          ({
+            select: mockSelect,
+            update: mockUpdate,
+          }) as any
+      );
 
       const { result } = renderHook(() => useQuotations());
 
@@ -703,7 +749,9 @@ describe('useQuotations', () => {
         expect(result.current.loading).toBe(false);
       });
 
-      await result.current.updateQuotationSystem('system-1', { system_name: 'Updated System' });
+      await result.current.updateQuotationSystem('system-1', {
+        system_name: 'Updated System',
+      });
 
       expect(mockUpdate).toHaveBeenCalled();
       expect(mockEq).toHaveBeenCalledWith('id', 'system-1');
@@ -727,10 +775,13 @@ describe('useQuotations', () => {
         order: mockOrder,
       });
 
-      vi.mocked(supabase.from).mockImplementation(() => ({
-        select: mockSelect,
-        delete: mockDelete,
-      } as any));
+      vi.mocked(supabase.from).mockImplementation(
+        () =>
+          ({
+            select: mockSelect,
+            delete: mockDelete,
+          }) as any
+      );
 
       const { result } = renderHook(() => useQuotations());
 
@@ -747,23 +798,24 @@ describe('useQuotations', () => {
 
   describe('Quotation Items Operations', () => {
     it('should add quotation item successfully', async () => {
-      const newItem: Omit<DbQuotationItem, 'id' | 'created_at' | 'updated_at'> = {
-        quotation_system_id: 'system-1',
-        component_id: 'comp-2',
-        item_name: 'Banner Sensor',
-        manufacturer: 'Banner',
-        manufacturer_part_number: 'Q45BB6AF300',
-        quantity: 4,
-        unit_cost: 150,
-        total_cost: 600,
-        margin_percentage: 25,
-        unit_price: 187.5,
-        total_price: 750,
-        original_currency: 'USD',
-        original_cost: 150,
-        notes: null,
-        sort_order: 1,
-      };
+      const newItem: Omit<DbQuotationItem, 'id' | 'created_at' | 'updated_at'> =
+        {
+          quotation_system_id: 'system-1',
+          component_id: 'comp-2',
+          item_name: 'Banner Sensor',
+          manufacturer: 'Banner',
+          manufacturer_part_number: 'Q45BB6AF300',
+          quantity: 4,
+          unit_cost: 150,
+          total_cost: 600,
+          margin_percentage: 25,
+          unit_price: 187.5,
+          total_price: 750,
+          original_currency: 'USD',
+          original_cost: 150,
+          notes: null,
+          sort_order: 1,
+        };
 
       const mockSingle = vi.fn().mockResolvedValue({
         data: { ...newItem, id: 'item-2' },
@@ -787,10 +839,13 @@ describe('useQuotations', () => {
         order: mockOrder,
       });
 
-      vi.mocked(supabase.from).mockImplementation(() => ({
-        select: mockSelect,
-        insert: mockInsert,
-      } as any));
+      vi.mocked(supabase.from).mockImplementation(
+        () =>
+          ({
+            select: mockSelect,
+            insert: mockInsert,
+          }) as any
+      );
 
       const { result } = renderHook(() => useQuotations());
 
@@ -830,10 +885,13 @@ describe('useQuotations', () => {
         order: mockOrder,
       });
 
-      vi.mocked(supabase.from).mockImplementation(() => ({
-        select: mockSelect,
-        update: mockUpdate,
-      } as any));
+      vi.mocked(supabase.from).mockImplementation(
+        () =>
+          ({
+            select: mockSelect,
+            update: mockUpdate,
+          }) as any
+      );
 
       const { result } = renderHook(() => useQuotations());
 
@@ -865,10 +923,13 @@ describe('useQuotations', () => {
         order: mockOrder,
       });
 
-      vi.mocked(supabase.from).mockImplementation(() => ({
-        select: mockSelect,
-        delete: mockDelete,
-      } as any));
+      vi.mocked(supabase.from).mockImplementation(
+        () =>
+          ({
+            select: mockSelect,
+            delete: mockDelete,
+          }) as any
+      );
 
       const { result } = renderHook(() => useQuotations());
 

@@ -5,9 +5,36 @@
  * Run with: npm test src/services/documentParsers.test.ts
  */
 
+import { describe, it, expect, beforeAll } from 'vitest';
 import { parseExcelFile } from './excelParser';
 import { parsePDFFile } from './pdfParser';
 import type { AIExtractionResult } from './claudeAI';
+
+// Polyfill DOMMatrix for pdfjs-dist (required for PDF parsing in Node.js environment)
+beforeAll(() => {
+  if (typeof global.DOMMatrix === 'undefined') {
+    global.DOMMatrix = class DOMMatrix {
+      constructor() {
+        this.a = 1;
+        this.b = 0;
+        this.c = 0;
+        this.d = 1;
+        this.e = 0;
+        this.f = 0;
+      }
+    } as any;
+  }
+});
+
+// Mock pdfjs-dist
+import { vi } from 'vitest';
+const mockGetDocument = vi.fn();
+vi.mock('pdfjs-dist', () => ({
+  GlobalWorkerOptions: {
+    workerSrc: '',
+  },
+  getDocument: (args: any) => mockGetDocument(args),
+}));
 
 /**
  * Test Excel Parser with a sample file structure
@@ -18,7 +45,7 @@ async function testExcelParser() {
   // Example: Create a test file blob
   // In real usage, this would come from file input
   const testFile = new File([''], 'test.xlsx', {
-    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   });
 
   try {
@@ -28,7 +55,7 @@ async function testExcelParser() {
       success: result.success,
       componentsFound: result.components.length,
       confidence: result.confidence,
-      metadata: result.metadata
+      metadata: result.metadata,
     });
 
     // Validate structure
@@ -38,9 +65,12 @@ async function testExcelParser() {
           name: component.name,
           manufacturer: component.manufacturer,
           manufacturerPN: component.manufacturerPN,
-          price: component.unitPriceUSD || component.unitPriceNIS || component.unitPriceEUR,
+          price:
+            component.unitPriceUSD ||
+            component.unitPriceNIS ||
+            component.unitPriceEUR,
           currency: component.currency,
-          confidence: component.confidence
+          confidence: component.confidence,
         });
       });
     }
@@ -56,7 +86,7 @@ async function testPDFParser() {
   console.log('\nTesting PDF Parser...');
 
   const testFile = new File([''], 'test.pdf', {
-    type: 'application/pdf'
+    type: 'application/pdf',
   });
 
   try {
@@ -66,7 +96,7 @@ async function testPDFParser() {
       success: result.success,
       componentsFound: result.components.length,
       confidence: result.confidence,
-      metadata: result.metadata
+      metadata: result.metadata,
     });
 
     if (result.success) {
@@ -74,8 +104,11 @@ async function testPDFParser() {
         console.log(`Component ${index + 1}:`, {
           name: component.name,
           manufacturerPN: component.manufacturerPN,
-          price: component.unitPriceUSD || component.unitPriceNIS || component.unitPriceEUR,
-          confidence: component.confidence
+          price:
+            component.unitPriceUSD ||
+            component.unitPriceNIS ||
+            component.unitPriceEUR,
+          confidence: component.confidence,
         });
       });
     }
@@ -92,8 +125,13 @@ async function handleFileUpload(file: File): Promise<AIExtractionResult> {
   const fileName = file.name.toLowerCase();
 
   // Route to appropriate parser
-  if (fileType.includes('excel') || fileType.includes('spreadsheet') ||
-      fileName.endsWith('.xlsx') || fileName.endsWith('.xls') || fileName.endsWith('.csv')) {
+  if (
+    fileType.includes('excel') ||
+    fileType.includes('spreadsheet') ||
+    fileName.endsWith('.xlsx') ||
+    fileName.endsWith('.xls') ||
+    fileName.endsWith('.csv')
+  ) {
     return await parseExcelFile(file);
   } else if (fileType === 'application/pdf' || fileName.endsWith('.pdf')) {
     return await parsePDFFile(file);
@@ -107,7 +145,7 @@ async function handleFileUpload(file: File): Promise<AIExtractionResult> {
       components: [],
       metadata: { documentType: 'unknown', totalItems: 0 },
       confidence: 0,
-      error: `Unsupported file type: ${fileType}`
+      error: `Unsupported file type: ${fileType}`,
     };
   }
 }
@@ -121,27 +159,87 @@ async function processExtractionResults(result: AIExtractionResult) {
     return;
   }
 
-  console.log(`\nProcessing ${result.components.length} extracted components...`);
+  console.log(
+    `\nProcessing ${result.components.length} extracted components...`
+  );
   console.log(`Overall confidence: ${(result.confidence * 100).toFixed(1)}%`);
 
   // Filter components by confidence threshold
-  const highConfidence = result.components.filter(c => c.confidence && c.confidence >= 0.7);
-  const mediumConfidence = result.components.filter(c => c.confidence && c.confidence >= 0.4 && c.confidence < 0.7);
-  const lowConfidence = result.components.filter(c => !c.confidence || c.confidence < 0.4);
+  const highConfidence = result.components.filter(
+    c => c.confidence && c.confidence >= 0.7
+  );
+  const mediumConfidence = result.components.filter(
+    c => c.confidence && c.confidence >= 0.4 && c.confidence < 0.7
+  );
+  const lowConfidence = result.components.filter(
+    c => !c.confidence || c.confidence < 0.4
+  );
 
   console.log(`\nConfidence breakdown:`);
-  console.log(`- High confidence (≥70%): ${highConfidence.length} components - Auto-import recommended`);
-  console.log(`- Medium confidence (40-70%): ${mediumConfidence.length} components - Review before import`);
-  console.log(`- Low confidence (<40%): ${lowConfidence.length} components - Manual verification required`);
+  console.log(
+    `- High confidence (≥70%): ${highConfidence.length} components - Auto-import recommended`
+  );
+  console.log(
+    `- Medium confidence (40-70%): ${mediumConfidence.length} components - Review before import`
+  );
+  console.log(
+    `- Low confidence (<40%): ${lowConfidence.length} components - Manual verification required`
+  );
 
   // Example: Auto-import high confidence components
   for (const component of highConfidence) {
     console.log(`\n✓ Ready to import: ${component.name}`);
     console.log(`  - Part Number: ${component.manufacturerPN || 'N/A'}`);
-    console.log(`  - Price: ${component.unitPriceUSD || component.unitPriceNIS || 'N/A'} ${component.currency || ''}`);
+    console.log(
+      `  - Price: ${component.unitPriceUSD || component.unitPriceNIS || 'N/A'} ${component.currency || ''}`
+    );
     console.log(`  - Category: ${component.category || 'אחר'}`);
   }
 }
 
 // Export for use in other modules
-export { testExcelParser, testPDFParser, handleFileUpload, processExtractionResults };
+export {
+  testExcelParser,
+  testPDFParser,
+  handleFileUpload,
+  processExtractionResults,
+};
+
+// Run tests if in test environment
+describe('Document Parsers Integration', () => {
+  it('should execute testExcelParser without error', async () => {
+    // Mock console.log to avoid cluttering output
+    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const consoleErrorSpy = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+
+    await testExcelParser();
+
+    consoleSpy.mockRestore();
+    consoleErrorSpy.mockRestore();
+  });
+
+  it('should execute testPDFParser without error', async () => {
+    // Mock console.log to avoid cluttering output
+    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const consoleErrorSpy = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+
+    await testPDFParser();
+
+    consoleSpy.mockRestore();
+    consoleErrorSpy.mockRestore();
+  });
+
+  it('should handle file upload for PDF', async () => {
+    const file = new File(['dummy content'], 'test.pdf', {
+      type: 'application/pdf',
+    });
+    const result = await handleFileUpload(file);
+    expect(result).toBeDefined();
+    // Since we mocked pdfjs-dist but didn't setup return values for this specific call in the global scope,
+    // it might return empty or error, but it shouldn't throw.
+  });
+});

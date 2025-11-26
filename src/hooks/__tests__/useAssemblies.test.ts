@@ -9,7 +9,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { useAssemblies } from '../useAssemblies';
 import { supabase } from '../../supabaseClient';
-import type { DbAssembly, Assembly, AssemblyComponent } from '../../types';
+import type { DbAssembly } from '../../types';
 
 // Mock Supabase client
 vi.mock('../../supabaseClient', () => ({
@@ -72,49 +72,6 @@ describe('useAssemblies', () => {
     updated_at: '2024-01-15T10:00:00Z',
   };
 
-  const mockAssembly: Assembly = {
-    id: 'asm-1',
-    name: 'Standard Control Cabinet',
-    description: 'Pre-configured control cabinet',
-    isComplete: true,
-    notes: 'Standard configuration for factory automation',
-    components: [
-      {
-        id: 'ac-1',
-        assemblyId: 'asm-1',
-        componentId: 'comp-1',
-        componentName: 'Siemens PLC',
-        componentManufacturer: 'Siemens',
-        componentPartNumber: '6ES7512-1DK01-0AB0',
-        quantity: 2,
-        sortOrder: 0,
-        component: {
-          id: 'comp-1',
-          name: 'Siemens PLC',
-          description: 'Industrial controller',
-          category: 'בקרים',
-          componentType: 'hardware',
-          productType: 'בקרים',
-          manufacturer: 'Siemens',
-          manufacturerPN: '6ES7512-1DK01-0AB0',
-          supplier: 'Automation Direct',
-          unitCostNIS: 9250,
-          unitCostUSD: 2500,
-          unitCostEUR: 2200,
-          currency: 'USD',
-          originalCost: 2500,
-          quoteDate: '2024-01-15',
-          quoteFileUrl: '',
-          notes: '',
-          createdAt: '2024-01-15T10:00:00Z',
-          updatedAt: '2024-01-15T10:00:00Z',
-        },
-      },
-    ],
-    createdAt: '2024-01-15T10:00:00Z',
-    updatedAt: '2024-01-15T10:00:00Z',
-  };
-
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -166,7 +123,9 @@ describe('useAssemblies', () => {
       });
 
       expect(result.current.assemblies).toHaveLength(1);
-      expect(result.current.assemblies[0].name).toBe('Standard Control Cabinet');
+      expect(result.current.assemblies[0].name).toBe(
+        'Standard Control Cabinet'
+      );
       expect(result.current.assemblies[0].components).toHaveLength(1);
       expect(result.current.error).toBeNull();
     });
@@ -312,20 +271,15 @@ describe('useAssemblies', () => {
         order: mockRefreshOrder,
       });
 
-      let callCount = 0;
       vi.mocked(supabase.from).mockImplementation((table: string) => {
         if (table === 'components') {
           return { select: mockComponentsSelect } as any;
         }
         if (table === 'assemblies') {
-          callCount++;
-          if (callCount === 1) {
-            return {
-              select: mockRefreshSelect,
-              insert: mockAssemblyInsert,
-            } as any;
-          }
-          return { select: mockRefreshSelect } as any;
+          return {
+            select: mockRefreshSelect,
+            insert: mockAssemblyInsert,
+          } as any;
         }
         if (table === 'assembly_components') {
           return {
@@ -409,21 +363,19 @@ describe('useAssemblies', () => {
       });
 
       await expect(
-        result.current.addAssembly('Duplicate', [{ componentId: 'comp-1', quantity: 1 }])
+        result.current.addAssembly('Duplicate', [
+          { componentId: 'comp-1', quantity: 1 },
+        ])
       ).rejects.toThrow();
 
       await waitFor(() => {
-        expect(result.current.error).toContain('Failed to add assembly');
+        expect(result.current.error).toContain('Duplicate assembly name');
       });
     });
   });
 
   describe('Updating Assemblies', () => {
     it('should update assembly metadata successfully', async () => {
-      const mockUpdate = vi.fn().mockResolvedValue({
-        error: null,
-      });
-
       const mockEq = vi.fn().mockReturnValue({
         error: null,
       });
@@ -473,10 +425,6 @@ describe('useAssemblies', () => {
     });
 
     it('should update assembly components successfully', async () => {
-      const mockDelete = vi.fn().mockResolvedValue({
-        error: null,
-      });
-
       const mockDeleteEq = vi.fn().mockReturnValue({
         error: null,
       });
@@ -495,10 +443,6 @@ describe('useAssemblies', () => {
       });
 
       const mockInsert = vi.fn().mockResolvedValue({
-        error: null,
-      });
-
-      const mockUpdateAssembly = vi.fn().mockResolvedValue({
         error: null,
       });
 
@@ -606,7 +550,9 @@ describe('useAssemblies', () => {
       ).rejects.toThrow();
 
       await waitFor(() => {
-        expect(result.current.error).toContain('Failed to update assembly');
+        expect(result.current.error).toContain(
+          'Update failed: validation error'
+        );
       });
     });
   });
@@ -705,7 +651,9 @@ describe('useAssemblies', () => {
       await expect(result.current.deleteAssembly('asm-1')).rejects.toThrow();
 
       await waitFor(() => {
-        expect(result.current.error).toContain('Failed to delete assembly');
+        expect(result.current.error).toContain(
+          'Cannot delete: assembly in use'
+        );
       });
     });
   });

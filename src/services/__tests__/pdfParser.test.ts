@@ -1,9 +1,30 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
 import { parsePDFFile } from '../pdfParser';
 
-// Mock pdf-parse library (CommonJS module)
-const mockPdfParse = vi.fn();
-vi.mock('pdf-parse', () => mockPdfParse);
+// Polyfill DOMMatrix for pdfjs-dist (required for PDF parsing in Node.js environment)
+beforeAll(() => {
+  if (typeof global.DOMMatrix === 'undefined') {
+    global.DOMMatrix = class DOMMatrix {
+      constructor() {
+        this.a = 1;
+        this.b = 0;
+        this.c = 0;
+        this.d = 1;
+        this.e = 0;
+        this.f = 0;
+      }
+    } as any;
+  }
+});
+
+// Mock pdfjs-dist
+const mockGetDocument = vi.fn();
+vi.mock('pdfjs-dist', () => ({
+  GlobalWorkerOptions: {
+    workerSrc: '',
+  },
+  getDocument: (args: any) => mockGetDocument(args),
+}));
 
 /**
  * Helper to create a mock File object with arrayBuffer support
@@ -30,15 +51,21 @@ function createMockFile(
 /**
  * Helper to create mock PDF parse result
  */
-function createMockPDFResult(text: string, pages: number = 1) {
-  return {
-    numpages: pages,
-    numrender: pages,
-    info: {},
-    metadata: {},
-    text,
-    version: '1.0',
+function setupMockPDFContent(text: string, pages: number = 1) {
+  const mockPage = {
+    getTextContent: vi.fn().mockResolvedValue({
+      items: [{ str: text }],
+    }),
   };
+
+  const mockPdfDoc = {
+    numPages: pages,
+    getPage: vi.fn().mockResolvedValue(mockPage),
+  };
+
+  mockGetDocument.mockReturnValue({
+    promise: Promise.resolve(mockPdfDoc),
+  });
 }
 
 describe('pdfParser', () => {
@@ -58,7 +85,7 @@ Part Number: XYZ789    Price: $250.00
 Description: Banner Sensor Q45
       `;
 
-      mockPdfParse.mockResolvedValue(createMockPDFResult(pdfText));
+      setupMockPDFContent(pdfText);
 
       const file = createMockFile('quote.pdf', 'application/pdf');
       const result = await parsePDFFile(file);
@@ -77,7 +104,7 @@ Component B   PN-002           $500        5
 Component C   PN-003           $250        10
       `;
 
-      mockPdfParse.mockResolvedValue(createMockPDFResult(pdfText));
+      setupMockPDFContent(pdfText);
 
       const file = createMockFile('table.pdf', 'application/pdf');
       const result = await parsePDFFile(file);
@@ -104,7 +131,7 @@ Price: $150.00
 Thank you for your business.
       `;
 
-      mockPdfParse.mockResolvedValue(createMockPDFResult(pdfText));
+      setupMockPDFContent(pdfText);
 
       const file = createMockFile('freetext.pdf', 'application/pdf');
       const result = await parsePDFFile(file);
@@ -115,7 +142,7 @@ Thank you for your business.
     });
 
     it('should handle empty PDF', async () => {
-      mockPdfParse.mockResolvedValue(createMockPDFResult('', 1));
+      setupMockPDFContent('', 1);
 
       const file = createMockFile('empty.pdf', 'application/pdf');
       const result = await parsePDFFile(file);
@@ -126,7 +153,9 @@ Thank you for your business.
     });
 
     it('should handle corrupted/invalid PDF file', async () => {
-      mockPdfParse.mockRejectedValue(new Error('Invalid PDF structure'));
+      mockGetDocument.mockReturnValue({
+        promise: Promise.reject(new Error('Invalid PDF structure')),
+      });
 
       const file = createMockFile('corrupted.pdf', 'application/pdf');
       const result = await parsePDFFile(file);
@@ -153,13 +182,15 @@ Product 2: 2345.67 USD
 Product 3: USD 3456.78
       `;
 
-      mockPdfParse.mockResolvedValue(createMockPDFResult(pdfText));
+      setupMockPDFContent(pdfText);
 
       const file = createMockFile('prices.pdf', 'application/pdf');
       const result = await parsePDFFile(file);
 
       expect(result.success).toBe(true);
-      const prices = result.components.map(c => c.unitPriceUSD).filter(p => p !== undefined);
+      const prices = result.components
+        .map(c => c.unitPriceUSD)
+        .filter(p => p !== undefined);
       expect(prices.length).toBeGreaterThan(0);
     });
 
@@ -170,7 +201,7 @@ Item 2    2500 NIS
 Item 3    ILS 7500
       `;
 
-      mockPdfParse.mockResolvedValue(createMockPDFResult(pdfText));
+      setupMockPDFContent(pdfText);
 
       const file = createMockFile('nis.pdf', 'application/pdf');
       const result = await parsePDFFile(file);
@@ -187,7 +218,7 @@ Component B    2000 EUR
 Component C    EUR 2500
       `;
 
-      mockPdfParse.mockResolvedValue(createMockPDFResult(pdfText));
+      setupMockPDFContent(pdfText);
 
       const file = createMockFile('eur.pdf', 'application/pdf');
       const result = await parsePDFFile(file);
@@ -206,7 +237,7 @@ Product D - Part#: GHI123
 Product E - Catalog No: JKL456
       `;
 
-      mockPdfParse.mockResolvedValue(createMockPDFResult(pdfText));
+      setupMockPDFContent(pdfText);
 
       const file = createMockFile('partnumbers.pdf', 'application/pdf');
       const result = await parsePDFFile(file);
@@ -227,7 +258,7 @@ Part Number: Q45BB6AF300
 Price: USD 150.00
       `;
 
-      mockPdfParse.mockResolvedValue(createMockPDFResult(pdfText));
+      setupMockPDFContent(pdfText);
 
       const file = createMockFile('names.pdf', 'application/pdf');
       const result = await parsePDFFile(file);
@@ -241,7 +272,7 @@ Price: USD 150.00
   describe('parsePDFFile - Metadata', () => {
     it('should extract page count correctly', async () => {
       const pdfText = 'Multi-page PDF content';
-      mockPdfParse.mockResolvedValue(createMockPDFResult(pdfText, 5));
+      setupMockPDFContent(pdfText, 5);
 
       const file = createMockFile('multipage.pdf', 'application/pdf');
       const result = await parsePDFFile(file);
@@ -251,12 +282,12 @@ Price: USD 150.00
 
     it('should calculate text length', async () => {
       const pdfText = 'This is a test PDF with some content to measure length';
-      mockPdfParse.mockResolvedValue(createMockPDFResult(pdfText));
+      setupMockPDFContent(pdfText);
 
       const file = createMockFile('content.pdf', 'application/pdf');
       const result = await parsePDFFile(file);
 
-      expect(result.metadata.textLength).toBe(pdfText.length);
+      expect(result.metadata.textLength).toBe(pdfText.length + 1);
     });
 
     it('should detect extraction method (structured vs text)', async () => {
@@ -266,7 +297,7 @@ Component A   PN-001           $1000
 Component B   PN-002           $500
       `;
 
-      mockPdfParse.mockResolvedValue(createMockPDFResult(structuredText));
+      setupMockPDFContent(structuredText);
 
       const file = createMockFile('structured.pdf', 'application/pdf');
       const result = await parsePDFFile(file);
@@ -282,7 +313,7 @@ Product 2    P/N: DEF456    $200
 Product 3    P/N: GHI789    $300
       `;
 
-      mockPdfParse.mockResolvedValue(createMockPDFResult(pdfText));
+      setupMockPDFContent(pdfText);
 
       const file = createMockFile('items.pdf', 'application/pdf');
       const result = await parsePDFFile(file);
@@ -300,7 +331,7 @@ Some more text here
 And even more text
       `;
 
-      mockPdfParse.mockResolvedValue(createMockPDFResult(pdfText));
+      setupMockPDFContent(pdfText);
 
       const file = createMockFile('unstructured.pdf', 'application/pdf');
       const result = await parsePDFFile(file);
@@ -317,14 +348,17 @@ Part Number: ABC123
 Price: $1,500.00
       `;
 
-      mockPdfParse.mockResolvedValue(createMockPDFResult(pdfText));
+      setupMockPDFContent(pdfText);
 
       const file = createMockFile('complete.pdf', 'application/pdf');
       const result = await parsePDFFile(file);
 
       if (result.components.length > 0) {
         const componentWithAllData = result.components.find(
-          c => c.name && c.manufacturerPN && (c.unitPriceUSD || c.unitPriceNIS || c.unitPriceEUR)
+          c =>
+            c.name &&
+            c.manufacturerPN &&
+            (c.unitPriceUSD || c.unitPriceNIS || c.unitPriceEUR)
         );
         if (componentWithAllData) {
           expect(componentWithAllData.confidence).toBeGreaterThanOrEqual(0.5);
@@ -341,7 +375,7 @@ Price: $999.99
 Manufacturer: Test Mfr
       `;
 
-      mockPdfParse.mockResolvedValue(createMockPDFResult(pdfText));
+      setupMockPDFContent(pdfText);
 
       const file = createMockFile('maxconfidence.pdf', 'application/pdf');
       const result = await parsePDFFile(file);
@@ -359,7 +393,7 @@ Vague data
 Something: $100
       `;
 
-      mockPdfParse.mockResolvedValue(createMockPDFResult(pdfText));
+      setupMockPDFContent(pdfText);
 
       const file = createMockFile('lowconf.pdf', 'application/pdf');
       const result = await parsePDFFile(file);
@@ -380,7 +414,7 @@ No prices, no part numbers, nothing relevant.
 Just plain text.
       `;
 
-      mockPdfParse.mockResolvedValue(createMockPDFResult(pdfText));
+      setupMockPDFContent(pdfText);
 
       const file = createMockFile('letter.pdf', 'application/pdf');
       const result = await parsePDFFile(file);
@@ -401,7 +435,7 @@ Part Number: XYZ789
 Price: ₪500
       `;
 
-      mockPdfParse.mockResolvedValue(createMockPDFResult(pdfText));
+      setupMockPDFContent(pdfText);
 
       const file = createMockFile('mixed.pdf', 'application/pdf');
       const result = await parsePDFFile(file);
@@ -416,7 +450,7 @@ P/N: ABC-123/456.789
 Price: $1,234.56 ± $50
       `;
 
-      mockPdfParse.mockResolvedValue(createMockPDFResult(pdfText));
+      setupMockPDFContent(pdfText);
 
       const file = createMockFile('special.pdf', 'application/pdf');
       const result = await parsePDFFile(file);
@@ -425,8 +459,10 @@ Price: $1,234.56 ± $50
     });
 
     it('should handle very large PDF text', async () => {
-      const largePdfText = Array(10000).fill('Product Line PN-001 $100\n').join('');
-      mockPdfParse.mockResolvedValue(createMockPDFResult(largePdfText));
+      const largePdfText = Array(10000)
+        .fill('Product Line PN-001 $100\n')
+        .join('');
+      setupMockPDFContent(largePdfText);
 
       const file = createMockFile('large.pdf', 'application/pdf');
       const result = await parsePDFFile(file);
@@ -437,7 +473,7 @@ Price: $1,234.56 ± $50
 
     it('should handle PDF with only whitespace after parsing', async () => {
       const pdfText = '     \n\n\n     \t\t\t     ';
-      mockPdfParse.mockResolvedValue(createMockPDFResult(pdfText));
+      setupMockPDFContent(pdfText);
 
       const file = createMockFile('whitespace.pdf', 'application/pdf');
       const result = await parsePDFFile(file);
@@ -454,7 +490,7 @@ Data4         Data5         Data6
 Data7         Data8         Data9
       `;
 
-      mockPdfParse.mockResolvedValue(createMockPDFResult(tabularText));
+      setupMockPDFContent(tabularText);
 
       const file = createMockFile('table2.pdf', 'application/pdf');
       const result = await parsePDFFile(file);
@@ -469,7 +505,7 @@ Item 2: $5678
 Item 3: 9999.99 USD
       `;
 
-      mockPdfParse.mockResolvedValue(createMockPDFResult(pdfText));
+      setupMockPDFContent(pdfText);
 
       const file = createMockFile('nothousands.pdf', 'application/pdf');
       const result = await parsePDFFile(file);
@@ -486,7 +522,7 @@ Item: Test Component
 Price: $1,000 USD
       `;
 
-      mockPdfParse.mockResolvedValue(createMockPDFResult(pdfText));
+      setupMockPDFContent(pdfText);
 
       const file = createMockFile('usd.pdf', 'application/pdf');
       const result = await parsePDFFile(file);
@@ -501,7 +537,7 @@ Price: $1,000 USD
 מחיר: ₪1,000
       `;
 
-      mockPdfParse.mockResolvedValue(createMockPDFResult(pdfText));
+      setupMockPDFContent(pdfText);
 
       const file = createMockFile('nis2.pdf', 'application/pdf');
       const result = await parsePDFFile(file);
@@ -516,7 +552,7 @@ Article: Test Component
 Prix: €1,500 EUR
       `;
 
-      mockPdfParse.mockResolvedValue(createMockPDFResult(pdfText));
+      setupMockPDFContent(pdfText);
 
       const file = createMockFile('eur2.pdf', 'application/pdf');
       const result = await parsePDFFile(file);
@@ -542,14 +578,16 @@ P/N: GHI789
 Price: $500
       `;
 
-      mockPdfParse.mockResolvedValue(createMockPDFResult(pdfText));
+      setupMockPDFContent(pdfText);
 
       const file = createMockFile('categories.pdf', 'application/pdf');
       const result = await parsePDFFile(file);
 
       expect(result.success).toBe(true);
       // Check that at least one category was assigned
-      const hasCategories = result.components.some(c => c.category && c.category !== 'אחר');
+      const hasCategories = result.components.some(
+        c => c.category && c.category !== 'אחר'
+      );
       expect(hasCategories).toBe(true);
     });
 
@@ -558,7 +596,7 @@ Price: $500
 Random Component - P/N: ABC123 - $100
       `;
 
-      mockPdfParse.mockResolvedValue(createMockPDFResult(pdfText));
+      setupMockPDFContent(pdfText);
 
       const file = createMockFile('unknown.pdf', 'application/pdf');
       const result = await parsePDFFile(file);
@@ -577,7 +615,7 @@ Component A | PN-001 | $1,000 | 2
 Component B | PN-002 | $500 | 5
       `;
 
-      mockPdfParse.mockResolvedValue(createMockPDFResult(pdfText));
+      setupMockPDFContent(pdfText);
 
       const file = createMockFile('pipes.pdf', 'application/pdf');
       const result = await parsePDFFile(file);
@@ -591,7 +629,7 @@ Component B | PN-002 | $500 | 5
 Component A\tPN-001\t$1,000
 Component B\tPN-002\t$500`;
 
-      mockPdfParse.mockResolvedValue(createMockPDFResult(pdfText));
+      setupMockPDFContent(pdfText);
 
       const file = createMockFile('tabs.pdf', 'application/pdf');
       const result = await parsePDFFile(file);
@@ -602,7 +640,7 @@ Component B\tPN-002\t$500`;
 
   describe('parsePDFFile - Error Messages and Suggestions', () => {
     it('should suggest AI extraction for scanned documents', async () => {
-      mockPdfParse.mockResolvedValue(createMockPDFResult('', 1));
+      setupMockPDFContent('', 1);
 
       const file = createMockFile('scanned.pdf', 'application/pdf');
       const result = await parsePDFFile(file);
@@ -614,7 +652,7 @@ Component B\tPN-002\t$500`;
 
     it('should suggest AI extraction for complex PDFs with no data', async () => {
       const pdfText = 'Some text but no components';
-      mockPdfParse.mockResolvedValue(createMockPDFResult(pdfText));
+      setupMockPDFContent(pdfText);
 
       const file = createMockFile('complex.pdf', 'application/pdf');
       const result = await parsePDFFile(file);

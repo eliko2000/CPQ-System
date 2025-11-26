@@ -1,10 +1,18 @@
-import { useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
-import { Button } from '../ui/button'
-import { Badge } from '../ui/badge'
-import { Input } from '../ui/input'
-import { CheckCircle, XCircle, AlertTriangle, FileText, ExternalLink, Edit3, Save } from 'lucide-react'
-import { ValidatedComponent, ComponentFormData } from '@/types'
+import { useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { Button } from '../ui/button';
+import { Badge } from '../ui/badge';
+import { Input } from '../ui/input';
+import {
+  CheckCircle,
+  XCircle,
+  AlertTriangle,
+  FileText,
+  ExternalLink,
+  Edit3,
+  Save,
+} from 'lucide-react';
+import type { ValidatedComponent, ComponentFormData } from '../../types';
 
 interface QuoteValidationProps {
   extractedData: {
@@ -24,9 +32,14 @@ interface QuoteValidationProps {
   onComplete: (validatedComponents: ValidatedComponent[]) => void;
 }
 
-export function QuoteValidation({ extractedData, onComplete }: QuoteValidationProps) {
-  const [validatedComponents, setValidatedComponents] = useState<ValidatedComponent[]>(() =>
-    extractedData.items.map((item) => ({
+export function QuoteValidation({
+  extractedData,
+  onComplete,
+}: QuoteValidationProps) {
+  const [validatedComponents, setValidatedComponents] = useState<
+    ValidatedComponent[]
+  >(() =>
+    extractedData.items.map(item => ({
       extractedItem: item,
       status: item.confidence > 0.8 ? 'approved' : 'modified',
       componentData: {
@@ -36,69 +49,78 @@ export function QuoteValidation({ extractedData, onComplete }: QuoteValidationPr
         manufacturerPN: item.manufacturerPN,
         unitCostNIS: item.unitPrice || 0,
       },
-      notes: item.confidence > 0.8 ? 'זוהה אוטומטית' : 'דורש בדיקה'
+      notes: item.confidence > 0.8 ? 'זוהה אוטומטית' : 'דורש בדיקה',
     }))
-  )
+  );
 
-  const handleComponentChange = (index: number, field: keyof ComponentFormData, value: string | number) => {
+  const handleComponentChange = (
+    index: number,
+    field: keyof ComponentFormData,
+    value: string | number
+  ) => {
     setValidatedComponents(prev => {
-      const updated = [...prev]
+      const updated = [...prev];
       updated[index] = {
         ...updated[index],
         componentData: {
           ...updated[index].componentData,
-          [field]: value
+          [field]: value,
         },
-        status: 'modified'
-      }
-      return updated
-    })
-  }
+        status: 'modified',
+      };
+      return updated;
+    });
+  };
 
-  const handleStatusChange = (index: number, status: 'approved' | 'modified' | 'rejected') => {
+  const handleStatusChange = (
+    index: number,
+    status: 'approved' | 'modified' | 'rejected'
+  ) => {
     setValidatedComponents(prev => {
-      const updated = [...prev]
-      updated[index] = { ...updated[index], status }
-      return updated
-    })
-  }
+      const updated = [...prev];
+      updated[index] = { ...updated[index], status };
+      return updated;
+    });
+  };
 
   const handleSave = () => {
-    const approvedComponents = validatedComponents.filter(comp => comp.status === 'approved')
-    onComplete(approvedComponents)
-  }
+    const approvedComponents = validatedComponents.filter(
+      comp => comp.status === 'approved'
+    );
+    onComplete(approvedComponents);
+  };
 
   const getConfidenceColor = (confidence: number) => {
-    if (confidence > 0.8) return 'bg-green-100 text-green-800'
-    if (confidence > 0.6) return 'bg-yellow-100 text-yellow-800'
-    return 'bg-red-100 text-red-800'
-  }
+    if (confidence > 0.8) return 'bg-green-100 text-green-800';
+    if (confidence > 0.6) return 'bg-yellow-100 text-yellow-800';
+    return 'bg-red-100 text-red-800';
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'approved':
-        return 'bg-green-100 text-green-800'
+        return 'bg-green-100 text-green-800';
       case 'modified':
-        return 'bg-blue-100 text-blue-800'
+        return 'bg-blue-100 text-blue-800';
       case 'rejected':
-        return 'bg-red-100 text-red-800'
+        return 'bg-red-100 text-red-800';
       default:
-        return 'bg-gray-100 text-gray-800'
+        return 'bg-gray-100 text-gray-800';
     }
-  }
+  };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'approved':
-        return <CheckCircle className="h-3 w-3" />
+        return <CheckCircle className="h-3 w-3" />;
       case 'modified':
-        return <Edit3 className="h-3 w-3" />
+        return <Edit3 className="h-3 w-3" />;
       case 'rejected':
-        return <XCircle className="h-3 w-3" />
+        return <XCircle className="h-3 w-3" />;
       default:
-        return <AlertTriangle className="h-3 w-3" />
+        return <AlertTriangle className="h-3 w-3" />;
     }
-  }
+  };
 
   return (
     <div className="space-y-6" dir="rtl">
@@ -134,7 +156,9 @@ export function QuoteValidation({ extractedData, onComplete }: QuoteValidationPr
             </div>
 
             <div className="space-y-2">
-              <h3 className="font-medium text-foreground">פריטים שזוהו ({extractedData.items.length})</h3>
+              <h3 className="font-medium text-foreground">
+                פריטים שזוהו ({extractedData.items.length})
+              </h3>
               <div className="space-y-3">
                 {validatedComponents.map((component, index) => (
                   <Card key={index} className="border">
@@ -144,11 +168,16 @@ export function QuoteValidation({ extractedData, onComplete }: QuoteValidationPr
                           <div className="flex items-center space-x-reverse space-x-2 mb-2">
                             <Badge className={getStatusColor(component.status)}>
                               {getStatusIcon(component.status)}
-                              {component.status === 'approved' ? 'אושר' :
-                               component.status === 'modified' ? 'נערך' : 'נדחה'}
+                              {component.status === 'approved'
+                                ? 'אושר'
+                                : component.status === 'modified'
+                                  ? 'נערך'
+                                  : 'נדחה'}
                             </Badge>
                             <div>
-                              <h4 className="font-semibold">{component.extractedItem.name}</h4>
+                              <h4 className="font-semibold">
+                                {component.extractedItem.name}
+                              </h4>
                               {component.extractedItem.description && (
                                 <p className="text-sm text-muted-foreground">
                                   {component.extractedItem.description}
@@ -161,21 +190,31 @@ export function QuoteValidation({ extractedData, onComplete }: QuoteValidationPr
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleStatusChange(index, component.status === 'approved' ? 'modified' : 'approved')}
+                            onClick={() =>
+                              handleStatusChange(
+                                index,
+                                component.status === 'approved'
+                                  ? 'modified'
+                                  : 'approved'
+                              )
+                            }
                           >
                             {component.status === 'approved' ? 'ערוך' : 'אשר'}
                           </Button>
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleStatusChange(index, 'rejected')}
+                            onClick={() =>
+                              handleStatusChange(index, 'rejected')
+                            }
                           >
                             דחה
                           </Button>
                         </div>
                       </div>
 
-                      {(component.status === 'approved' || component.status === 'modified') && (
+                      {(component.status === 'approved' ||
+                        component.status === 'modified') && (
                         <div className="grid grid-cols-2 gap-4 text-sm">
                           <div>
                             <label className="block text-xs font-medium text-muted-foreground mb-1">
@@ -183,7 +222,13 @@ export function QuoteValidation({ extractedData, onComplete }: QuoteValidationPr
                             </label>
                             <Input
                               value={component.componentData?.name || ''}
-                              onChange={(e) => handleComponentChange(index, 'name', e.target.value)}
+                              onChange={e =>
+                                handleComponentChange(
+                                  index,
+                                  'name',
+                                  e.target.value
+                                )
+                              }
                               placeholder="שם הרכיב"
                             />
                           </div>
@@ -192,8 +237,16 @@ export function QuoteValidation({ extractedData, onComplete }: QuoteValidationPr
                               יצרן
                             </label>
                             <Input
-                              value={component.componentData?.manufacturer || ''}
-                              onChange={(e) => handleComponentChange(index, 'manufacturer', e.target.value)}
+                              value={
+                                component.componentData?.manufacturer || ''
+                              }
+                              onChange={e =>
+                                handleComponentChange(
+                                  index,
+                                  'manufacturer',
+                                  e.target.value
+                                )
+                              }
                               placeholder="יצרן"
                             />
                           </div>
@@ -202,8 +255,16 @@ export function QuoteValidation({ extractedData, onComplete }: QuoteValidationPr
                               מק"ט יצרן
                             </label>
                             <Input
-                              value={component.componentData?.manufacturerPN || ''}
-                              onChange={(e) => handleComponentChange(index, 'manufacturerPN', e.target.value)}
+                              value={
+                                component.componentData?.manufacturerPN || ''
+                              }
+                              onChange={e =>
+                                handleComponentChange(
+                                  index,
+                                  'manufacturerPN',
+                                  e.target.value
+                                )
+                              }
                               placeholder="מקט יצרן"
                             />
                           </div>
@@ -213,7 +274,13 @@ export function QuoteValidation({ extractedData, onComplete }: QuoteValidationPr
                             </label>
                             <Input
                               value={component.componentData?.category || ''}
-                              onChange={(e) => handleComponentChange(index, 'category', e.target.value)}
+                              onChange={e =>
+                                handleComponentChange(
+                                  index,
+                                  'category',
+                                  e.target.value
+                                )
+                              }
                               placeholder="קטגוריה"
                             />
                           </div>
@@ -223,7 +290,13 @@ export function QuoteValidation({ extractedData, onComplete }: QuoteValidationPr
                             </label>
                             <Input
                               value={component.componentData?.supplier || ''}
-                              onChange={(e) => handleComponentChange(index, 'supplier', e.target.value)}
+                              onChange={e =>
+                                handleComponentChange(
+                                  index,
+                                  'supplier',
+                                  e.target.value
+                                )
+                              }
                               placeholder="ספק"
                             />
                           </div>
@@ -234,7 +307,13 @@ export function QuoteValidation({ extractedData, onComplete }: QuoteValidationPr
                             <Input
                               type="number"
                               value={component.componentData?.unitCostNIS || 0}
-                              onChange={(e) => handleComponentChange(index, 'unitCostNIS', parseFloat(e.target.value) || 0)}
+                              onChange={e =>
+                                handleComponentChange(
+                                  index,
+                                  'unitCostNIS',
+                                  parseFloat(e.target.value) || 0
+                                )
+                              }
                               placeholder="מחיר בשקלים"
                             />
                           </div>
@@ -250,14 +329,15 @@ export function QuoteValidation({ extractedData, onComplete }: QuoteValidationPr
       </Card>
 
       <div className="flex justify-end space-x-reverse space-x-2">
-        <Button variant="outline">
-          צור הכל
-        </Button>
-        <Button onClick={handleSave} className="flex items-center space-x-reverse space-x-2">
+        <Button variant="outline">צור הכל</Button>
+        <Button
+          onClick={handleSave}
+          className="flex items-center space-x-reverse space-x-2"
+        >
           <Save className="h-4 w-4" />
           שמור רכיבים אישורים
         </Button>
       </div>
     </div>
-  )
+  );
 }

@@ -1,11 +1,17 @@
-import { useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
-import { Button } from '../ui/button'
-import { Badge } from '../ui/badge'
-import { FileText, Upload, CheckCircle, Clock, AlertCircle } from 'lucide-react'
-import { QuoteUpload } from './QuoteUpload'
-import { QuoteValidation } from './QuoteValidation'
-import { ValidatedComponent } from '@/types'
+import { useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { Button } from '../ui/button';
+import { Badge } from '../ui/badge';
+import {
+  FileText,
+  Upload,
+  CheckCircle,
+  Clock,
+  AlertCircle,
+} from 'lucide-react';
+import { QuoteUpload } from './QuoteUpload';
+import { QuoteValidation } from './QuoteValidation';
+import type { ValidatedComponent } from '../../types';
 
 interface ExtractedData {
   supplier: string;
@@ -23,17 +29,23 @@ interface ExtractedData {
 }
 
 export function QuoteIngestion() {
-  const [currentStep, setCurrentStep] = useState<'upload' | 'validation' | 'completed'>('upload')
-  const [extractedData, setExtractedData] = useState<ExtractedData | null>(null)
-  const [quotes, setQuotes] = useState<Array<{
-    id: string;
-    fileName: string;
-    fileUrl: string;
-    status: 'uploaded' | 'processing' | 'completed' | 'error';
-    uploadDate: string;
-    validatedComponents?: ValidatedComponent[];
-    errors?: string[];
-  }>>([])
+  const [currentStep, setCurrentStep] = useState<
+    'upload' | 'validation' | 'completed'
+  >('upload');
+  const [extractedData, setExtractedData] = useState<ExtractedData | null>(
+    null
+  );
+  const [quotes, setQuotes] = useState<
+    Array<{
+      id: string;
+      fileName: string;
+      fileUrl: string;
+      status: 'uploaded' | 'processing' | 'completed' | 'error';
+      uploadDate: string;
+      validatedComponents?: ValidatedComponent[];
+      errors?: string[];
+    }>
+  >([]);
 
   const handleQuoteProcessed = () => {
     const newExtractedData: ExtractedData = {
@@ -47,7 +59,7 @@ export function QuoteIngestion() {
           manufacturerPN: 'KR10-2',
           quantity: 1,
           unitPrice: 75000,
-          confidence: 0.95
+          confidence: 0.95,
         },
         {
           name: 'בקרת KRC4',
@@ -56,7 +68,7 @@ export function QuoteIngestion() {
           manufacturerPN: 'KRC4-2',
           quantity: 1,
           unitPrice: 12000,
-          confidence: 0.92
+          confidence: 0.92,
         },
         {
           name: 'חיישב מהיר',
@@ -65,17 +77,19 @@ export function QuoteIngestion() {
           manufacturerPN: 'SICK-WTB6S',
           quantity: 2,
           unitPrice: 2500,
-          confidence: 0.78
-        }
+          confidence: 0.78,
+        },
       ],
-      confidence: 0.88
-    }
-    setExtractedData(newExtractedData)
-    setCurrentStep('validation')
-  }
+      confidence: 0.88,
+    };
+    setExtractedData(newExtractedData);
+    setCurrentStep('validation');
+  };
 
-  const handleValidationComplete = (validatedComponents: ValidatedComponent[]) => {
-    setCurrentStep('completed')
+  const handleValidationComplete = (
+    validatedComponents: ValidatedComponent[]
+  ) => {
+    setCurrentStep('completed');
 
     if (extractedData) {
       const newQuote = {
@@ -84,47 +98,47 @@ export function QuoteIngestion() {
         fileUrl: '/quotes/demo_quote.pdf',
         status: 'completed' as const,
         uploadDate: new Date().toISOString(),
-        validatedComponents
-      }
+        validatedComponents,
+      };
 
-      setQuotes(prev => [...prev, newQuote])
+      setQuotes(prev => [...prev, newQuote]);
     }
-  }
+  };
 
   const startNewQuote = () => {
-    setCurrentStep('upload')
-    setExtractedData(null)
-  }
+    setCurrentStep('upload');
+    setExtractedData(null);
+  };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'uploaded':
-        return <Clock className="h-4 w-4 text-blue-600" />
+        return <Clock className="h-4 w-4 text-blue-600" />;
       case 'processing':
-        return <Clock className="h-4 w-4 text-orange-600 animate-pulse" />
+        return <Clock className="h-4 w-4 text-orange-600 animate-pulse" />;
       case 'completed':
-        return <CheckCircle className="h-4 w-4 text-green-600" />
+        return <CheckCircle className="h-4 w-4 text-green-600" />;
       case 'error':
-        return <AlertCircle className="h-4 w-4 text-red-600" />
+        return <AlertCircle className="h-4 w-4 text-red-600" />;
       default:
-        return <FileText className="h-4 w-4" />
+        return <FileText className="h-4 w-4" />;
     }
-  }
+  };
 
   const getStatusText = (status: string) => {
     switch (status) {
       case 'uploaded':
-        return 'הועלה'
+        return 'הועלה';
       case 'processing':
-        return 'בעיבוד'
+        return 'בעיבוד';
       case 'completed':
-        return 'הושלם'
+        return 'הושלם';
       case 'error':
-        return 'שגיא'
+        return 'שגיא';
       default:
-        return status
+        return status;
     }
-  }
+  };
 
   return (
     <div className="space-y-6" dir="rtl">
@@ -189,7 +203,7 @@ export function QuoteIngestion() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {quotes.map((quote) => (
+                  {quotes.map(quote => (
                     <div
                       key={quote.id}
                       className="flex items-center justify-between p-4 border rounded-lg"
@@ -199,18 +213,21 @@ export function QuoteIngestion() {
                         <div>
                           <div className="font-medium">{quote.fileName}</div>
                           <div className="text-sm text-muted-foreground">
-                            {quote.uploadDate} • {quote.validatedComponents?.length || 0} רכיבים
+                            {quote.uploadDate} •{' '}
+                            {quote.validatedComponents?.length || 0} רכיבים
                           </div>
                         </div>
                       </div>
                       <Badge
-                        variant={quote.status === 'completed' ? 'default' : 'secondary'}
+                        variant={
+                          quote.status === 'completed' ? 'default' : 'secondary'
+                        }
                         className={
                           quote.status === 'completed'
                             ? 'bg-green-100 text-green-800'
                             : quote.status === 'error'
-                            ? 'bg-red-100 text-red-800'
-                            : 'bg-blue-100 text-blue-800'
+                              ? 'bg-red-100 text-red-800'
+                              : 'bg-blue-100 text-blue-800'
                         }
                       >
                         {getStatusText(quote.status)}
@@ -224,5 +241,5 @@ export function QuoteIngestion() {
         </div>
       )}
     </div>
-  )
+  );
 }

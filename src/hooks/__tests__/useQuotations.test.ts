@@ -225,18 +225,10 @@ describe('useQuotations', () => {
         single: mockSingle,
       });
 
-      const __mockGetSelect = vi.fn().mockReturnValue({
-        eq: mockEq,
-      });
-
       // Mock for initial fetch
       const mockOrder = vi.fn().mockResolvedValue({
         data: [],
         error: undefined,
-      });
-
-      const __mockListSelect = vi.fn().mockReturnValue({
-        order: mockOrder,
       });
 
       vi.mocked(supabase.from).mockImplementation((table: string) => {
@@ -465,8 +457,6 @@ describe('useQuotations', () => {
     });
 
     it('should preserve nested data when updating quotation', async () => {
-      const __updatedQuotation = { ...mockQuotation, status: 'sent' };
-
       const mockSingle = vi.fn().mockResolvedValue({
         data: { status: 'sent' }, // DB only returns updated fields
         error: undefined,
@@ -804,6 +794,7 @@ describe('useQuotations', () => {
           quotation_system_id: 'system-1',
           component_id: 'comp-2',
           item_name: 'Banner Sensor',
+          item_type: 'hardware',
           manufacturer: 'Banner',
           manufacturer_part_number: 'Q45BB6AF300',
           quantity: 4,

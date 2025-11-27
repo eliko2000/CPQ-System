@@ -275,8 +275,6 @@ describe('CustomHeader Integration Tests', () => {
     });
 
     it('should clear filter state when clearing', async () => {
-      const __user = userEvent.setup();
-
       // Set up with an active filter
       filterModel = {
         filterType: 'text',

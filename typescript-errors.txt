@@ -1,0 +1,47 @@
+src/components/grid/__tests__/CustomHeader.integration.test.tsx(278,13): error TS6133: '____user' is declared but its value is never read.
+src/components/library/EnhancedComponentGrid.tsx(3,10): error TS6133: 'ColDef' is declared but its value is never read.
+src/components/library/EnhancedComponentGrid.tsx(399,7): error TS7023: 'valueSetter' implicitly has return type 'any' because it does not have a return type annotation and is referenced directly or indirectly in one of its return expressions.
+src/components/library/EnhancedComponentGrid.tsx(399,21): error TS7006: Parameter 'params' implicitly has an 'any' type.
+src/components/library/EnhancedComponentGrid.tsx(407,24): error TS7006: Parameter 'params' implicitly has an 'any' type.
+src/components/library/EnhancedComponentGrid.tsx(411,19): error TS7006: Parameter 'params' implicitly has an 'any' type.
+src/components/library/EnhancedComponentGrid.tsx(443,18): error TS7006: Parameter 'params' implicitly has an 'any' type.
+src/components/library/EnhancedComponentGrid.tsx(448,7): error TS7023: 'valueSetter' implicitly has return type 'any' because it does not have a return type annotation and is referenced directly or indirectly in one of its return expressions.
+src/components/library/EnhancedComponentGrid.tsx(448,21): error TS7006: Parameter 'params' implicitly has an 'any' type.
+src/components/library/EnhancedComponentGrid.tsx(455,24): error TS7006: Parameter 'params' implicitly has an 'any' type.
+src/components/library/EnhancedComponentGrid.tsx(462,19): error TS7006: Parameter 'params' implicitly has an 'any' type.
+src/components/library/EnhancedComponentGrid.tsx(785,11): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(props: AgGridReactProps<any> | AgReactUiProps<any>): AgGridReact<any>', gave the following error.
+    Type '({ headerName: string; field: string; sortable: boolean; filter: string; resizable: boolean; width: number; editable: boolean; cellEditor: string; onCellValueChanged: (params: ValueSetterParams<any, any>) => true; ... 10 more ...; cellEditorPopup?: undefined; } | ... 8 more ... | { ...; })[]' is not assignable to type '(ColDef<any, any> | ColGroupDef<any>)[]'.
+      Type '{ headerName: string; field: string; sortable: boolean; filter: string; resizable: boolean; width: number; editable: boolean; cellEditor: string; onCellValueChanged: (params: ValueSetterParams<any, any>) => true; ... 10 more ...; cellEditorPopup?: undefined; } | ... 8 more ... | { ...; }' is not assignable to type 'ColDef<any, any> | ColGroupDef<any>'.
+        Type '{ headerName: string; field: string; sortable: boolean; filter: string; resizable: boolean; width: number; editable: (params: any) => boolean; cellEditor: string; cellEditorParams: { values: string[]; }; ... 10 more ...; cellEditorPopup?: undefined; }' is not assignable to type 'ColDef<any, any> | ColGroupDef<any>'.
+          Type '{ headerName: string; field: string; sortable: boolean; filter: string; resizable: boolean; width: number; editable: (params: any) => boolean; cellEditor: string; cellEditorParams: { values: string[]; }; ... 10 more ...; cellEditorPopup?: undefined; }' is not assignable to type 'ColDef<any, any>'.
+            Types of property 'cellStyle' are incompatible.
+              Type '(params: any) => { backgroundColor: string; color: string; fontWeight?: undefined; } | { fontWeight: string; backgroundColor?: undefined; color?: undefined; }' is not assignable to type 'CellStyle | CellStyleFunc<any, any> | undefined'.
+                Type '(params: any) => { backgroundColor: string; color: string; fontWeight?: undefined; } | { fontWeight: string; backgroundColor?: undefined; color?: undefined; }' is not assignable to type 'CellStyleFunc<any, any>'.
+                  Type '{ backgroundColor: string; color: string; fontWeight?: undefined; } | { fontWeight: string; backgroundColor?: undefined; color?: undefined; }' is not assignable to type 'CellStyle | null | undefined'.
+                    Type '{ backgroundColor: string; color: string; fontWeight?: undefined; }' is not assignable to type 'CellStyle'.
+                      Property 'fontWeight' is incompatible with index signature.
+                        Type 'undefined' is not assignable to type 'string | number'.
+  Overload 2 of 2, '(props: AgGridReactProps<any> | AgReactUiProps<any>, context: any): AgGridReact<any>', gave the following error.
+    Type '({ headerName: string; field: string; sortable: boolean; filter: string; resizable: boolean; width: number; editable: boolean; cellEditor: string; onCellValueChanged: (params: ValueSetterParams<any, any>) => true; ... 10 more ...; cellEditorPopup?: undefined; } | ... 8 more ... | { ...; })[]' is not assignable to type '(ColDef<any, any> | ColGroupDef<any>)[]'.
+      Type '{ headerName: string; field: string; sortable: boolean; filter: string; resizable: boolean; width: number; editable: boolean; cellEditor: string; onCellValueChanged: (params: ValueSetterParams<any, any>) => true; ... 10 more ...; cellEditorPopup?: undefined; } | ... 8 more ... | { ...; }' is not assignable to type 'ColDef<any, any> | ColGroupDef<any>'.
+        Type '{ headerName: string; field: string; sortable: boolean; filter: string; resizable: boolean; width: number; editable: (params: any) => boolean; cellEditor: string; cellEditorParams: { values: string[]; }; ... 10 more ...; cellEditorPopup?: undefined; }' is not assignable to type 'ColDef<any, any> | ColGroupDef<any>'.
+          Type '{ headerName: string; field: string; sortable: boolean; filter: string; resizable: boolean; width: number; editable: (params: any) => boolean; cellEditor: string; cellEditorParams: { values: string[]; }; ... 10 more ...; cellEditorPopup?: undefined; }' is not assignable to type 'ColDef<any, any>'.
+            Types of property 'cellStyle' are incompatible.
+              Type '(params: any) => { backgroundColor: string; color: string; fontWeight?: undefined; } | { fontWeight: string; backgroundColor?: undefined; color?: undefined; }' is not assignable to type 'CellStyle | CellStyleFunc<any, any> | undefined'.
+                Type '(params: any) => { backgroundColor: string; color: string; fontWeight?: undefined; } | { fontWeight: string; backgroundColor?: undefined; color?: undefined; }' is not assignable to type 'CellStyleFunc<any, any>'.
+                  Type '{ backgroundColor: string; color: string; fontWeight?: undefined; } | { fontWeight: string; backgroundColor?: undefined; color?: undefined; }' is not assignable to type 'CellStyle | null | undefined'.
+                    Type '{ backgroundColor: string; color: string; fontWeight?: undefined; }' is not assignable to type 'CellStyle'.
+                      Property 'fontWeight' is incompatible with index signature.
+                        Type 'undefined' is not assignable to type 'string | number'.
+src/components/quotations/QuotationEditor.tsx(88,9): error TS6133: '__openComponentSelector' is declared but its value is never read.
+src/components/quotations/QuotationEditor.tsx(98,9): error TS6133: '__deleteSystem' is declared but its value is never read.
+src/components/shared/__tests__/BOMGrid.test.tsx(37,10): error TS6133: '__props' is declared but its value is never read.
+src/components/shared/__tests__/BOMGrid.test.tsx(266,13): error TS6133: '____descriptionCell' is declared but its value is never read.
+src/hooks/__tests__/useQuotations.test.ts(228,13): error TS6133: '____mockGetSelect' is declared but its value is never read.
+src/hooks/__tests__/useQuotations.test.ts(238,13): error TS6133: '____mockListSelect' is declared but its value is never read.
+src/hooks/__tests__/useQuotations.test.ts(468,13): error TS6133: '____updatedQuotation' is declared but its value is never read.
+src/hooks/useComponents.ts(41,10): error TS6133: '____dbToComponent' is declared but its value is never read.
+src/utils/__tests__/analyticsCalculations.test.ts(1025,11): error TS6133: '____components' is declared but its value is never read.
+src/utils/__tests__/analyticsCalculations.test.ts(1027,11): error TS6133: '____trends' is declared but its value is never read.
+src/utils/__tests__/analyticsCalculations.test.ts(1028,11): error TS6133: '____customers' is declared but its value is never read.

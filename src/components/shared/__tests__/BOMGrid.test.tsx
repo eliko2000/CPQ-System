@@ -28,14 +28,7 @@ vi.mock('@/lib/utils', async () => {
 // Mock AG Grid modules
 vi.mock('ag-grid-react', () => ({
   AgGridReact: vi.fn(
-    ({
-      rowData,
-      onCellValueChanged,
-      onRowDragEnd,
-      onGridReady,
-      columnDefs,
-      ..._props
-    }) => {
+    ({ rowData, onCellValueChanged, onGridReady, columnDefs }) => {
       // Call onGridReady if provided
       if (onGridReady) {
         setTimeout(() => {
@@ -262,11 +255,6 @@ describe('BOMGrid', () => {
 
       // Check that cells are not editable when readonly is true
       // The description text is rendered inside the cell
-      const gridCells = screen.getAllByText('Siemens S7-1500 PLC');
-      const __descriptionCell = gridCells.find(
-        el => el.getAttribute('data-col-id') === 'description'
-      );
-
       // In readonly mode, contenteditable should be false or the cell parent should not be editable
       // The actual implementation sets editable: allowEditing && !readonly in columnDefs
       expect(screen.getByText('Siemens S7-1500 PLC')).toBeInTheDocument();

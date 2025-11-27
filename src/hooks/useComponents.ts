@@ -37,7 +37,8 @@ function componentToDb(component: Partial<Component>): Partial<DbComponent> {
   return result;
 }
 
-// Transform DB format to UI Component
+// Transform DB format to UI Component (kept for reference, unused)
+// @ts-expect-error - Kept for reference but currently unused
 function __dbToComponent(dbComp: DbComponent): Component {
   logger.debug('📥 dbToComponent converting:', {
     id: dbComp.id,

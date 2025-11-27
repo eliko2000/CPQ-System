@@ -1,7 +1,6 @@
 import { useCallback, useMemo, useEffect } from 'react';
 import { useCPQ } from '../../contexts/CPQContext';
 import { QuotationParameters } from './QuotationParameters';
-import { renumberItems } from '../../utils/quotationCalculations';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { QuotationStatisticsPanelSimplified } from './QuotationStatisticsPanelSimplified';
 import { logger } from '@/lib/logger';
@@ -84,67 +83,8 @@ export function QuotationEditor() {
   const { calculations, statistics } =
     useQuotationCalculations(currentQuotation);
 
-  // Open component selector popup
-  const _openComponentSelector = useCallback(
-    (systemId: string) => {
-      state.setSelectedSystemId(systemId);
-      state.setComponentSearchText('');
-      state.setShowComponentSelector(true);
-    },
-    [state]
-  );
-
-  // Delete system handler
-  const _deleteSystem = useCallback(
-    async (systemId: string) => {
-      if (!currentQuotation) return;
-
-      // Delete from Supabase first
-      try {
-        // Delete all items in this system
-        const itemsToDelete = currentQuotation.items.filter(
-          item => item.systemId === systemId
-        );
-        for (const item of itemsToDelete) {
-          await quotationsHook.deleteQuotationItem(item.id);
-        }
-
-        // Delete the system itself
-        await quotationsHook.deleteQuotationSystem(systemId);
-
-        // Remove from local state
-        const updatedSystems = currentQuotation.systems
-          .filter(s => s.id !== systemId)
-          .map((s, index) => ({
-            ...s,
-            order: index + 1,
-          }));
-
-        const updatedItems = currentQuotation.items.filter(
-          item => item.systemId !== systemId
-        );
-
-        // Renumber all items with new system orders
-        const renumberedItems = renumberItems(updatedItems, updatedSystems);
-
-        const updatedQuotation = {
-          ...currentQuotation,
-          systems: updatedSystems,
-          items: renumberedItems,
-        };
-
-        setCurrentQuotation(updatedQuotation);
-        updateQuotation(currentQuotation.id, {
-          systems: updatedSystems,
-          items: renumberedItems,
-        });
-      } catch (error) {
-        logger.error('Failed to delete system:', error);
-        alert('שגיאה במחיקת מערכת. נסה שוב.');
-      }
-    },
-    [currentQuotation, quotationsHook, setCurrentQuotation, updateQuotation]
-  );
+  // TODO Phase 5: Wire up openComponentSelector and deleteSystem handlers to UI components
+  // These handlers were extracted during refactoring but not yet connected to the new modular components
 
   // TODO: Extract grid configuration to useQuotationGrid hook (Phase 5 continuation)
   // For now, using inline placeholder values to fix TypeScript error

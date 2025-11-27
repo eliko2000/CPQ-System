@@ -1022,10 +1022,10 @@ describe('Edge Cases', () => {
 
     const revenue = calculateRevenueMetrics(quotations);
     const margin = calculateMarginAnalysis(quotations);
-    const __components = calculateComponentAnalytics(quotations);
+    calculateComponentAnalytics(quotations); // Called for side effects
     const labor = calculateLaborMetrics(quotations);
-    const __trends = calculateTrends(quotations);
-    const __customers = calculateCustomerMetrics(quotations);
+    calculateTrends(quotations); // Called for side effects
+    calculateCustomerMetrics(quotations); // Called for side effects
 
     expect(revenue.averageValue).toBeGreaterThan(0);
     expect(margin.averageMargin).toBeGreaterThan(0);

@@ -4,13 +4,13 @@ import {
   detectOriginalCurrency,
   normalizeComponentPrices,
   getGlobalExchangeRates,
-  type ExchangeRates
+  type ExchangeRates,
 } from '../currencyConversion';
 
 describe('Currency Conversion Utilities', () => {
   const mockRates: ExchangeRates = {
     usdToIlsRate: 3.7,
-    eurToIlsRate: 4.0
+    eurToIlsRate: 4.0,
   };
 
   beforeEach(() => {
@@ -23,8 +23,8 @@ describe('Currency Conversion Utilities', () => {
         defaultRisk: 10,
         dayWorkCost: 1200,
         vatRate: 17,
-        deliveryTime: '4-6 שבועות'
-      }
+        deliveryTime: '4-6 שבועות',
+      },
     };
     localStorage.setItem('cpq-settings-cache', JSON.stringify(mockCache));
   });
@@ -70,21 +70,36 @@ describe('Currency Conversion Utilities', () => {
 
   describe('detectOriginalCurrency', () => {
     it('should detect NIS as original when only NIS is provided', () => {
-      const result = detectOriginalCurrency(370, undefined, undefined, undefined);
+      const result = detectOriginalCurrency(
+        370,
+        undefined,
+        undefined,
+        undefined
+      );
 
       expect(result.currency).toBe('NIS');
       expect(result.amount).toBe(370);
     });
 
     it('should detect USD as original when only USD is provided', () => {
-      const result = detectOriginalCurrency(undefined, 100, undefined, undefined);
+      const result = detectOriginalCurrency(
+        undefined,
+        100,
+        undefined,
+        undefined
+      );
 
       expect(result.currency).toBe('USD');
       expect(result.amount).toBe(100);
     });
 
     it('should detect EUR as original when only EUR is provided', () => {
-      const result = detectOriginalCurrency(undefined, undefined, 100, undefined);
+      const result = detectOriginalCurrency(
+        undefined,
+        undefined,
+        100,
+        undefined
+      );
 
       expect(result.currency).toBe('EUR');
       expect(result.amount).toBe(100);
@@ -106,7 +121,12 @@ describe('Currency Conversion Utilities', () => {
     });
 
     it('should default to NIS with 0 when no currencies provided', () => {
-      const result = detectOriginalCurrency(undefined, undefined, undefined, undefined);
+      const result = detectOriginalCurrency(
+        undefined,
+        undefined,
+        undefined,
+        undefined
+      );
 
       expect(result.currency).toBe('NIS');
       expect(result.amount).toBe(0);
@@ -117,7 +137,7 @@ describe('Currency Conversion Utilities', () => {
     it('should normalize component with only USD price', () => {
       const component = {
         unitCostUSD: 100,
-        currency: 'USD' as const
+        currency: 'USD' as const,
       };
 
       const result = normalizeComponentPrices(component, mockRates);
@@ -131,7 +151,7 @@ describe('Currency Conversion Utilities', () => {
     it('should normalize component with only EUR price', () => {
       const component = {
         unitCostEUR: 100,
-        currency: 'EUR' as const
+        currency: 'EUR' as const,
       };
 
       const result = normalizeComponentPrices(component, mockRates);
@@ -145,7 +165,7 @@ describe('Currency Conversion Utilities', () => {
     it('should normalize component with only NIS price', () => {
       const component = {
         unitCostNIS: 370,
-        currency: 'NIS' as const
+        currency: 'NIS' as const,
       };
 
       const result = normalizeComponentPrices(component, mockRates);
@@ -160,7 +180,7 @@ describe('Currency Conversion Utilities', () => {
       const component = {
         unitCostUSD: 95, // Might be calculated/rounded
         currency: 'USD' as const,
-        originalCost: 100 // Original input
+        originalCost: 100, // Original input
       };
 
       const result = normalizeComponentPrices(component, mockRates);
@@ -172,15 +192,15 @@ describe('Currency Conversion Utilities', () => {
     it('should handle smart import scenario - USD only component', () => {
       // Simulating a component extracted from a USD-based Excel file
       const extractedComponent = {
-        unitCostUSD: 250.50,
+        unitCostUSD: 250.5,
         unitCostNIS: undefined,
         unitCostEUR: undefined,
-        currency: 'USD' as const
+        currency: 'USD' as const,
       };
 
       const result = normalizeComponentPrices(extractedComponent, mockRates);
 
-      expect(result.unitCostUSD).toBe(250.50);
+      expect(result.unitCostUSD).toBe(250.5);
       expect(result.unitCostNIS).toBe(926.85); // 250.50 * 3.7
       expect(result.unitCostEUR).toBe(231.71); // 250.50 * (3.7 / 4.0)
       expect(result.currency).toBe('USD');
@@ -192,7 +212,7 @@ describe('Currency Conversion Utilities', () => {
         unitCostEUR: 150.75,
         unitCostNIS: undefined,
         unitCostUSD: undefined,
-        currency: 'EUR' as const
+        currency: 'EUR' as const,
       };
 
       const result = normalizeComponentPrices(extractedComponent, mockRates);
@@ -206,7 +226,7 @@ describe('Currency Conversion Utilities', () => {
     it('should use global exchange rates when none provided', () => {
       const component = {
         unitCostUSD: 100,
-        currency: 'USD' as const
+        currency: 'USD' as const,
       };
 
       const result = normalizeComponentPrices(component); // No rates provided
@@ -268,7 +288,7 @@ describe('Currency Conversion Utilities', () => {
         unitCostUSD: 100,
         unitCostEUR: 92.5,
         currency: 'USD' as const,
-        originalCost: 100
+        originalCost: 100,
       };
 
       const result = normalizeComponentPrices(component, mockRates);
@@ -283,7 +303,7 @@ describe('Currency Conversion Utilities', () => {
     it('should handle zero exchange rate gracefully', () => {
       const zeroRates: ExchangeRates = {
         usdToIlsRate: 0,
-        eurToIlsRate: 4.0
+        eurToIlsRate: 4.0,
       };
 
       const result = convertToAllCurrencies(100, 'USD', zeroRates);
@@ -308,7 +328,7 @@ describe('Currency Conversion Utilities', () => {
     it('should handle extreme exchange rates - very high', () => {
       const extremeRates: ExchangeRates = {
         usdToIlsRate: 1000,
-        eurToIlsRate: 1200
+        eurToIlsRate: 1200,
       };
 
       const result = convertToAllCurrencies(100, 'USD', extremeRates);
@@ -321,7 +341,7 @@ describe('Currency Conversion Utilities', () => {
     it('should handle extreme exchange rates - very low', () => {
       const extremeRates: ExchangeRates = {
         usdToIlsRate: 0.01,
-        eurToIlsRate: 0.01
+        eurToIlsRate: 0.01,
       };
 
       const result = convertToAllCurrencies(1000, 'USD', extremeRates);
@@ -354,7 +374,7 @@ describe('Currency Conversion Utilities', () => {
       const component = {
         unitCostNIS: undefined,
         unitCostUSD: undefined,
-        unitCostEUR: undefined
+        unitCostEUR: undefined,
       };
 
       const result = normalizeComponentPrices(component, mockRates);
@@ -415,7 +435,8 @@ describe('Currency Conversion Utilities', () => {
       // USD->EUR should equal (USD->NIS) / (EUR->NIS)
       const result = convertToAllCurrencies(100, 'USD', mockRates);
 
-      const expectedUsdToEurRate = mockRates.usdToIlsRate / mockRates.eurToIlsRate;
+      const expectedUsdToEurRate =
+        mockRates.usdToIlsRate / mockRates.eurToIlsRate;
       const expectedEUR = Math.round(100 * expectedUsdToEurRate * 100) / 100;
 
       expect(result.unitCostEUR).toBe(expectedEUR);
@@ -441,8 +462,10 @@ describe('Currency Conversion Utilities', () => {
 
     describe('ILS-native items (e.g., labor)', () => {
       it('should preserve ILS price when USD rate changes', () => {
-        const _oldRates: ExchangeRates = { usdToIlsRate: 3.7, eurToIlsRate: 4.0 };
-        const newRates: ExchangeRates = { usdToIlsRate: 4.0, eurToIlsRate: 4.0 };
+        const newRates: ExchangeRates = {
+          usdToIlsRate: 4.0,
+          eurToIlsRate: 4.0,
+        };
 
         // Labor item: 1200 ILS/day, no USD/EUR
         const originalItem = {
@@ -450,7 +473,7 @@ describe('Currency Conversion Utilities', () => {
           unitPriceUSD: 324.32, // Previously calculated: 1200 / 3.7
           unitPriceEUR: 300, // Previously calculated: 1200 / 4.0
           originalCurrency: 'NIS' as const,
-          originalCost: 1200
+          originalCost: 1200,
         };
 
         // Detect currency
@@ -476,15 +499,17 @@ describe('Currency Conversion Utilities', () => {
       });
 
       it('should preserve ILS price for labor when EUR rate changes', () => {
-        const _oldRates: ExchangeRates = { usdToIlsRate: 3.7, eurToIlsRate: 4.0 };
-        const newRates: ExchangeRates = { usdToIlsRate: 3.7, eurToIlsRate: 4.5 };
+        const newRates: ExchangeRates = {
+          usdToIlsRate: 3.7,
+          eurToIlsRate: 4.5,
+        };
 
         const laborItem = {
           unitPriceILS: 1200,
           unitPriceUSD: 324.32,
           unitPriceEUR: 300,
           originalCurrency: 'NIS' as const,
-          originalCost: 1200
+          originalCost: 1200,
         };
 
         const { currency, amount } = detectOriginalCurrency(
@@ -507,8 +532,10 @@ describe('Currency Conversion Utilities', () => {
 
     describe('USD-native items (e.g., hardware)', () => {
       it('should preserve USD price when exchange rate changes', () => {
-        const _oldRates: ExchangeRates = { usdToIlsRate: 3.7, eurToIlsRate: 4.0 };
-        const newRates: ExchangeRates = { usdToIlsRate: 4.0, eurToIlsRate: 4.0 };
+        const newRates: ExchangeRates = {
+          usdToIlsRate: 4.0,
+          eurToIlsRate: 4.0,
+        };
 
         // Hardware component: $2500 USD
         const hardwareItem = {
@@ -516,7 +543,7 @@ describe('Currency Conversion Utilities', () => {
           unitPriceUSD: 2500,
           unitPriceEUR: 2312.5, // Previously: 2500 * (3.7 / 4.0)
           originalCurrency: 'USD' as const,
-          originalCost: 2500
+          originalCost: 2500,
         };
 
         const { currency, amount } = detectOriginalCurrency(
@@ -540,15 +567,17 @@ describe('Currency Conversion Utilities', () => {
       });
 
       it('should preserve USD price when only EUR rate changes', () => {
-        const _oldRates: ExchangeRates = { usdToIlsRate: 3.7, eurToIlsRate: 4.0 };
-        const newRates: ExchangeRates = { usdToIlsRate: 3.7, eurToIlsRate: 4.5 };
+        const newRates: ExchangeRates = {
+          usdToIlsRate: 3.7,
+          eurToIlsRate: 4.5,
+        };
 
         const usdItem = {
           unitPriceILS: 3700,
           unitPriceUSD: 1000,
           unitPriceEUR: 925,
           originalCurrency: 'USD' as const,
-          originalCost: 1000
+          originalCost: 1000,
         };
 
         const { currency, amount } = detectOriginalCurrency(
@@ -571,15 +600,17 @@ describe('Currency Conversion Utilities', () => {
 
     describe('EUR-native items', () => {
       it('should preserve EUR price when exchange rate changes', () => {
-        const _oldRates: ExchangeRates = { usdToIlsRate: 3.7, eurToIlsRate: 4.0 };
-        const newRates: ExchangeRates = { usdToIlsRate: 4.0, eurToIlsRate: 4.5 };
+        const newRates: ExchangeRates = {
+          usdToIlsRate: 4.0,
+          eurToIlsRate: 4.5,
+        };
 
         const eurItem = {
           unitPriceILS: 400, // Previously: 100 * 4.0
           unitPriceUSD: 108.11, // Previously: 100 * (4.0 / 3.7)
           unitPriceEUR: 100,
           originalCurrency: 'EUR' as const,
-          originalCost: 100
+          originalCost: 100,
         };
 
         const { currency, amount } = detectOriginalCurrency(
@@ -605,8 +636,10 @@ describe('Currency Conversion Utilities', () => {
 
     describe('Mixed currency quotation integration', () => {
       it('should correctly handle quotation with mixed currency items when rate changes', () => {
-        const _oldRates: ExchangeRates = { usdToIlsRate: 3.7, eurToIlsRate: 4.0 };
-        const newRates: ExchangeRates = { usdToIlsRate: 4.0, eurToIlsRate: 4.0 };
+        const newRates: ExchangeRates = {
+          usdToIlsRate: 4.0,
+          eurToIlsRate: 4.0,
+        };
 
         // Simulate a quotation with mixed items
         const quotationItems = [
@@ -617,7 +650,7 @@ describe('Currency Conversion Utilities', () => {
             unitPriceUSD: 324.32,
             unitPriceEUR: 300,
             originalCurrency: 'NIS' as const,
-            originalCost: 1200
+            originalCost: 1200,
           },
           // Hardware (USD)
           {
@@ -626,7 +659,7 @@ describe('Currency Conversion Utilities', () => {
             unitPriceUSD: 2500,
             unitPriceEUR: 2312.5,
             originalCurrency: 'USD' as const,
-            originalCost: 2500
+            originalCost: 2500,
           },
           // Software (EUR)
           {
@@ -635,8 +668,8 @@ describe('Currency Conversion Utilities', () => {
             unitPriceUSD: 108.11,
             unitPriceEUR: 100,
             originalCurrency: 'EUR' as const,
-            originalCost: 100
-          }
+            originalCost: 100,
+          },
         ];
 
         // Recalculate all items with new rates
@@ -652,7 +685,7 @@ describe('Currency Conversion Utilities', () => {
           return {
             name: item.name,
             originalCurrency: currency,
-            ...convertToAllCurrencies(finalAmount, currency, newRates)
+            ...convertToAllCurrencies(finalAmount, currency, newRates),
           };
         });
 
@@ -674,7 +707,7 @@ describe('Currency Conversion Utilities', () => {
         const laborItemLegacy = {
           unitPriceILS: 1200,
           unitPriceUSD: 324.32,
-          unitPriceEUR: 300
+          unitPriceEUR: 300,
           // No originalCurrency or originalCost
         };
 
@@ -695,7 +728,7 @@ describe('Currency Conversion Utilities', () => {
           unitPriceILS: 1500,
           unitPriceUSD: 0,
           unitPriceEUR: 0,
-          originalCurrency: 'NIS' as const
+          originalCurrency: 'NIS' as const,
         };
 
         const { currency, amount } = detectOriginalCurrency(
@@ -708,7 +741,11 @@ describe('Currency Conversion Utilities', () => {
         expect(currency).toBe('NIS');
         expect(amount).toBe(1500);
 
-        const recalculated = convertToAllCurrencies(amount, currency, mockRates);
+        const recalculated = convertToAllCurrencies(
+          amount,
+          currency,
+          mockRates
+        );
         expect(recalculated.unitCostNIS).toBe(1500);
         expect(recalculated.unitCostUSD).toBe(405.41); // 1500 / 3.7
         expect(recalculated.unitCostEUR).toBe(375); // 1500 / 4.0
@@ -723,7 +760,7 @@ describe('Currency Conversion Utilities', () => {
           unitPriceUSD: 123.45,
           unitPriceILS: 460.47, // 123.45 * 3.73
           originalCurrency: 'USD' as const,
-          originalCost: 123.45
+          originalCost: 123.45,
         };
 
         const { currency, amount } = detectOriginalCurrency(
@@ -739,7 +776,9 @@ describe('Currency Conversion Utilities', () => {
         expect(recalculated.unitCostUSD).toBe(123.45);
         expect(recalculated.unitCostNIS).toBe(460.47); // 123.45 * 3.73
         expect(Number.isFinite(recalculated.unitCostNIS)).toBe(true);
-        expect(recalculated.unitCostNIS.toString().split('.')[1]?.length || 0).toBeLessThanOrEqual(2);
+        expect(
+          recalculated.unitCostNIS.toString().split('.')[1]?.length || 0
+        ).toBeLessThanOrEqual(2);
       });
 
       it('should handle repeated rate changes without accumulating errors', () => {
@@ -747,14 +786,14 @@ describe('Currency Conversion Utilities', () => {
           unitPriceILS: 1000,
           unitPriceUSD: 270.27,
           originalCurrency: 'NIS' as const,
-          originalCost: 1000
+          originalCost: 1000,
         };
 
         const rateChanges = [
           { usdToIlsRate: 3.7, eurToIlsRate: 4.0 },
           { usdToIlsRate: 4.0, eurToIlsRate: 4.0 },
           { usdToIlsRate: 3.5, eurToIlsRate: 4.0 },
-          { usdToIlsRate: 3.7, eurToIlsRate: 4.0 } // Back to original
+          { usdToIlsRate: 3.7, eurToIlsRate: 4.0 }, // Back to original
         ];
 
         for (const rates of rateChanges) {
@@ -766,13 +805,17 @@ describe('Currency Conversion Utilities', () => {
           );
 
           const finalAmount = currentItem.originalCost || amount;
-          const recalculated = convertToAllCurrencies(finalAmount, currency, rates);
+          const recalculated = convertToAllCurrencies(
+            finalAmount,
+            currency,
+            rates
+          );
 
           currentItem = {
             unitPriceILS: recalculated.unitCostNIS,
             unitPriceUSD: recalculated.unitCostUSD,
-            originalCurrency: currency,
-            originalCost: finalAmount
+            originalCurrency: currency as any,
+            originalCost: finalAmount,
           };
         }
 

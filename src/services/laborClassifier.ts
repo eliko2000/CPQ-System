@@ -17,29 +17,95 @@ interface LaborClassification {
 const LABOR_KEYWORDS: Record<LaborSubtype, string[]> = {
   engineering: [
     // Hebrew - includes programming/development
-    'הנדסה', 'הנדס', 'תכנון', 'עיצוב', 'תכנן', 'מהנדס',
-    'תכנות', 'תכנת', 'קוד', 'סקריפט', 'תוכנה', 'פיתוח', 'קידוד',
-    'plc', 'hmi', 'scada',
+    'הנדסה',
+    'הנדס',
+    'תכנון',
+    'עיצוב',
+    'תכנן',
+    'מהנדס',
+    'תכנות',
+    'תכנת',
+    'קוד',
+    'סקריפט',
+    'תוכנה',
+    'פיתוח',
+    'קידוד',
+    'plc',
+    'hmi',
+    'scada',
     // English
-    'engineering', 'engineer', 'design', 'planning', 'architect',
-    'programming', 'program', 'coding', 'code', 'software', 'development',
-    'script', 'ladder', 'logic'
+    'engineering',
+    'engineer',
+    'design',
+    'planning',
+    'architect',
+    'programming',
+    'program',
+    'coding',
+    'code',
+    'software',
+    'development',
+    'script',
+    'ladder',
+    'logic',
   ],
   commissioning: [
     // Hebrew
-    'הזמנה', 'הפעלה', 'הזמנות', 'הפעלות', 'קבלת עבודה', 'אימות',
-    'ריצה', 'בדיקה', 'טסט', 'ניסוי',
+    'הזמנה',
+    'הפעלה',
+    'הזמנות',
+    'הפעלות',
+    'קבלת עבודה',
+    'אימות',
+    'ריצה',
+    'בדיקה',
+    'טסט',
+    'ניסוי',
     // English
-    'commissioning', 'startup', 'testing', 'validation', 'checkout',
-    'trial', 'run', 'acceptance'
+    'commissioning',
+    'startup',
+    'testing',
+    'validation',
+    'checkout',
+    'trial',
+    'run',
+    'acceptance',
   ],
   installation: [
     // Hebrew
-    'התקנה', 'התקנת', 'מתקין', 'הרכבה', 'הרכב', 'הקמה', 'בנייה',
+    'התקנה',
+    'התקנת',
+    'מתקין',
+    'הרכבה',
+    'הרכב',
+    'הקמה',
+    'בנייה',
     // English
-    'installation', 'install', 'mounting', 'assembly', 'setup',
-    'construction', 'erection'
-  ]
+    'installation',
+    'install',
+    'mounting',
+    'assembly',
+    'setup',
+    'installation',
+    'install',
+    'mounting',
+    'assembly',
+    'setup',
+    'construction',
+    'erection',
+  ],
+  programming: [
+    // Hebrew
+    'תכנות',
+    'קוד',
+    'פיתוח',
+    'תוכנה',
+    // English
+    'programming',
+    'coding',
+    'software',
+    'development',
+  ],
 };
 
 /**
@@ -59,7 +125,8 @@ export function classifyLaborSubtype(
   const matches: Record<LaborSubtype, { count: number; keywords: string[] }> = {
     engineering: { count: 0, keywords: [] },
     commissioning: { count: 0, keywords: [] },
-    installation: { count: 0, keywords: [] }
+    installation: { count: 0, keywords: [] },
+    programming: { count: 0, keywords: [] },
   };
 
   // Check each subtype's keywords
@@ -87,14 +154,12 @@ export function classifyLaborSubtype(
 
   // Calculate confidence based on number of matches and text length
   // More matches = higher confidence, but cap at 0.95 (never 100% certain)
-  const confidence = maxCount > 0
-    ? Math.min(0.95, 0.5 + (maxCount * 0.15))
-    : 0.3; // Low confidence if no matches
+  const confidence = maxCount > 0 ? Math.min(0.95, 0.5 + maxCount * 0.15) : 0.3; // Low confidence if no matches
 
   return {
     laborSubtype: bestSubtype,
     confidence,
-    matchedKeywords
+    matchedKeywords,
   };
 }
 
@@ -130,7 +195,11 @@ export function getAllLaborScores(
   description?: string
 ): Array<{ subtype: LaborSubtype; confidence: number; keywords: string[] }> {
   const text = `${name} ${description || ''}`.toLowerCase();
-  const results: Array<{ subtype: LaborSubtype; confidence: number; keywords: string[] }> = [];
+  const results: Array<{
+    subtype: LaborSubtype;
+    confidence: number;
+    keywords: string[];
+  }> = [];
 
   for (const [subtype, keywords] of Object.entries(LABOR_KEYWORDS)) {
     const matchedKeywords: string[] = [];
@@ -143,14 +212,13 @@ export function getAllLaborScores(
       }
     }
 
-    const confidence = matchCount > 0
-      ? Math.min(0.95, 0.5 + (matchCount * 0.15))
-      : 0;
+    const confidence =
+      matchCount > 0 ? Math.min(0.95, 0.5 + matchCount * 0.15) : 0;
 
     results.push({
       subtype: subtype as LaborSubtype,
       confidence,
-      keywords: matchedKeywords
+      keywords: matchedKeywords,
     });
   }
 

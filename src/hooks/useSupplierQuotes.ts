@@ -12,10 +12,12 @@ import {
   ComponentQuoteHistory,
   DbSupplierQuote,
   DbComponentQuoteHistory,
-  Component
 } from '../types';
 import type { AIExtractedComponent } from '../services/claudeAI';
-import { findComponentMatches, MatchResult } from '../services/componentMatcher';
+import {
+  findComponentMatches,
+  MatchResult,
+} from '../services/componentMatcher';
 import { logger } from '../lib/logger';
 
 // ============================================
@@ -41,11 +43,13 @@ function dbToSupplierQuote(db: DbSupplierQuote): SupplierQuote {
     notes: db.notes,
     uploadDate: db.upload_date,
     createdAt: db.created_at,
-    updatedAt: db.updated_at
+    updatedAt: db.updated_at,
   };
 }
 
-function supplierQuoteToDb(quote: Partial<SupplierQuote>): Partial<DbSupplierQuote> {
+function supplierQuoteToDb(
+  quote: Partial<SupplierQuote>
+): Partial<DbSupplierQuote> {
   return {
     quote_number: quote.quoteNumber,
     supplier_name: quote.supplierName,
@@ -60,11 +64,13 @@ function supplierQuoteToDb(quote: Partial<SupplierQuote>): Partial<DbSupplierQuo
     confidence_score: quote.confidenceScore,
     total_components: quote.totalComponents,
     metadata: quote.metadata,
-    notes: quote.notes
+    notes: quote.notes,
   };
 }
 
-function dbToComponentQuoteHistory(db: DbComponentQuoteHistory): ComponentQuoteHistory {
+function dbToComponentQuoteHistory(
+  db: DbComponentQuoteHistory
+): ComponentQuoteHistory {
   return {
     id: db.id,
     componentId: db.component_id,
@@ -77,7 +83,7 @@ function dbToComponentQuoteHistory(db: DbComponentQuoteHistory): ComponentQuoteH
     supplierName: db.supplier_name,
     confidenceScore: db.confidence_score,
     isCurrentPrice: db.is_current_price,
-    createdAt: db.created_at
+    createdAt: db.created_at,
   };
 }
 
@@ -107,7 +113,8 @@ export function useSupplierQuotes() {
 
       setQuotes((data || []).map(dbToSupplierQuote));
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch quotes';
+      const errorMessage =
+        err instanceof Error ? err.message : 'Failed to fetch quotes';
       setError(errorMessage);
       logger.error('Error fetching supplier quotes:', err);
     } finally {
@@ -118,23 +125,26 @@ export function useSupplierQuotes() {
   // ============================================
   // Get Single Quote
   // ============================================
-  const getQuote = useCallback(async (id: string): Promise<SupplierQuote | null> => {
-    try {
-      const { data, error } = await supabase
-        .from('supplier_quotes')
-        .select('*')
-        .eq('id', id)
-        .single();
+  const getQuote = useCallback(
+    async (id: string): Promise<SupplierQuote | null> => {
+      try {
+        const { data, error } = await supabase
+          .from('supplier_quotes')
+          .select('*')
+          .eq('id', id)
+          .single();
 
-      if (error) throw error;
-      if (!data) return null;
+        if (error) throw error;
+        if (!data) return null;
 
-      return dbToSupplierQuote(data);
-    } catch (err) {
-      logger.error('Error fetching quote:', err);
-      return null;
-    }
-  }, []);
+        return dbToSupplierQuote(data);
+      } catch (err) {
+        logger.error('Error fetching quote:', err);
+        return null;
+      }
+    },
+    []
+  );
 
   // ============================================
   // Get Quote with Component History
@@ -143,13 +153,15 @@ export function useSupplierQuotes() {
     try {
       const { data, error } = await supabase
         .from('supplier_quotes')
-        .select(`
+        .select(
+          `
           *,
           component_quote_history (
             *,
             component:components (*)
           )
-        `)
+        `
+        )
         .eq('id', id)
         .single();
 
@@ -160,8 +172,8 @@ export function useSupplierQuotes() {
         quote: dbToSupplierQuote(data),
         components: (data.component_quote_history || []).map((h: any) => ({
           history: dbToComponentQuoteHistory(h),
-          component: h.component
-        }))
+          component: h.component,
+        })),
       };
     } catch (err) {
       logger.error('Error fetching quote with components:', err);
@@ -172,74 +184,83 @@ export function useSupplierQuotes() {
   // ============================================
   // Create Quote
   // ============================================
-  const createQuote = useCallback(async (
-    quote: Omit<SupplierQuote, 'id' | 'createdAt' | 'updatedAt' | 'uploadDate'>
-  ): Promise<SupplierQuote | null> => {
-    try {
-      setError(null);
+  const createQuote = useCallback(
+    async (
+      quote: Omit<
+        SupplierQuote,
+        'id' | 'createdAt' | 'updatedAt' | 'uploadDate'
+      >
+    ): Promise<SupplierQuote | null> => {
+      try {
+        setError(null);
 
-      const dbQuote = supplierQuoteToDb(quote);
+        const dbQuote = supplierQuoteToDb(quote);
 
-      const { data, error } = await supabase
-        .from('supplier_quotes')
-        .insert([dbQuote])
-        .select()
-        .single();
+        const { data, error } = await supabase
+          .from('supplier_quotes')
+          .insert([dbQuote])
+          .select()
+          .single();
 
-      if (error) throw error;
-      if (!data) throw new Error('No data returned from insert');
+        if (error) throw error;
+        if (!data) throw new Error('No data returned from insert');
 
-      const newQuote = dbToSupplierQuote(data);
+        const newQuote = dbToSupplierQuote(data);
 
-      // Update local state
-      setQuotes(prev => [newQuote, ...prev]);
+        // Update local state
+        setQuotes(prev => [newQuote, ...prev]);
 
-      return newQuote;
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to create quote';
-      setError(errorMessage);
-      logger.error('Error creating quote:', err);
-      return null;
-    }
-  }, []);
+        return newQuote;
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : 'Failed to create quote';
+        setError(errorMessage);
+        logger.error('Error creating quote:', err);
+        return null;
+      }
+    },
+    []
+  );
 
   // ============================================
   // Update Quote
   // ============================================
-  const updateQuote = useCallback(async (
-    id: string,
-    updates: Partial<SupplierQuote>
-  ): Promise<SupplierQuote | null> => {
-    try {
-      setError(null);
+  const updateQuote = useCallback(
+    async (
+      id: string,
+      updates: Partial<SupplierQuote>
+    ): Promise<SupplierQuote | null> => {
+      try {
+        setError(null);
 
-      const dbUpdates = supplierQuoteToDb(updates);
+        const dbUpdates = supplierQuoteToDb(updates);
 
-      const { data, error } = await supabase
-        .from('supplier_quotes')
-        .update(dbUpdates)
-        .eq('id', id)
-        .select()
-        .single();
+        const { data, error } = await supabase
+          .from('supplier_quotes')
+          .update(dbUpdates)
+          .eq('id', id)
+          .select()
+          .single();
 
-      if (error) throw error;
-      if (!data) throw new Error('No data returned from update');
+        if (error) throw error;
+        if (!data) throw new Error('No data returned from update');
 
-      const updatedQuote = dbToSupplierQuote(data);
+        const updatedQuote = dbToSupplierQuote(data);
 
-      // Update local state
-      setQuotes(prev =>
-        prev.map(q => q.id === id ? updatedQuote : q)
-      );
+        // Update local state
+        setQuotes(prev => prev.map(q => (q.id === id ? updatedQuote : q)));
 
-      return updatedQuote;
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to update quote';
-      setError(errorMessage);
-      logger.error('Error updating quote:', err);
-      return null;
-    }
-  }, []);
+        return updatedQuote;
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : 'Failed to update quote';
+        setError(errorMessage);
+        logger.error('Error updating quote:', err);
+        return null;
+      }
+    },
+    []
+  );
 
   // ============================================
   // Delete Quote
@@ -260,7 +281,8 @@ export function useSupplierQuotes() {
 
       return true;
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to delete quote';
+      const errorMessage =
+        err instanceof Error ? err.message : 'Failed to delete quote';
       setError(errorMessage);
       logger.error('Error deleting quote:', err);
       return false;
@@ -270,181 +292,198 @@ export function useSupplierQuotes() {
   // ============================================
   // Add Component to Quote History
   // ============================================
-  const addComponentHistory = useCallback(async (
-    componentId: string,
-    quoteId: string,
-    historyData: {
-      unitPriceNIS?: number;
-      unitPriceUSD?: number;
-      unitPriceEUR?: number;
-      currency: 'NIS' | 'USD' | 'EUR';
-      quoteDate?: string;
-      supplierName?: string;
-      confidenceScore?: number;
-      isCurrentPrice?: boolean;
-    }
-  ): Promise<ComponentQuoteHistory | null> => {
-    try {
-      // Check if this combination already exists
-      const { data: existing } = await supabase
-        .from('component_quote_history')
-        .select('id')
-        .eq('component_id', componentId)
-        .eq('quote_id', quoteId)
-        .single();
-
-      if (existing) {
-        logger.debug('⏭️  History entry already exists, skipping...');
-        return null; // Already exists, skip
+  const addComponentHistory = useCallback(
+    async (
+      componentId: string,
+      quoteId: string,
+      historyData: {
+        unitPriceNIS?: number;
+        unitPriceUSD?: number;
+        unitPriceEUR?: number;
+        currency: 'NIS' | 'USD' | 'EUR';
+        quoteDate?: string;
+        supplierName?: string;
+        confidenceScore?: number;
+        isCurrentPrice?: boolean;
       }
+    ): Promise<ComponentQuoteHistory | null> => {
+      try {
+        // Check if this combination already exists
+        const { data: existing } = await supabase
+          .from('component_quote_history')
+          .select('id')
+          .eq('component_id', componentId)
+          .eq('quote_id', quoteId)
+          .single();
 
-      const { data, error } = await supabase
-        .from('component_quote_history')
-        .insert([{
-          component_id: componentId,
-          quote_id: quoteId,
-          unit_price_nis: historyData.unitPriceNIS,
-          unit_price_usd: historyData.unitPriceUSD,
-          unit_price_eur: historyData.unitPriceEUR,
-          currency: historyData.currency,
-          quote_date: historyData.quoteDate,
-          supplier_name: historyData.supplierName,
-          confidence_score: historyData.confidenceScore,
-          is_current_price: historyData.isCurrentPrice || false
-        }])
-        .select()
-        .single();
+        if (existing) {
+          logger.debug('⏭️  History entry already exists, skipping...');
+          return null; // Already exists, skip
+        }
 
-      if (error) throw error;
-      if (!data) throw new Error('No data returned');
+        const { data, error } = await supabase
+          .from('component_quote_history')
+          .insert([
+            {
+              component_id: componentId,
+              quote_id: quoteId,
+              unit_price_nis: historyData.unitPriceNIS,
+              unit_price_usd: historyData.unitPriceUSD,
+              unit_price_eur: historyData.unitPriceEUR,
+              currency: historyData.currency,
+              quote_date: historyData.quoteDate,
+              supplier_name: historyData.supplierName,
+              confidence_score: historyData.confidenceScore,
+              is_current_price: historyData.isCurrentPrice || false,
+            },
+          ])
+          .select()
+          .single();
 
-      return dbToComponentQuoteHistory(data);
-    } catch (err) {
-      logger.error('Error adding component history:', err);
-      return null;
-    }
-  }, []);
+        if (error) throw error;
+        if (!data) throw new Error('No data returned');
+
+        return dbToComponentQuoteHistory(data);
+      } catch (err) {
+        logger.error('Error adding component history:', err);
+        return null;
+      }
+    },
+    []
+  );
 
   // ============================================
   // Get Component Price History
   // ============================================
-  const getComponentHistory = useCallback(async (
-    componentId: string
-  ): Promise<ComponentQuoteHistory[]> => {
-    try {
-      const { data, error } = await supabase
-        .from('component_quote_history')
-        .select('*')
-        .eq('component_id', componentId)
-        .order('quote_date', { ascending: false });
+  const getComponentHistory = useCallback(
+    async (componentId: string): Promise<ComponentQuoteHistory[]> => {
+      try {
+        const { data, error } = await supabase
+          .from('component_quote_history')
+          .select('*')
+          .eq('component_id', componentId)
+          .order('quote_date', { ascending: false });
 
-      if (error) throw error;
+        if (error) throw error;
 
-      return (data || []).map(dbToComponentQuoteHistory);
-    } catch (err) {
-      logger.error('Error fetching component history:', err);
-      return [];
-    }
-  }, []);
+        return (data || []).map(dbToComponentQuoteHistory);
+      } catch (err) {
+        logger.error('Error fetching component history:', err);
+        return [];
+      }
+    },
+    []
+  );
 
   // ============================================
   // Search Quotes
   // ============================================
-  const searchQuotes = useCallback(async (query: string): Promise<SupplierQuote[]> => {
-    try {
-      setLoading(true);
-      setError(null);
+  const searchQuotes = useCallback(
+    async (query: string): Promise<SupplierQuote[]> => {
+      try {
+        setLoading(true);
+        setError(null);
 
-      const { data, error } = await supabase
-        .from('supplier_quotes')
-        .select('*')
-        .or(`file_name.ilike.%${query}%,supplier_name.ilike.%${query}%,quote_number.ilike.%${query}%`)
-        .order('created_at', { ascending: false });
+        const { data, error } = await supabase
+          .from('supplier_quotes')
+          .select('*')
+          .or(
+            `file_name.ilike.%${query}%,supplier_name.ilike.%${query}%,quote_number.ilike.%${query}%`
+          )
+          .order('created_at', { ascending: false });
 
-      if (error) throw error;
+        if (error) throw error;
 
-      return (data || []).map(dbToSupplierQuote);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to search quotes';
-      setError(errorMessage);
-      logger.error('Error searching quotes:', err);
-      return [];
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+        return (data || []).map(dbToSupplierQuote);
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : 'Failed to search quotes';
+        setError(errorMessage);
+        logger.error('Error searching quotes:', err);
+        return [];
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
 
   // ============================================
   // Filter Quotes
   // ============================================
-  const filterQuotes = useCallback(async (filters: {
-    supplier?: string;
-    dateFrom?: string;
-    dateTo?: string;
-    status?: string;
-  }): Promise<SupplierQuote[]> => {
-    try {
-      setLoading(true);
-      setError(null);
+  const filterQuotes = useCallback(
+    async (filters: {
+      supplier?: string;
+      dateFrom?: string;
+      dateTo?: string;
+      status?: string;
+    }): Promise<SupplierQuote[]> => {
+      try {
+        setLoading(true);
+        setError(null);
 
-      let query = supabase
-        .from('supplier_quotes')
-        .select('*');
+        let query = supabase.from('supplier_quotes').select('*');
 
-      if (filters.supplier) {
-        query = query.eq('supplier_name', filters.supplier);
+        if (filters.supplier) {
+          query = query.eq('supplier_name', filters.supplier);
+        }
+
+        if (filters.dateFrom) {
+          query = query.gte('quote_date', filters.dateFrom);
+        }
+
+        if (filters.dateTo) {
+          query = query.lte('quote_date', filters.dateTo);
+        }
+
+        if (filters.status) {
+          query = query.eq('status', filters.status);
+        }
+
+        query = query.order('created_at', { ascending: false });
+
+        const { data, error } = await query;
+
+        if (error) throw error;
+
+        return (data || []).map(dbToSupplierQuote);
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : 'Failed to filter quotes';
+        setError(errorMessage);
+        logger.error('Error filtering quotes:', err);
+        return [];
+      } finally {
+        setLoading(false);
       }
-
-      if (filters.dateFrom) {
-        query = query.gte('quote_date', filters.dateFrom);
-      }
-
-      if (filters.dateTo) {
-        query = query.lte('quote_date', filters.dateTo);
-      }
-
-      if (filters.status) {
-        query = query.eq('status', filters.status);
-      }
-
-      query = query.order('created_at', { ascending: false });
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-
-      return (data || []).map(dbToSupplierQuote);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to filter quotes';
-      setError(errorMessage);
-      logger.error('Error filtering quotes:', err);
-      return [];
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    },
+    []
+  );
 
   // ============================================
   // Process Quote with Component Matching
   // ============================================
-  const processQuoteWithMatching = useCallback(async (
-    quoteId: string,
-    extractedComponents: AIExtractedComponent[]
-  ): Promise<MatchResult[]> => {
-    try {
-      const matchResults: MatchResult[] = [];
+  const processQuoteWithMatching = useCallback(
+    async (
+      _quoteId: string,
+      extractedComponents: AIExtractedComponent[]
+    ): Promise<MatchResult[]> => {
+      try {
+        const matchResults: MatchResult[] = [];
 
-      for (const extractedComp of extractedComponents) {
-        const matchResult = await findComponentMatches(extractedComp);
-        matchResults.push(matchResult);
+        for (const extractedComp of extractedComponents) {
+          const matchResult = await findComponentMatches(extractedComp);
+          matchResults.push(matchResult);
+        }
+
+        return matchResults;
+      } catch (err) {
+        logger.error('Error processing quote with matching:', err);
+        return [];
       }
-
-      return matchResults;
-    } catch (err) {
-      logger.error('Error processing quote with matching:', err);
-      return [];
-    }
-  }, []);
+    },
+    []
+  );
 
   // ============================================
   // Load quotes on mount
@@ -470,6 +509,6 @@ export function useSupplierQuotes() {
     getComponentHistory,
     searchQuotes,
     filterQuotes,
-    processQuoteWithMatching
+    processQuoteWithMatching,
   };
 }

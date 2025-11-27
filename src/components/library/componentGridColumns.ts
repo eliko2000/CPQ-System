@@ -1,8 +1,4 @@
-import {
-  ColDef,
-  ICellRendererParams,
-  ValueSetterParams,
-} from 'ag-grid-community';
+import { ColDef, ValueSetterParams } from 'ag-grid-community';
 import { CustomHeader } from '../grid/CustomHeader';
 import {
   NameCellRenderer,
@@ -367,9 +363,17 @@ export const createComponentColumnDefs = ({
     },
     cellStyle: params => {
       if (params.data?.componentType !== 'labor') {
-        return { backgroundColor: '#f5f5f5', color: '#aaa' };
+        return {
+          backgroundColor: '#f5f5f5',
+          color: '#aaa',
+          fontWeight: 'normal',
+        };
       }
-      return { fontWeight: '500' };
+      return {
+        fontWeight: '500',
+        backgroundColor: 'transparent',
+        color: 'inherit',
+      };
     },
     headerComponent: CustomHeader,
     headerComponentParams: (params: any) => ({

@@ -1,9 +1,9 @@
 import { memo, useCallback } from 'react';
-import type { QuotationParameters } from '../../types';
+import type { QuotationParameters as QuotationParametersType } from '../../types';
 
 interface QuotationParametersProps {
-  parameters: QuotationParameters;
-  onChange: (parameters: QuotationParameters) => void;
+  parameters: QuotationParametersType;
+  onChange: (parameters: QuotationParametersType) => void;
   disabled?: boolean;
 }
 
@@ -13,7 +13,7 @@ export const QuotationParameters = memo(function QuotationParameters({
   disabled = false,
 }: QuotationParametersProps) {
   const handleChange = useCallback(
-    (field: keyof QuotationParameters, value: any) => {
+    (field: keyof QuotationParametersType, value: any) => {
       onChange({
         ...parameters,
         [field]: value,

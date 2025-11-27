@@ -41,6 +41,7 @@ describe('useQuotations', () => {
     item_name: 'Siemens PLC',
     manufacturer: 'Siemens',
     manufacturer_part_number: '6ES7512-1DK01-0AB0',
+    item_type: 'hardware',
     quantity: 2,
     unit_cost: 2500,
     total_cost: 5000,
@@ -49,7 +50,7 @@ describe('useQuotations', () => {
     total_price: 6250,
     original_currency: 'USD',
     original_cost: 2500,
-    notes: null,
+    notes: undefined,
     sort_order: 0,
     created_at: '2024-01-15T10:00:00Z',
     updated_at: '2024-01-15T10:00:00Z',
@@ -80,7 +81,7 @@ describe('useQuotations', () => {
     customer_email: 'contact@acme.com',
     project_name: 'Factory Automation',
     project_description: 'Complete automation solution',
-    project_id: null,
+    project_id: undefined,
     currency: 'ILS',
     exchange_rate: 3.7,
     margin_percentage: 25,
@@ -107,7 +108,7 @@ describe('useQuotations', () => {
     it('should fetch quotations with nested systems and items on mount', async () => {
       const mockOrder = vi.fn().mockResolvedValue({
         data: [mockQuotation],
-        error: null,
+        error: undefined,
       });
 
       const mockSelect = vi.fn().mockReturnValue({
@@ -130,7 +131,7 @@ describe('useQuotations', () => {
       expect(result.current.quotations[0].quotation_number).toBe('Q-2024-001');
       expect(result.current.quotations[0].quotation_systems).toHaveLength(1);
       expect(
-        result.current.quotations[0].quotation_systems[0].quotation_items
+        result.current.quotations[0].quotation_systems?.[0].quotation_items
       ).toHaveLength(1);
       expect(result.current.error).toBeNull();
     });
@@ -138,7 +139,7 @@ describe('useQuotations', () => {
     it('should handle fetch errors', async () => {
       const mockError = { message: 'Database connection failed' };
       const mockOrder = vi.fn().mockResolvedValue({
-        data: null,
+        data: undefined,
         error: mockError,
       });
 
@@ -163,7 +164,7 @@ describe('useQuotations', () => {
     it('should handle empty database', async () => {
       const mockOrder = vi.fn().mockResolvedValue({
         data: [],
-        error: null,
+        error: undefined,
       });
 
       const mockSelect = vi.fn().mockReturnValue({
@@ -189,7 +190,7 @@ describe('useQuotations', () => {
     it('should fetch single quotation by ID', async () => {
       const mockSingle = vi.fn().mockResolvedValue({
         data: mockQuotation,
-        error: null,
+        error: undefined,
       });
 
       const mockEq = vi.fn().mockReturnValue({
@@ -216,7 +217,7 @@ describe('useQuotations', () => {
     it('should return null on fetch error', async () => {
       const mockError = { message: 'Quotation not found' };
       const mockSingle = vi.fn().mockResolvedValue({
-        data: null,
+        data: undefined,
         error: mockError,
       });
 
@@ -224,17 +225,17 @@ describe('useQuotations', () => {
         single: mockSingle,
       });
 
-      const _mockGetSelect = vi.fn().mockReturnValue({
+      const __mockGetSelect = vi.fn().mockReturnValue({
         eq: mockEq,
       });
 
       // Mock for initial fetch
       const mockOrder = vi.fn().mockResolvedValue({
         data: [],
-        error: null,
+        error: undefined,
       });
 
-      const _mockListSelect = vi.fn().mockReturnValue({
+      const __mockListSelect = vi.fn().mockReturnValue({
         order: mockOrder,
       });
 
@@ -273,7 +274,7 @@ describe('useQuotations', () => {
     it('should add new quotation successfully', async () => {
       const mockSingle = vi.fn().mockResolvedValue({
         data: mockQuotation,
-        error: null,
+        error: undefined,
       });
 
       const mockInsertSelect = vi.fn().mockReturnValue({
@@ -287,7 +288,7 @@ describe('useQuotations', () => {
       // Mock initial fetch
       const mockOrder = vi.fn().mockResolvedValue({
         data: [],
-        error: null,
+        error: undefined,
       });
 
       const mockSelect = vi.fn().mockReturnValue({
@@ -317,17 +318,17 @@ describe('useQuotations', () => {
         quotation_number: 'Q-2024-002',
         version: 1,
         customer_name: 'New Customer',
-        customer_email: null,
+        customer_email: undefined,
         project_name: 'New Project',
-        project_description: null,
-        project_id: null,
+        project_description: undefined,
+        project_id: undefined,
         currency: 'ILS',
         exchange_rate: 3.7,
         margin_percentage: 25,
         status: 'draft',
-        valid_until_date: null,
-        terms: null,
-        notes: null,
+        valid_until_date: undefined,
+        terms: undefined,
+        notes: undefined,
         total_cost: 0,
         total_price: 0,
         quotation_systems: [],
@@ -342,7 +343,7 @@ describe('useQuotations', () => {
     it('should handle add quotation errors', async () => {
       const mockError = { message: 'Duplicate quotation number' };
       const mockSingle = vi.fn().mockResolvedValue({
-        data: null,
+        data: undefined,
         error: mockError,
       });
 
@@ -356,7 +357,7 @@ describe('useQuotations', () => {
 
       const mockOrder = vi.fn().mockResolvedValue({
         data: [],
-        error: null,
+        error: undefined,
       });
 
       const mockSelect = vi.fn().mockReturnValue({
@@ -384,17 +385,17 @@ describe('useQuotations', () => {
         quotation_number: 'Q-2024-001', // Duplicate
         version: 1,
         customer_name: 'Test',
-        customer_email: null,
-        project_name: null,
-        project_description: null,
-        project_id: null,
+        customer_email: undefined,
+        project_name: undefined,
+        project_description: undefined,
+        project_id: undefined,
         currency: 'ILS',
         exchange_rate: 3.7,
         margin_percentage: 25,
         status: 'draft',
-        valid_until_date: null,
-        terms: null,
-        notes: null,
+        valid_until_date: undefined,
+        terms: undefined,
+        notes: undefined,
         total_cost: 0,
         total_price: 0,
         quotation_systems: [],
@@ -410,14 +411,14 @@ describe('useQuotations', () => {
 
   describe('Updating Quotations', () => {
     it('should update quotation successfully', async () => {
-      const _updatedQuotation = {
+      const __updatedQuotation = {
         ...mockQuotation,
         customer_name: 'Updated Corp',
       };
 
       const mockSingle = vi.fn().mockResolvedValue({
-        data: _updatedQuotation,
-        error: null,
+        data: __updatedQuotation,
+        error: undefined,
       });
 
       const mockUpdateSelect = vi.fn().mockReturnValue({
@@ -434,7 +435,7 @@ describe('useQuotations', () => {
 
       const mockOrder = vi.fn().mockResolvedValue({
         data: [mockQuotation],
-        error: null,
+        error: undefined,
       });
 
       const mockSelect = vi.fn().mockReturnValue({
@@ -464,11 +465,11 @@ describe('useQuotations', () => {
     });
 
     it('should preserve nested data when updating quotation', async () => {
-      const _updatedQuotation = { ...mockQuotation, status: 'sent' };
+      const __updatedQuotation = { ...mockQuotation, status: 'sent' };
 
       const mockSingle = vi.fn().mockResolvedValue({
         data: { status: 'sent' }, // DB only returns updated fields
-        error: null,
+        error: undefined,
       });
 
       const mockUpdateSelect = vi.fn().mockReturnValue({
@@ -485,7 +486,7 @@ describe('useQuotations', () => {
 
       const mockOrder = vi.fn().mockResolvedValue({
         data: [mockQuotation],
-        error: null,
+        error: undefined,
       });
 
       const mockSelect = vi.fn().mockReturnValue({
@@ -517,7 +518,7 @@ describe('useQuotations', () => {
     it('should handle update errors', async () => {
       const mockError = { message: 'Update failed: validation error' };
       const mockSingle = vi.fn().mockResolvedValue({
-        data: null,
+        data: undefined,
         error: mockError,
       });
 
@@ -535,7 +536,7 @@ describe('useQuotations', () => {
 
       const mockOrder = vi.fn().mockResolvedValue({
         data: [mockQuotation],
-        error: null,
+        error: undefined,
       });
 
       const mockSelect = vi.fn().mockReturnValue({
@@ -571,7 +572,7 @@ describe('useQuotations', () => {
   describe('Deleting Quotations', () => {
     it('should delete quotation successfully', async () => {
       const mockEq = vi.fn().mockResolvedValue({
-        error: null,
+        error: undefined,
       });
 
       const mockDelete = vi.fn().mockReturnValue({
@@ -580,7 +581,7 @@ describe('useQuotations', () => {
 
       const mockOrder = vi.fn().mockResolvedValue({
         data: [mockQuotation],
-        error: null,
+        error: undefined,
       });
 
       const mockSelect = vi.fn().mockReturnValue({
@@ -619,7 +620,7 @@ describe('useQuotations', () => {
 
       const mockOrder = vi.fn().mockResolvedValue({
         data: [mockQuotation],
-        error: null,
+        error: undefined,
       });
 
       const mockSelect = vi.fn().mockReturnValue({
@@ -656,7 +657,7 @@ describe('useQuotations', () => {
       > = {
         quotation_id: 'quot-1',
         system_name: 'Secondary System',
-        system_description: null,
+        system_description: undefined,
         quantity: 1,
         unit_cost: 5000,
         total_cost: 5000,
@@ -669,7 +670,7 @@ describe('useQuotations', () => {
 
       const mockSingle = vi.fn().mockResolvedValue({
         data: { ...newSystem, id: 'system-2' },
-        error: null,
+        error: undefined,
       });
 
       const mockInsertSelect = vi.fn().mockReturnValue({
@@ -682,7 +683,7 @@ describe('useQuotations', () => {
 
       const mockOrder = vi.fn().mockResolvedValue({
         data: [mockQuotation],
-        error: null,
+        error: undefined,
       });
 
       const mockSelect = vi.fn().mockReturnValue({
@@ -690,7 +691,7 @@ describe('useQuotations', () => {
       });
 
       vi.mocked(supabase.from).mockImplementation(
-        (table: string) =>
+        (_table: string) =>
           ({
             select: mockSelect,
             insert: mockInsert,
@@ -711,7 +712,7 @@ describe('useQuotations', () => {
     it('should update quotation system successfully', async () => {
       const mockSingle = vi.fn().mockResolvedValue({
         data: { ...mockQuotationSystem, system_name: 'Updated System' },
-        error: null,
+        error: undefined,
       });
 
       const mockUpdateSelect = vi.fn().mockReturnValue({
@@ -728,7 +729,7 @@ describe('useQuotations', () => {
 
       const mockOrder = vi.fn().mockResolvedValue({
         data: [mockQuotation],
-        error: null,
+        error: undefined,
       });
 
       const mockSelect = vi.fn().mockReturnValue({
@@ -759,7 +760,7 @@ describe('useQuotations', () => {
 
     it('should delete quotation system successfully', async () => {
       const mockEq = vi.fn().mockResolvedValue({
-        error: null,
+        error: undefined,
       });
 
       const mockDelete = vi.fn().mockReturnValue({
@@ -768,7 +769,7 @@ describe('useQuotations', () => {
 
       const mockOrder = vi.fn().mockResolvedValue({
         data: [mockQuotation],
-        error: null,
+        error: undefined,
       });
 
       const mockSelect = vi.fn().mockReturnValue({
@@ -813,13 +814,13 @@ describe('useQuotations', () => {
           total_price: 750,
           original_currency: 'USD',
           original_cost: 150,
-          notes: null,
+          notes: undefined,
           sort_order: 1,
         };
 
       const mockSingle = vi.fn().mockResolvedValue({
         data: { ...newItem, id: 'item-2' },
-        error: null,
+        error: undefined,
       });
 
       const mockInsertSelect = vi.fn().mockReturnValue({
@@ -832,7 +833,7 @@ describe('useQuotations', () => {
 
       const mockOrder = vi.fn().mockResolvedValue({
         data: [mockQuotation],
-        error: null,
+        error: undefined,
       });
 
       const mockSelect = vi.fn().mockReturnValue({
@@ -861,7 +862,7 @@ describe('useQuotations', () => {
     it('should update quotation item successfully', async () => {
       const mockSingle = vi.fn().mockResolvedValue({
         data: { ...mockQuotationItem, quantity: 3 },
-        error: null,
+        error: undefined,
       });
 
       const mockUpdateSelect = vi.fn().mockReturnValue({
@@ -878,7 +879,7 @@ describe('useQuotations', () => {
 
       const mockOrder = vi.fn().mockResolvedValue({
         data: [mockQuotation],
-        error: null,
+        error: undefined,
       });
 
       const mockSelect = vi.fn().mockReturnValue({
@@ -907,7 +908,7 @@ describe('useQuotations', () => {
 
     it('should delete quotation item successfully', async () => {
       const mockEq = vi.fn().mockResolvedValue({
-        error: null,
+        error: undefined,
       });
 
       const mockDelete = vi.fn().mockReturnValue({
@@ -916,7 +917,7 @@ describe('useQuotations', () => {
 
       const mockOrder = vi.fn().mockResolvedValue({
         data: [mockQuotation],
-        error: null,
+        error: undefined,
       });
 
       const mockSelect = vi.fn().mockReturnValue({
@@ -964,7 +965,7 @@ describe('useQuotations', () => {
 
       const mockOrder = vi.fn().mockResolvedValue({
         data: [quotationWithCurrency],
-        error: null,
+        error: undefined,
       });
 
       const mockSelect = vi.fn().mockReturnValue({
@@ -982,10 +983,10 @@ describe('useQuotations', () => {
       });
 
       const quotation = result.current.quotations[0];
-      const item = quotation.quotation_systems[0].quotation_items[0];
+      const item = quotation.quotation_systems?.[0].quotation_items?.[0];
 
-      expect(item.original_currency).toBe('USD');
-      expect(item.original_cost).toBe(2500);
+      expect(item?.original_currency).toBe('USD');
+      expect(item?.original_cost).toBe(2500);
     });
   });
 
@@ -998,7 +999,7 @@ describe('useQuotations', () => {
 
       const mockOrder = vi.fn().mockResolvedValue({
         data: [quotationWithoutSystems],
-        error: null,
+        error: undefined,
       });
 
       const mockSelect = vi.fn().mockReturnValue({
@@ -1021,7 +1022,7 @@ describe('useQuotations', () => {
     it('should handle visibility change events', async () => {
       const mockOrder = vi.fn().mockResolvedValue({
         data: [mockQuotation],
-        error: null,
+        error: undefined,
       });
 
       const mockSelect = vi.fn().mockReturnValue({
@@ -1052,7 +1053,7 @@ describe('useQuotations', () => {
     it('should handle window focus events', async () => {
       const mockOrder = vi.fn().mockResolvedValue({
         data: [mockQuotation],
-        error: null,
+        error: undefined,
       });
 
       const mockSelect = vi.fn().mockReturnValue({

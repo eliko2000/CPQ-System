@@ -23,9 +23,7 @@ import type { Assembly, AssemblyComponent, Component } from '../../types';
 /**
  * Create a mock component for testing
  */
-function createMockComponent(
-  overrides: Partial<Component> = {}
-): Component {
+function createMockComponent(overrides: Partial<Component> = {}): Component {
   const defaults: Component = {
     id: `comp-${Math.random().toString(36).substr(2, 9)}`,
     name: 'Test Component',
@@ -466,9 +464,7 @@ describe('Assembly Edge Cases', () => {
       unitCostNIS: 100,
     });
 
-    const assembly = createMockAssembly([
-      createMockAssemblyComponent(comp, 1),
-    ]);
+    const assembly = createMockAssembly([createMockAssemblyComponent(comp, 1)]);
 
     const pricing = calculateAssemblyPricing(assembly);
 
@@ -499,14 +495,11 @@ describe('Assembly Edge Cases', () => {
 
   it('should handle component with missing currency field (legacy data)', () => {
     const comp = createMockComponent({
-      // @ts-expect-error - testing legacy data without currency field
       currency: undefined,
       unitCostNIS: 100,
     });
 
-    const assembly = createMockAssembly([
-      createMockAssemblyComponent(comp, 1),
-    ]);
+    const assembly = createMockAssembly([createMockAssemblyComponent(comp, 1)]);
 
     const pricing = calculateAssemblyPricing(assembly);
 
@@ -538,9 +531,7 @@ describe('Assembly Edge Cases', () => {
       unitCostNIS: 0.001,
     });
 
-    const assembly = createMockAssembly([
-      createMockAssemblyComponent(comp, 1),
-    ]);
+    const assembly = createMockAssembly([createMockAssemblyComponent(comp, 1)]);
 
     const pricing = calculateAssemblyPricing(assembly);
 
@@ -607,9 +598,7 @@ describe('Assembly Pricing Formatting', () => {
       unitCostEUR: 92.5,
     });
 
-    const assembly = createMockAssembly([
-      createMockAssemblyComponent(comp, 2),
-    ]);
+    const assembly = createMockAssembly([createMockAssemblyComponent(comp, 2)]);
 
     const pricing = calculateAssemblyPricing(assembly);
     const formatted = formatAssemblyPricing(pricing);
@@ -676,9 +665,7 @@ describe('Component Price Updates', () => {
       unitCostNIS: 100,
     });
 
-    const assembly = createMockAssembly([
-      createMockAssemblyComponent(comp, 2),
-    ]);
+    const assembly = createMockAssembly([createMockAssemblyComponent(comp, 2)]);
 
     // Initial pricing: 100 * 2 = 200
     const pricing1 = calculateAssemblyPricing(assembly);
@@ -701,9 +688,7 @@ describe('Component Price Updates', () => {
       unitCostUSD: 100,
     });
 
-    const assembly = createMockAssembly([
-      createMockAssemblyComponent(comp, 1),
-    ]);
+    const assembly = createMockAssembly([createMockAssemblyComponent(comp, 1)]);
 
     const rates = { usdToIlsRate: 3.7, eurToIlsRate: 4.0 };
 

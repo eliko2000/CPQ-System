@@ -544,11 +544,11 @@ export function ProjectList({ onViewProject }: ProjectListProps = {}) {
         isOpen={deleteConfirm.isOpen}
         title="מחיקת פרויקט"
         message={`האם אתה בטוח שברצונך למחוק את הפרויקט "${deleteConfirm.projectName}"? פעולה זו אינה הפיכה.`}
-        confirmLabel="מחק"
-        cancelLabel="ביטול"
+        confirmText="מחק"
+        cancelText="ביטול"
         onConfirm={confirmDelete}
         onCancel={cancelDelete}
-        variant="destructive"
+        type="danger"
       />
     </div>
   );

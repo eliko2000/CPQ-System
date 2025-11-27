@@ -6,13 +6,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import type {
-  Assembly,
-  Assembly_Component,
-  DbAssembly,
-  _DbAssembly_Component,
-  _Component,
-} from '../types';
+import type { Assembly, AssemblyComponent, DbAssembly } from '../types';
 import { supabase } from '../supabaseClient';
 import { logger } from '../lib/logger';
 
@@ -80,68 +74,74 @@ export function useAssemblies(): UseAssembliesReturn {
         )
         .in(
           'assembly_id',
-          assembliesData.map((a) => a.id)
+          assembliesData.map(a => a.id)
         )
         .order('sort_order', { ascending: true });
 
       if (componentsError) throw componentsError;
 
       // Map to Assembly[] format
-      const mappedAssemblies: Assembly[] = assembliesData.map((dbAssembly: DbAssembly) => {
-        const assemblyComponents = (componentsData || [])
-          .filter((ac: any) => ac.assembly_id === dbAssembly.id)
-          .map((ac: any) => {
-            const assemblyComp: AssemblyComponent = {
-              id: ac.id,
-              assemblyId: ac.assembly_id,
-              componentId: ac.component_id,
-              componentName: ac.component_name,
-              componentManufacturer: ac.component_manufacturer,
-              componentPartNumber: ac.component_part_number,
-              quantity: parseFloat(ac.quantity),
-              sortOrder: ac.sort_order || 0,
-            };
-
-            // Add component data if exists
-            if (ac.component) {
-              assemblyComp.component = {
-                id: ac.component.id,
-                name: ac.component.name,
-                description: ac.component.description || '',
-                category: ac.component.category || 'Other',
-                componentType: ac.component.component_type || 'hardware',
-                laborSubtype: ac.component.labor_subtype,
-                productType: ac.component.category || 'Other',
-                manufacturer: ac.component.manufacturer || '',
-                manufacturerPN: ac.component.manufacturer_part_number || '',
-                supplier: ac.component.supplier || '',
-                unitCostNIS: parseFloat(ac.component.unit_cost_ils || 0),
-                unitCostUSD: parseFloat(ac.component.unit_cost_usd || 0),
-                unitCostEUR: parseFloat(ac.component.unit_cost_eur || 0),
-                currency: ac.component.currency || 'NIS',
-                originalCost: parseFloat(ac.component.original_cost || ac.component.unit_cost_ils || 0),
-                quoteDate: ac.component.created_at?.split('T')[0] || '',
-                quoteFileUrl: '',
-                notes: ac.component.notes,
-                createdAt: ac.component.created_at,
-                updatedAt: ac.component.updated_at,
+      const mappedAssemblies: Assembly[] = assembliesData.map(
+        (dbAssembly: DbAssembly) => {
+          const assemblyComponents = (componentsData || [])
+            .filter((ac: any) => ac.assembly_id === dbAssembly.id)
+            .map((ac: any) => {
+              const assemblyComp: AssemblyComponent = {
+                id: ac.id,
+                assemblyId: ac.assembly_id,
+                componentId: ac.component_id,
+                componentName: ac.component_name,
+                componentManufacturer: ac.component_manufacturer,
+                componentPartNumber: ac.component_part_number,
+                quantity: parseFloat(ac.quantity),
+                sortOrder: ac.sort_order || 0,
               };
-            }
 
-            return assemblyComp;
-          });
+              // Add component data if exists
+              if (ac.component) {
+                assemblyComp.component = {
+                  id: ac.component.id,
+                  name: ac.component.name,
+                  description: ac.component.description || '',
+                  category: ac.component.category || 'Other',
+                  componentType: ac.component.component_type || 'hardware',
+                  laborSubtype: ac.component.labor_subtype,
+                  productType: ac.component.category || 'Other',
+                  manufacturer: ac.component.manufacturer || '',
+                  manufacturerPN: ac.component.manufacturer_part_number || '',
+                  supplier: ac.component.supplier || '',
+                  unitCostNIS: parseFloat(ac.component.unit_cost_ils || 0),
+                  unitCostUSD: parseFloat(ac.component.unit_cost_usd || 0),
+                  unitCostEUR: parseFloat(ac.component.unit_cost_eur || 0),
+                  currency: ac.component.currency || 'NIS',
+                  originalCost: parseFloat(
+                    ac.component.original_cost ||
+                      ac.component.unit_cost_ils ||
+                      0
+                  ),
+                  quoteDate: ac.component.created_at?.split('T')[0] || '',
+                  quoteFileUrl: '',
+                  notes: ac.component.notes,
+                  createdAt: ac.component.created_at,
+                  updatedAt: ac.component.updated_at,
+                };
+              }
 
-        return {
-          id: dbAssembly.id,
-          name: dbAssembly.name,
-          description: dbAssembly.description,
-          isComplete: dbAssembly.is_complete,
-          notes: dbAssembly.notes,
-          components: assemblyComponents,
-          createdAt: dbAssembly.created_at,
-          updatedAt: dbAssembly.updated_at,
-        };
-      });
+              return assemblyComp;
+            });
+
+          return {
+            id: dbAssembly.id,
+            name: dbAssembly.name,
+            description: dbAssembly.description,
+            isComplete: dbAssembly.is_complete,
+            notes: dbAssembly.notes,
+            components: assemblyComponents,
+            createdAt: dbAssembly.created_at,
+            updatedAt: dbAssembly.updated_at,
+          };
+        }
+      );
 
       setAssemblies(mappedAssemblies);
     } catch (err: any) {
@@ -171,7 +171,7 @@ export function useAssemblies(): UseAssembliesReturn {
           .select('id, name, manufacturer, manufacturer_part_number')
           .in(
             'id',
-            components.map((c) => c.componentId)
+            components.map(c => c.componentId)
           );
 
         if (fetchError) throw fetchError;
@@ -192,7 +192,9 @@ export function useAssemblies(): UseAssembliesReturn {
 
         // Create assembly components
         const assemblyComponents = components.map((comp, index) => {
-          const componentDetail = componentDetails?.find((c) => c.id === comp.componentId);
+          const componentDetail = componentDetails?.find(
+            c => c.id === comp.componentId
+          );
           return {
             assembly_id: assemblyData.id,
             component_id: comp.componentId,
@@ -240,7 +242,8 @@ export function useAssemblies(): UseAssembliesReturn {
         // Update assembly metadata
         const assemblyUpdates: Partial<DbAssembly> = {};
         if (updates.name !== undefined) assemblyUpdates.name = updates.name;
-        if (updates.description !== undefined) assemblyUpdates.description = updates.description;
+        if (updates.description !== undefined)
+          assemblyUpdates.description = updates.description;
         if (updates.notes !== undefined) assemblyUpdates.notes = updates.notes;
 
         if (Object.keys(assemblyUpdates).length > 0) {
@@ -268,14 +271,16 @@ export function useAssemblies(): UseAssembliesReturn {
             .select('id, name, manufacturer, manufacturer_part_number')
             .in(
               'id',
-              updates.components.map((c) => c.componentId)
+              updates.components.map(c => c.componentId)
             );
 
           if (fetchError) throw fetchError;
 
           // Insert new components
           const assemblyComponents = updates.components.map((comp, index) => {
-            const componentDetail = componentDetails?.find((c) => c.id === comp.componentId);
+            const componentDetail = componentDetails?.find(
+              c => c.id === comp.componentId
+            );
             return {
               assembly_id: id,
               component_id: comp.componentId,
@@ -294,11 +299,14 @@ export function useAssemblies(): UseAssembliesReturn {
           if (insertError) throw insertError;
 
           // Check if assembly is still complete
-          const isComplete = updates.components.every((c) =>
-            componentDetails?.some((d) => d.id === c.componentId)
+          const isComplete = updates.components.every(c =>
+            componentDetails?.some(d => d.id === c.componentId)
           );
 
-          await supabase.from('assemblies').update({ is_complete: isComplete }).eq('id', id);
+          await supabase
+            .from('assemblies')
+            .update({ is_complete: isComplete })
+            .eq('id', id);
         }
 
         // Refresh assemblies
@@ -320,7 +328,10 @@ export function useAssemblies(): UseAssembliesReturn {
       try {
         setError(null);
 
-        const { error: deleteError } = await supabase.from('assemblies').delete().eq('id', id);
+        const { error: deleteError } = await supabase
+          .from('assemblies')
+          .delete()
+          .eq('id', id);
 
         if (deleteError) throw deleteError;
 

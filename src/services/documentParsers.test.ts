@@ -14,13 +14,77 @@ import type { AIExtractionResult } from './claudeAI';
 beforeAll(() => {
   if (typeof global.DOMMatrix === 'undefined') {
     global.DOMMatrix = class DOMMatrix {
-      constructor() {
-        this.a = 1;
-        this.b = 0;
-        this.c = 0;
-        this.d = 1;
-        this.e = 0;
-        this.f = 0;
+      a: number = 1;
+      b: number = 0;
+      c: number = 0;
+      d: number = 1;
+      e: number = 0;
+      f: number = 0;
+      m11: number = 1;
+      m12: number = 0;
+      m21: number = 0;
+      m22: number = 1;
+      m31: number = 0;
+      m32: number = 0;
+      m41: number = 0;
+      m42: number = 0;
+      m13: number = 0;
+      m14: number = 0;
+      m23: number = 0;
+      m24: number = 0;
+      m33: number = 1;
+      m34: number = 0;
+      m43: number = 0;
+      m44: number = 1;
+      is2D: boolean = true;
+      isIdentity: boolean = true;
+
+      constructor() {}
+
+      multiply() {
+        return this;
+      }
+      translate() {
+        return this;
+      }
+      scale() {
+        return this;
+      }
+      rotate() {
+        return this;
+      }
+      transformPoint() {
+        return { x: 0, y: 0, z: 0, w: 1 };
+      }
+      inverse() {
+        return this;
+      }
+      flipX() {
+        return this;
+      }
+      flipY() {
+        return this;
+      }
+      skewX() {
+        return this;
+      }
+      skewY() {
+        return this;
+      }
+      setMatrixValue() {
+        return this;
+      }
+      toFloat32Array() {
+        return new Float32Array(16);
+      }
+      toFloat64Array() {
+        return new Float64Array(16);
+      }
+      toJSON() {
+        return {};
+      }
+      toString() {
+        return '';
       }
     } as any;
   }

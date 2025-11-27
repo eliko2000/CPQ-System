@@ -11,7 +11,7 @@ import { Badge } from '../ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { useSupplierQuotes } from '../../hooks/useSupplierQuotes';
 import { SupplierQuote, Component } from '../../types';
-import { logger } from '@/lib/logger'
+import { logger } from '@/lib/logger';
 import {
   X,
   FileText,
@@ -19,10 +19,9 @@ import {
   Calendar,
   Package,
   TrendingUp,
-  Download,
   DollarSign,
   Tag,
-  Loader2
+  Loader2,
 } from 'lucide-react';
 
 interface SupplierQuoteDetailsDrawerProps {
@@ -34,15 +33,17 @@ interface SupplierQuoteDetailsDrawerProps {
 export function SupplierQuoteDetailsDrawer({
   quoteId,
   isOpen,
-  onClose
+  onClose,
 }: SupplierQuoteDetailsDrawerProps) {
   const { getQuoteWithComponents } = useSupplierQuotes();
   const [loading, setLoading] = useState(false);
   const [quote, setQuote] = useState<SupplierQuote | null>(null);
-  const [components, setComponents] = useState<Array<{
-    history: any;
-    component: Component;
-  }>>([]);
+  const [components, setComponents] = useState<
+    Array<{
+      history: any;
+      component: Component;
+    }>
+  >([]);
 
   useEffect(() => {
     if (isOpen && quoteId) {
@@ -125,19 +126,25 @@ export function SupplierQuoteDetailsDrawer({
                       </div>
 
                       <div>
-                        <p className="text-sm text-muted-foreground">תאריך הצעה</p>
+                        <p className="text-sm text-muted-foreground">
+                          תאריך הצעה
+                        </p>
                         <div className="flex items-center gap-2 mt-1">
                           <Calendar className="h-4 w-4 text-muted-foreground" />
                           <p className="font-medium">
                             {quote.quoteDate
-                              ? new Date(quote.quoteDate).toLocaleDateString('he-IL')
+                              ? new Date(quote.quoteDate).toLocaleDateString(
+                                  'he-IL'
+                                )
                               : 'לא צוין'}
                           </p>
                         </div>
                       </div>
 
                       <div>
-                        <p className="text-sm text-muted-foreground">מספר הצעה</p>
+                        <p className="text-sm text-muted-foreground">
+                          מספר הצעה
+                        </p>
                         <p className="font-medium">
                           {quote.quoteNumber || 'לא צוין'}
                         </p>
@@ -150,19 +157,19 @@ export function SupplierQuoteDetailsDrawer({
                             quote.status === 'completed'
                               ? 'bg-green-100 text-green-800'
                               : quote.status === 'processing'
-                              ? 'bg-blue-100 text-blue-800'
-                              : quote.status === 'error'
-                              ? 'bg-red-100 text-red-800'
-                              : 'bg-gray-100 text-gray-800'
+                                ? 'bg-blue-100 text-blue-800'
+                                : quote.status === 'error'
+                                  ? 'bg-red-100 text-red-800'
+                                  : 'bg-gray-100 text-gray-800'
                           }
                         >
                           {quote.status === 'completed'
                             ? 'הושלם'
                             : quote.status === 'processing'
-                            ? 'בעיבוד'
-                            : quote.status === 'error'
-                            ? 'שגיאה'
-                            : quote.status}
+                              ? 'בעיבוד'
+                              : quote.status === 'error'
+                                ? 'שגיאה'
+                                : quote.status}
                         </Badge>
                       </div>
                     </div>
@@ -177,12 +184,12 @@ export function SupplierQuoteDetailsDrawer({
                             {quote.extractionMethod === 'native'
                               ? 'Excel מקורי'
                               : quote.extractionMethod === 'text'
-                              ? 'חילוץ טקסט'
-                              : quote.extractionMethod === 'structured'
-                              ? 'מובנה'
-                              : quote.extractionMethod === 'ai_vision'
-                              ? 'AI Vision'
-                              : quote.extractionMethod || 'לא זמין'}
+                                ? 'חילוץ טקסט'
+                                : quote.extractionMethod === 'structured'
+                                  ? 'מובנה'
+                                  : quote.extractionMethod === 'ai_vision'
+                                    ? 'AI Vision'
+                                    : quote.extractionMethod || 'לא זמין'}
                           </p>
                         </div>
 
@@ -194,8 +201,8 @@ export function SupplierQuoteDetailsDrawer({
                                 (quote.confidenceScore || 0) >= 0.8
                                   ? 'text-green-600'
                                   : (quote.confidenceScore || 0) >= 0.6
-                                  ? 'text-yellow-600'
-                                  : 'text-red-600'
+                                    ? 'text-yellow-600'
+                                    : 'text-red-600'
                               }`}
                             />
                             <p
@@ -203,8 +210,8 @@ export function SupplierQuoteDetailsDrawer({
                                 (quote.confidenceScore || 0) >= 0.8
                                   ? 'text-green-600'
                                   : (quote.confidenceScore || 0) >= 0.6
-                                  ? 'text-yellow-600'
-                                  : 'text-red-600'
+                                    ? 'text-yellow-600'
+                                    : 'text-red-600'
                               }`}
                             >
                               {quote.confidenceScore
@@ -253,7 +260,9 @@ export function SupplierQuoteDetailsDrawer({
                           >
                             <div className="flex items-start justify-between mb-2">
                               <div className="flex-1">
-                                <h4 className="font-medium">{component.name}</h4>
+                                <h4 className="font-medium">
+                                  {component.name}
+                                </h4>
                                 {component.description && (
                                   <p className="text-sm text-muted-foreground mt-1">
                                     {component.description}
@@ -277,7 +286,9 @@ export function SupplierQuoteDetailsDrawer({
                               </div>
 
                               <div>
-                                <p className="text-muted-foreground">מק"ט יצרן</p>
+                                <p className="text-muted-foreground">
+                                  מק"ט יצרן
+                                </p>
                                 <div className="flex items-center gap-1 mt-1">
                                   <Tag className="h-3 w-3 text-muted-foreground" />
                                   <p className="font-mono text-xs">
@@ -298,13 +309,15 @@ export function SupplierQuoteDetailsDrawer({
                                 <div className="flex items-center gap-1 mt-1">
                                   <DollarSign className="h-3 w-3 text-muted-foreground" />
                                   <p className="font-medium">
-                                    {history.currency === 'USD' && history.unitPriceUSD
+                                    {history.currency === 'USD' &&
+                                    history.unitPriceUSD
                                       ? `$${history.unitPriceUSD.toFixed(2)}`
-                                      : history.currency === 'EUR' && history.unitPriceEUR
-                                      ? `€${history.unitPriceEUR.toFixed(2)}`
-                                      : history.unitPriceNIS
-                                      ? `₪${history.unitPriceNIS.toFixed(2)}`
-                                      : 'לא זמין'}
+                                      : history.currency === 'EUR' &&
+                                          history.unitPriceEUR
+                                        ? `€${history.unitPriceEUR.toFixed(2)}`
+                                        : history.unitPriceNIS
+                                          ? `₪${history.unitPriceNIS.toFixed(2)}`
+                                          : 'לא זמין'}
                                   </p>
                                 </div>
                               </div>
@@ -319,11 +332,12 @@ export function SupplierQuoteDetailsDrawer({
                                       history.confidenceScore >= 0.8
                                         ? 'text-green-600'
                                         : history.confidenceScore >= 0.6
-                                        ? 'text-yellow-600'
-                                        : 'text-red-600'
+                                          ? 'text-yellow-600'
+                                          : 'text-red-600'
                                     }`}
                                   >
-                                    {(history.confidenceScore * 100).toFixed(0)}%
+                                    {(history.confidenceScore * 100).toFixed(0)}
+                                    %
                                   </span>
                                 </p>
                               </div>

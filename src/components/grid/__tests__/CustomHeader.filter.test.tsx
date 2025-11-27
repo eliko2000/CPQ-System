@@ -1,12 +1,26 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { CustomHeader } from '../CustomHeader';
 import { Column } from 'ag-grid-community';
+
+// Mock logger
+vi.mock('@/lib/logger', () => ({
+  logger: {
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  },
+}));
 
 // Mock lucide-react icons
 vi.mock('lucide-react', () => ({
   MoreVertical: () => <div>More</div>,
   Filter: () => <div>Filter</div>,
+  Search: () => <div>Search</div>,
+  X: () => <div>X</div>,
+  Check: () => <div>Check</div>,
 }));
 
 // Mock react-dom createPortal
@@ -33,17 +47,22 @@ describe('CustomHeader Filter Functionality', () => {
   let mockApi: any;
   let mockColumn: Column;
   let mockFilterInstance: any;
+  let filterModel: any = null;
 
   beforeEach(() => {
     // Reset all mocks
     vi.clearAllMocks();
+    filterModel = null;
 
     // Create mock filter instance that simulates AG Grid TextFilter behavior
     mockFilterInstance = {
       constructor: { name: 'TextFilter' },
-      setModel: vi.fn().mockResolvedValue(undefined),
-      getModel: vi.fn().mockReturnValue(null),
-      isFilterActive: vi.fn().mockReturnValue(false),
+      setModel: vi.fn().mockImplementation(async model => {
+        filterModel = model;
+        return undefined;
+      }),
+      getModel: vi.fn().mockImplementation(() => filterModel),
+      isFilterActive: vi.fn().mockImplementation(() => filterModel !== null),
       applyModel: vi.fn(),
     };
 
@@ -51,7 +70,12 @@ describe('CustomHeader Filter Functionality', () => {
     mockApi = {
       getColumnFilterInstance: vi.fn().mockResolvedValue(mockFilterInstance),
       onFilterChanged: vi.fn(),
-      getFilterModel: vi.fn().mockReturnValue({}),
+      getFilterModel: vi.fn().mockImplementation(() => {
+        if (filterModel) {
+          return { test_column: filterModel };
+        }
+        return {};
+      }),
     };
 
     // Create mock column
@@ -62,6 +86,7 @@ describe('CustomHeader Filter Functionality', () => {
 
   describe('TextFilter (Community Edition)', () => {
     it('should format single value filter correctly for TextFilter', async () => {
+      const user = userEvent.setup();
       const props = {
         displayName: 'Test Column',
         column: mockColumn,
@@ -71,25 +96,38 @@ describe('CustomHeader Filter Functionality', () => {
 
       render(<CustomHeader {...props} />);
 
-      // Simulate filter change from SmartFilter
+      // Open filter
       const filterButton = screen.getByTitle('סינון');
-      fireEvent.click(filterButton);
+      await user.click(filterButton);
 
-      // Wait for async operations
+      // Wait for filter to open
       await waitFor(() => {
-        expect(mockApi.getColumnFilterInstance).toHaveBeenCalledWith(
-          'test_column'
-        );
+        expect(screen.getByText('Value1')).toBeInTheDocument();
+      });
+
+      // Select first value
+      const checkboxes = screen.getAllByRole('checkbox');
+      await user.click(checkboxes[1]); // Second checkbox is Value1
+
+      // Apply filter
+      const applyButton = screen.getByRole('button', { name: /החל סינון/i });
+      await user.click(applyButton);
+
+      // Wait for filter to be set
+      await waitFor(() => {
+        expect(mockFilterInstance.setModel).toHaveBeenCalled();
       });
 
       // Verify TextFilter model format for single value
-      // Expected model format: { filterType: 'text', type: 'equals', filter: 'Value1' }
-
-      // This ensures the correct format is used
-      expect(mockFilterInstance.setModel).toHaveBeenCalled();
+      expect(filterModel).toEqual({
+        filterType: 'text',
+        type: 'equals',
+        filter: 'Value1',
+      });
     });
 
     it('should format multiple values filter with OR conditions for TextFilter', async () => {
+      const user = userEvent.setup();
       const props = {
         displayName: 'Test Column',
         column: mockColumn,
@@ -99,28 +137,48 @@ describe('CustomHeader Filter Functionality', () => {
 
       render(<CustomHeader {...props} />);
 
-      // The filter should use OR operator for multiple values
-      // Expected model format:
-      // {
-      //   filterType: 'text',
-      //   operator: 'OR',
-      //   conditions: [
-      //     { filterType: 'text', type: 'equals', filter: 'Value1' },
-      //     { filterType: 'text', type: 'equals', filter: 'Value2' },
-      //     { filterType: 'text', type: 'equals', filter: 'Value3' }
-      //   ]
-      // }
+      // Open filter
+      const filterButton = screen.getByTitle('סינון');
+      await user.click(filterButton);
 
-      // This format is REQUIRED for TextFilter to work with multiple values
-      // DO NOT CHANGE THIS FORMAT without updating the implementation
+      // Wait for filter to open
+      await waitFor(() => {
+        expect(screen.getByText('Value1')).toBeInTheDocument();
+      });
+
+      // Select all values
+      const checkboxes = screen.getAllByRole('checkbox');
+      await user.click(checkboxes[0]); // Select All
+
+      // Apply filter
+      const applyButton = screen.getByRole('button', { name: /החל סינון/i });
+      await user.click(applyButton);
+
+      // Wait for filter to be set
+      await waitFor(() => {
+        expect(mockFilterInstance.setModel).toHaveBeenCalled();
+      });
+
+      // The filter should use OR operator for multiple values
+      expect(filterModel).toEqual({
+        filterType: 'text',
+        operator: 'OR',
+        conditions: [
+          { filterType: 'text', type: 'equals', filter: 'Value1' },
+          { filterType: 'text', type: 'equals', filter: 'Value2' },
+          { filterType: 'text', type: 'equals', filter: 'Value3' },
+        ],
+      });
     });
 
     it('should properly await setModel before calling onFilterChanged', async () => {
+      const user = userEvent.setup();
       const callOrder: string[] = [];
 
-      mockFilterInstance.setModel = vi.fn().mockImplementation(async () => {
+      mockFilterInstance.setModel = vi.fn().mockImplementation(async model => {
         callOrder.push('setModel');
         await new Promise(resolve => setTimeout(resolve, 10));
+        filterModel = model;
       });
 
       mockApi.onFilterChanged = vi.fn().mockImplementation(() => {
@@ -136,11 +194,28 @@ describe('CustomHeader Filter Functionality', () => {
 
       render(<CustomHeader {...props} />);
 
+      // Open filter
+      const filterButton = screen.getByTitle('סינון');
+      await user.click(filterButton);
+
+      // Wait for filter to open
+      await waitFor(() => {
+        expect(screen.getByText('Value1')).toBeInTheDocument();
+      });
+
+      // Select value
+      const checkboxes = screen.getAllByRole('checkbox');
+      await user.click(checkboxes[1]); // Value1
+
+      // Apply filter
+      const applyButton = screen.getByRole('button', { name: /החל סינון/i });
+      await user.click(applyButton);
+
       await waitFor(
         () => {
           expect(callOrder).toEqual(['setModel', 'onFilterChanged']);
         },
-        { timeout: 100 }
+        { timeout: 500 }
       );
 
       // CRITICAL: onFilterChanged must be called AFTER setModel completes
@@ -148,6 +223,7 @@ describe('CustomHeader Filter Functionality', () => {
     });
 
     it('should call applyModel if filter instance has it', async () => {
+      const user = userEvent.setup();
       const props = {
         displayName: 'Test Column',
         column: mockColumn,
@@ -156,6 +232,23 @@ describe('CustomHeader Filter Functionality', () => {
       };
 
       render(<CustomHeader {...props} />);
+
+      // Open filter
+      const filterButton = screen.getByTitle('סינון');
+      await user.click(filterButton);
+
+      // Wait for filter to open
+      await waitFor(() => {
+        expect(screen.getByText('Value1')).toBeInTheDocument();
+      });
+
+      // Select value
+      const checkboxes = screen.getAllByRole('checkbox');
+      await user.click(checkboxes[1]); // Value1
+
+      // Apply filter
+      const applyButton = screen.getByRole('button', { name: /החל סינון/i });
+      await user.click(applyButton);
 
       await waitFor(() => {
         expect(mockFilterInstance.applyModel).toHaveBeenCalled();
@@ -165,13 +258,7 @@ describe('CustomHeader Filter Functionality', () => {
     });
 
     it('should verify filter is active after setting', async () => {
-      mockFilterInstance.getModel = vi.fn().mockReturnValue({
-        filterType: 'text',
-        type: 'equals',
-        filter: 'Value1',
-      });
-      mockFilterInstance.isFilterActive = vi.fn().mockReturnValue(true);
-
+      const user = userEvent.setup();
       const props = {
         displayName: 'Test Column',
         column: mockColumn,
@@ -181,8 +268,25 @@ describe('CustomHeader Filter Functionality', () => {
 
       render(<CustomHeader {...props} />);
 
+      // Open filter
+      const filterButton = screen.getByTitle('סינון');
+      await user.click(filterButton);
+
+      // Wait for filter to open
       await waitFor(() => {
-        expect(mockFilterInstance.isFilterActive).toHaveBeenCalled();
+        expect(screen.getByText('Value1')).toBeInTheDocument();
+      });
+
+      // Select value
+      const checkboxes = screen.getAllByRole('checkbox');
+      await user.click(checkboxes[1]); // Value1
+
+      // Apply filter
+      const applyButton = screen.getByRole('button', { name: /החל סינון/i });
+      await user.click(applyButton);
+
+      await waitFor(() => {
+        expect(mockFilterInstance.isFilterActive()).toBe(true);
       });
 
       // Verification ensures the filter was actually set
@@ -196,6 +300,7 @@ describe('CustomHeader Filter Functionality', () => {
     });
 
     it('should use values array format for SetFilter', async () => {
+      const user = userEvent.setup();
       const props = {
         displayName: 'Test Column',
         column: mockColumn,
@@ -205,16 +310,35 @@ describe('CustomHeader Filter Functionality', () => {
 
       render(<CustomHeader {...props} />);
 
+      // Open filter
+      const filterButton = screen.getByTitle('סינון');
+      await user.click(filterButton);
+
+      // Wait for filter to open
+      await waitFor(() => {
+        expect(screen.getByText('Value1')).toBeInTheDocument();
+      });
+
+      // Select all values
+      const checkboxes = screen.getAllByRole('checkbox');
+      await user.click(checkboxes[0]); // Select All
+
+      // Apply filter
+      const applyButton = screen.getByRole('button', { name: /החל סינון/i });
+      await user.click(applyButton);
+
+      await waitFor(() => {
+        expect(mockFilterInstance.setModel).toHaveBeenCalled();
+      });
+
       // SetFilter uses different format: { values: ['Value1', 'Value2'] }
-      // This format is ONLY for enterprise SetFilter
-      // DO NOT use this format with TextFilter (Community edition)
+      expect(filterModel).toEqual({ values: ['Value1', 'Value2'] });
     });
   });
 
   describe('Filter State Persistence', () => {
     it('should update UI state when filter is set', async () => {
-      mockFilterInstance.isFilterActive = vi.fn().mockReturnValue(true);
-
+      const user = userEvent.setup();
       const props = {
         displayName: 'Test Column',
         column: mockColumn,
@@ -224,6 +348,23 @@ describe('CustomHeader Filter Functionality', () => {
 
       const { container } = render(<CustomHeader {...props} />);
 
+      // Open filter
+      const filterButton = screen.getByTitle('סינון');
+      await user.click(filterButton);
+
+      // Wait for filter to open
+      await waitFor(() => {
+        expect(screen.getByText('Value1')).toBeInTheDocument();
+      });
+
+      // Select value
+      const checkboxes = screen.getAllByRole('checkbox');
+      await user.click(checkboxes[1]); // Value1
+
+      // Apply filter
+      const applyButton = screen.getByRole('button', { name: /החל סינון/i });
+      await user.click(applyButton);
+
       await waitFor(() => {
         const filterButton = container.querySelector('button[title*="סינון"]');
         // Filter button should show active state (blue)
@@ -232,14 +373,7 @@ describe('CustomHeader Filter Functionality', () => {
     });
 
     it('should save filter state to grid model', async () => {
-      mockApi.getFilterModel = vi.fn().mockReturnValue({
-        test_column: {
-          filterType: 'text',
-          type: 'equals',
-          filter: 'Value1',
-        },
-      });
-
+      const user = userEvent.setup();
       const props = {
         displayName: 'Test Column',
         column: mockColumn,
@@ -249,23 +383,45 @@ describe('CustomHeader Filter Functionality', () => {
 
       render(<CustomHeader {...props} />);
 
+      // Open filter
+      const filterButton = screen.getByTitle('סינון');
+      await user.click(filterButton);
+
+      // Wait for filter to open
       await waitFor(() => {
-        expect(mockApi.getFilterModel).toHaveBeenCalled();
+        expect(screen.getByText('Value1')).toBeInTheDocument();
       });
 
-      // Filter model should be available in grid's filter model
+      // Select value
+      const checkboxes = screen.getAllByRole('checkbox');
+      await user.click(checkboxes[1]); // Value1
+
+      // Apply filter
+      const applyButton = screen.getByRole('button', { name: /החל סינון/i });
+      await user.click(applyButton);
+
+      await waitFor(() => {
+        const gridModel = mockApi.getFilterModel();
+        expect(gridModel.test_column).toBeDefined();
+        expect(gridModel.test_column).toEqual({
+          filterType: 'text',
+          type: 'equals',
+          filter: 'Value1',
+        });
+      });
     });
   });
 
   describe('Error Handling', () => {
     it('should handle setModel rejection gracefully', async () => {
+      const user = userEvent.setup();
       mockFilterInstance.setModel = vi
         .fn()
         .mockRejectedValue(new Error('Filter error'));
 
-      const consoleErrorSpy = vi
-        .spyOn(console, 'error')
-        .mockImplementation(() => {});
+      // Import logger to spy on it
+      const { logger } = await import('@/lib/logger');
+      const loggerErrorSpy = vi.spyOn(logger, 'error');
 
       const props = {
         displayName: 'Test Column',
@@ -276,17 +432,36 @@ describe('CustomHeader Filter Functionality', () => {
 
       render(<CustomHeader {...props} />);
 
+      // Open filter
+      const filterButton = screen.getByTitle('סינון');
+      await user.click(filterButton);
+
+      // Wait for filter to open
       await waitFor(() => {
-        expect(consoleErrorSpy).toHaveBeenCalledWith(
-          expect.stringContaining('[CustomHeader] Error setting filter'),
-          expect.any(Error)
-        );
+        expect(screen.getByText('Value1')).toBeInTheDocument();
       });
 
-      consoleErrorSpy.mockRestore();
+      // Select value
+      const checkboxes = screen.getAllByRole('checkbox');
+      await user.click(checkboxes[1]); // Value1
+
+      // Apply filter (this will trigger error)
+      const applyButton = screen.getByRole('button', { name: /החל סינון/i });
+      await user.click(applyButton);
+
+      await waitFor(
+        () => {
+          expect(loggerErrorSpy).toHaveBeenCalledWith(
+            expect.stringContaining('[CustomHeader] Error setting filter'),
+            expect.any(Error)
+          );
+        },
+        { timeout: 1000 }
+      );
     });
 
     it('should handle missing filter instance', async () => {
+      const user = userEvent.setup();
       mockApi.getColumnFilterInstance = vi.fn().mockResolvedValue(null);
 
       const props = {
@@ -298,6 +473,23 @@ describe('CustomHeader Filter Functionality', () => {
 
       render(<CustomHeader {...props} />);
 
+      // Open filter
+      const filterButton = screen.getByTitle('סינון');
+      await user.click(filterButton);
+
+      // Wait for filter to open
+      await waitFor(() => {
+        expect(screen.getByText('Value1')).toBeInTheDocument();
+      });
+
+      // Select value
+      const checkboxes = screen.getAllByRole('checkbox');
+      await user.click(checkboxes[1]); // Value1
+
+      // Apply filter (should not crash)
+      const applyButton = screen.getByRole('button', { name: /החל סינון/i });
+      await user.click(applyButton);
+
       await waitFor(() => {
         // Should not throw error
         expect(mockApi.getColumnFilterInstance).toHaveBeenCalled();
@@ -307,6 +499,7 @@ describe('CustomHeader Filter Functionality', () => {
 
   describe('Filter Model Format Validation', () => {
     it('CRITICAL: must not use SetFilter format with TextFilter', async () => {
+      const user = userEvent.setup();
       // This test prevents the exact bug that occurred
       mockFilterInstance.constructor.name = 'TextFilter';
 
@@ -318,6 +511,23 @@ describe('CustomHeader Filter Functionality', () => {
       };
 
       render(<CustomHeader {...props} />);
+
+      // Open filter
+      const filterButton = screen.getByTitle('סינון');
+      await user.click(filterButton);
+
+      // Wait for filter to open
+      await waitFor(() => {
+        expect(screen.getByText('Value1')).toBeInTheDocument();
+      });
+
+      // Select all values
+      const checkboxes = screen.getAllByRole('checkbox');
+      await user.click(checkboxes[0]); // Select All
+
+      // Apply filter
+      const applyButton = screen.getByRole('button', { name: /החל סינון/i });
+      await user.click(applyButton);
 
       await waitFor(() => {
         expect(mockFilterInstance.setModel).toHaveBeenCalled();
@@ -335,14 +545,32 @@ describe('CustomHeader Filter Functionality', () => {
     });
 
     it('CRITICAL: must convert all values to strings', async () => {
+      const user = userEvent.setup();
       const props = {
         displayName: 'Test Column',
         column: mockColumn,
         api: mockApi,
-        uniqueValues: [123, 'text', null, undefined] as any,
+        uniqueValues: ['123', 'text', 'null', 'undefined'] as any,
       };
 
       render(<CustomHeader {...props} />);
+
+      // Open filter
+      const filterButton = screen.getByTitle('סינון');
+      await user.click(filterButton);
+
+      // Wait for filter to open
+      await waitFor(() => {
+        expect(screen.getByText('123')).toBeInTheDocument();
+      });
+
+      // Select all values
+      const checkboxes = screen.getAllByRole('checkbox');
+      await user.click(checkboxes[0]); // Select All
+
+      // Apply filter
+      const applyButton = screen.getByRole('button', { name: /החל סינון/i });
+      await user.click(applyButton);
 
       await waitFor(() => {
         expect(mockFilterInstance.setModel).toHaveBeenCalled();

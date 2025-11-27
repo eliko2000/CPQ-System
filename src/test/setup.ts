@@ -9,34 +9,36 @@ vi.mock('@/src/supabaseClient', () => ({
       select: vi.fn(() => ({
         eq: vi.fn(() => ({
           data: [],
-          error: null
-        }))
+          error: null,
+        })),
       })),
       insert: vi.fn(() => ({
         data: null,
-        error: null
+        error: null,
       })),
       update: vi.fn(() => ({
         eq: vi.fn(() => ({
           data: null,
-          error: null
-        }))
+          error: null,
+        })),
       })),
       delete: vi.fn(() => ({
         eq: vi.fn(() => ({
           data: null,
-          error: null
-        }))
-      }))
+          error: null,
+        })),
+      })),
     })),
     auth: {
-      getSession: vi.fn(() => Promise.resolve({
-        data: { session: null },
-        error: null
-      }))
-    }
-  }
-}))
+      getSession: vi.fn(() =>
+        Promise.resolve({
+          data: { session: null },
+          error: null,
+        })
+      ),
+    },
+  },
+}));
 
 // Mock CPQ Context
 vi.mock('@/src/contexts/CPQContext', () => ({
@@ -55,8 +57,8 @@ vi.mock('@/src/contexts/CPQContext', () => ({
     createProject: vi.fn(),
     updateProject: vi.fn(),
     deleteProject: vi.fn(),
-    processQuote: vi.fn()
-  })
+    processQuote: vi.fn(),
+  }),
 }));
 
 // Mock React Hook Form
@@ -67,8 +69,8 @@ vi.mock('react-hook-form', () => ({
     formState: { errors: {} },
     reset: vi.fn(),
     setValue: vi.fn(),
-    getValues: vi.fn()
-  })
+    getValues: vi.fn(),
+  }),
 }));
 
 // Mock React Router
@@ -76,8 +78,10 @@ vi.mock('react-router-dom', () => ({
   useNavigate: () => vi.fn(),
   useLocation: () => ({ pathname: '/test' }),
   useParams: () => ({ id: 'test-id' }),
-  Link: ({ children, to, ...props }: any) => React.createElement('a', { href: to, ...props }, children),
-  BrowserRouter: ({ children }: { children: React.ReactNode }) => React.createElement('div', null, children)
+  Link: ({ children, to, ...props }: any) =>
+    React.createElement('a', { href: to, ...props }, children),
+  BrowserRouter: ({ children }: { children: React.ReactNode }) =>
+    React.createElement('div', null, children),
 }));
 
 // Mock File API for quote uploads
@@ -87,12 +91,16 @@ Object.defineProperty(window, 'File', {
     size: number;
     type: string;
 
-    constructor(parts: BlobPart[], filename: string, options?: FilePropertyBag) {
+    constructor(
+      parts: BlobPart[],
+      filename: string,
+      options?: FilePropertyBag
+    ) {
       this.name = filename;
       this.size = parts.reduce((acc, part) => acc + new Blob([part]).size, 0);
       this.type = options?.type || '';
     }
-  }
+  },
 });
 
 // Mock Lucide icons
@@ -126,7 +134,8 @@ vi.mock('lucide-react', () => ({
   Eye: () => 'Eye',
   Copy: () => 'Copy',
   Trash2: () => 'Trash2',
-  ChevronDown: () => 'ChevronDown'
+  ChevronDown: () => 'ChevronDown',
+  LogOut: () => 'LogOut',
 }));
 
 // Mock AG Grid
@@ -136,7 +145,7 @@ vi.mock('ag-grid-react', () => ({
   GridApi: vi.fn(),
   GridReadyEvent: vi.fn(),
   CellValueChangedEvent: vi.fn(),
-  RowDragEvent: vi.fn()
+  RowDragEvent: vi.fn(),
 }));
 
 vi.mock('ag-grid-community/styles/ag-grid.css', () => ({}));

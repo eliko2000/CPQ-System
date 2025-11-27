@@ -10,12 +10,14 @@ import {
   getQuotationType,
   validateStatistics,
   formatStatisticsForExport,
-  compareQuotationStatistics
+  compareQuotationStatistics,
 } from '../quotationStatistics';
 import type { QuotationProject } from '../../types';
 
 // Helper to create a test quotation
-function createTestQuotation(overrides: Partial<QuotationProject> = {}): QuotationProject {
+function createTestQuotation(
+  overrides: Partial<QuotationProject> = {}
+): QuotationProject {
   return {
     id: 'test-1',
     name: 'Test Quotation',
@@ -33,25 +35,33 @@ function createTestQuotation(overrides: Partial<QuotationProject> = {}): Quotati
       profitPercent: 25,
       riskPercent: 5,
       includeVAT: false,
-      vatRate: 17
+      vatRate: 17,
     },
     calculations: {
       totalHardwareILS: 0,
+      totalHardwareUSD: 0,
       totalSoftwareILS: 0,
+      totalSoftwareUSD: 0,
       totalLaborILS: 0,
+      totalLaborUSD: 0,
       totalEngineeringILS: 0,
       totalCommissioningILS: 0,
       totalInstallationILS: 0,
+      totalProgrammingILS: 0,
       subtotalILS: 0,
+      subtotalUSD: 0,
       totalCostILS: 0,
       totalProfitILS: 0,
       riskAdditionILS: 0,
       totalQuoteILS: 0,
-      profitMarginPercent: 25
+      totalVATILS: 0,
+      finalTotalILS: 0,
+      totalCustomerPriceILS: 0,
+      profitMarginPercent: 25,
     },
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -59,18 +69,26 @@ describe('calculateQuotationStatistics', () => {
   it('should calculate statistics for a hardware-heavy quotation', () => {
     const quotation = createTestQuotation({
       calculations: {
+        totalHardwareUSD: 21621,
         totalHardwareILS: 80000,
+        totalSoftwareUSD: 2703,
         totalSoftwareILS: 10000,
+        totalLaborUSD: 2703,
         totalLaborILS: 10000,
         totalEngineeringILS: 5000,
         totalCommissioningILS: 5000,
         totalInstallationILS: 0,
+        totalProgrammingILS: 0,
+        subtotalUSD: 27027,
         subtotalILS: 100000,
-        totalCostILS: 100000,
-        totalProfitILS: 25000,
+        totalCustomerPriceILS: 130000,
         riskAdditionILS: 5000,
         totalQuoteILS: 130000,
-        profitMarginPercent: 25
+        totalVATILS: 0,
+        finalTotalILS: 130000,
+        totalCostILS: 100000,
+        totalProfitILS: 25000,
+        profitMarginPercent: 25,
       },
       items: [
         {
@@ -91,7 +109,7 @@ describe('calculateQuotationStatistics', () => {
           itemMarkupPercent: 25,
           customerPriceILS: 9250,
           createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
+          updatedAt: new Date().toISOString(),
         },
         {
           id: '2',
@@ -112,9 +130,9 @@ describe('calculateQuotationStatistics', () => {
           itemMarkupPercent: 25,
           customerPriceILS: 2312.5,
           createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        }
-      ]
+          updatedAt: new Date().toISOString(),
+        },
+      ],
     });
 
     const stats = calculateQuotationStatistics(quotation);
@@ -135,20 +153,28 @@ describe('calculateQuotationStatistics', () => {
   it('should calculate statistics for a labor-heavy quotation', () => {
     const quotation = createTestQuotation({
       calculations: {
+        totalHardwareUSD: 5405,
         totalHardwareILS: 20000,
+        totalSoftwareUSD: 1351,
         totalSoftwareILS: 5000,
+        totalLaborUSD: 20270,
         totalLaborILS: 75000,
         totalEngineeringILS: 50000,
         totalCommissioningILS: 25000,
         totalInstallationILS: 0,
+        totalProgrammingILS: 0,
+        subtotalUSD: 27027,
         subtotalILS: 100000,
-        totalCostILS: 100000,
-        totalProfitILS: 25000,
+        totalCustomerPriceILS: 130000,
         riskAdditionILS: 5000,
         totalQuoteILS: 130000,
-        profitMarginPercent: 25
+        totalVATILS: 0,
+        finalTotalILS: 130000,
+        totalCostILS: 100000,
+        totalProfitILS: 25000,
+        profitMarginPercent: 25,
       },
-      items: []
+      items: [],
     });
 
     const stats = calculateQuotationStatistics(quotation);
@@ -166,20 +192,28 @@ describe('calculateQuotationStatistics', () => {
   it('should calculate statistics for a balanced quotation', () => {
     const quotation = createTestQuotation({
       calculations: {
+        totalHardwareUSD: 13514,
         totalHardwareILS: 50000,
+        totalSoftwareUSD: 2703,
         totalSoftwareILS: 10000,
+        totalLaborUSD: 10811,
         totalLaborILS: 40000,
         totalEngineeringILS: 25000,
         totalCommissioningILS: 15000,
         totalInstallationILS: 0,
+        totalProgrammingILS: 0,
+        subtotalUSD: 27027,
         subtotalILS: 100000,
-        totalCostILS: 100000,
-        totalProfitILS: 25000,
+        totalCustomerPriceILS: 130000,
         riskAdditionILS: 5000,
         totalQuoteILS: 130000,
-        profitMarginPercent: 25
+        totalVATILS: 0,
+        finalTotalILS: 130000,
+        totalCostILS: 100000,
+        totalProfitILS: 25000,
+        profitMarginPercent: 25,
       },
-      items: []
+      items: [],
     });
 
     const stats = calculateQuotationStatistics(quotation);
@@ -194,20 +228,28 @@ describe('calculateQuotationStatistics', () => {
   it('should handle zero totals gracefully', () => {
     const quotation = createTestQuotation({
       calculations: {
+        totalHardwareUSD: 0,
         totalHardwareILS: 0,
+        totalSoftwareUSD: 0,
         totalSoftwareILS: 0,
         totalLaborILS: 0,
+        totalLaborUSD: 0,
         totalEngineeringILS: 0,
         totalCommissioningILS: 0,
         totalInstallationILS: 0,
+        totalProgrammingILS: 0,
         subtotalILS: 0,
+        subtotalUSD: 0,
         totalCostILS: 0,
         totalProfitILS: 0,
         riskAdditionILS: 0,
         totalQuoteILS: 0,
-        profitMarginPercent: 0
+        totalVATILS: 0,
+        finalTotalILS: 0,
+        totalCustomerPriceILS: 0,
+        profitMarginPercent: 0,
       },
-      items: []
+      items: [],
     });
 
     const stats = calculateQuotationStatistics(quotation);
@@ -243,8 +285,8 @@ describe('getDominantCategory', () => {
       profitByType: {
         hardware: { profit: 10000, margin: 20 },
         software: { profit: 1000, margin: 25 },
-        labor: { profit: 2000, margin: 18 }
-      }
+        labor: { profit: 2000, margin: 18 },
+      },
     };
 
     const dominant = getDominantCategory(stats);
@@ -267,8 +309,8 @@ describe('getDominantCategory', () => {
       profitByType: {
         hardware: { profit: 2000, margin: 20 },
         software: { profit: 500, margin: 25 },
-        labor: { profit: 10000, margin: 18 }
-      }
+        labor: { profit: 10000, margin: 18 },
+      },
     };
 
     const dominant = getDominantCategory(stats);
@@ -282,7 +324,7 @@ describe('getQuotationType', () => {
   it('should classify as material-heavy', () => {
     const stats = {
       materialPercent: 80,
-      laborOnlyPercent: 20
+      laborOnlyPercent: 20,
     } as any;
 
     expect(getQuotationType(stats)).toBe('material-heavy');
@@ -291,7 +333,7 @@ describe('getQuotationType', () => {
   it('should classify as labor-heavy', () => {
     const stats = {
       materialPercent: 20,
-      laborOnlyPercent: 80
+      laborOnlyPercent: 80,
     } as any;
 
     expect(getQuotationType(stats)).toBe('labor-heavy');
@@ -300,7 +342,7 @@ describe('getQuotationType', () => {
   it('should classify as balanced', () => {
     const stats = {
       materialPercent: 55,
-      laborOnlyPercent: 45
+      laborOnlyPercent: 45,
     } as any;
 
     expect(getQuotationType(stats)).toBe('balanced');
@@ -315,7 +357,7 @@ describe('validateStatistics', () => {
       laborPercent: 30,
       materialPercent: 70,
       laborOnlyPercent: 30,
-      componentCounts: { hardware: 10, software: 2, labor: 5, total: 17 }
+      componentCounts: { hardware: 10, software: 2, labor: 5, total: 17 },
     } as any;
 
     const validation = validateStatistics(stats);
@@ -330,7 +372,7 @@ describe('validateStatistics', () => {
       laborPercent: 25, // Should sum to 100
       materialPercent: 70,
       laborOnlyPercent: 30,
-      componentCounts: { hardware: 10, software: 2, labor: 5, total: 17 }
+      componentCounts: { hardware: 10, software: 2, labor: 5, total: 17 },
     } as any;
 
     const validation = validateStatistics(stats);
@@ -345,12 +387,14 @@ describe('validateStatistics', () => {
       laborPercent: 30,
       materialPercent: 70,
       laborOnlyPercent: 30,
-      componentCounts: { hardware: 10, software: 2, labor: 5, total: 20 } // Should sum to 17
+      componentCounts: { hardware: 10, software: 2, labor: 5, total: 20 }, // Should sum to 17
     } as any;
 
     const validation = validateStatistics(stats);
     expect(validation.valid).toBe(false);
-    expect(validation.errors.some(e => e.includes('Component counts'))).toBe(true);
+    expect(validation.errors.some(e => e.includes('Component counts'))).toBe(
+      true
+    );
   });
 });
 
@@ -360,7 +404,7 @@ describe('getQuotationSummaryText', () => {
       hardwarePercent: 60,
       softwarePercent: 10,
       engineeringPercent: 20,
-      commissioningPercent: 10
+      commissioningPercent: 10,
     } as any;
 
     const summary = getQuotationSummaryText(stats);
@@ -379,8 +423,8 @@ describe('getQuotationSummaryText', () => {
       robotComponents: {
         totalCostILS: 50000,
         percentOfTotal: 35.5,
-        count: 2
-      }
+        count: 2,
+      },
     } as any;
 
     const summary = getQuotationSummaryText(stats);
@@ -405,8 +449,8 @@ describe('formatStatisticsForExport', () => {
       profitByType: {
         hardware: { profit: 10000, margin: 20 },
         software: { profit: 1000, margin: 25 },
-        labor: { profit: 2000, margin: 18 }
-      }
+        labor: { profit: 2000, margin: 18 },
+      },
     } as any;
 
     const exported = formatStatisticsForExport(stats);
@@ -426,13 +470,13 @@ describe('compareQuotationStatistics', () => {
     const current = {
       hardwarePercent: 65,
       laborPercent: 35,
-      componentCounts: { total: 20 }
+      componentCounts: { total: 20 },
     } as any;
 
     const previous = {
       hardwarePercent: 60,
       laborPercent: 40,
-      componentCounts: { total: 15 }
+      componentCounts: { total: 15 },
     } as any;
 
     const comparison = compareQuotationStatistics(current, previous);

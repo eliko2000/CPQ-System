@@ -19,10 +19,14 @@ import { useSupplierQuotes } from '../../hooks/useSupplierQuotes';
 import { useComponents } from '../../hooks/useComponents';
 import { supabase } from '../../supabaseClient';
 import type { AIExtractionResult } from '../../services/claudeAI';
-import type { Component, SupplierQuote, ComponentMatchDecision } from '../../types';
+import type {
+  Component,
+  SupplierQuote,
+  ComponentMatchDecision,
+} from '../../types';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
-import { logger } from '@/lib/logger'
+import { logger } from '@/lib/logger';
 
 interface SupplierQuoteImportProps {
   isOpen: boolean;
@@ -38,13 +42,20 @@ export const SupplierQuoteImport: React.FC<SupplierQuoteImportProps> = ({
   onSuccess,
 }) => {
   const [step, setStep] = useState<ImportStep>('upload');
-  const [extractionResult, setExtractionResult] = useState<AIExtractionResult | null>(null);
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
-  const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
+  const [extractionResult, setExtractionResult] =
+    useState<AIExtractionResult | null>(null);
+  const [_uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [importProgress, setImportProgress] = useState({
+    current: 0,
+    total: 0,
+  });
   const [createdQuote, setCreatedQuote] = useState<SupplierQuote | null>(null);
-  const [matchDecisions, setMatchDecisions] = useState<ComponentMatchDecision[]>([]);
+  const [matchDecisions, setMatchDecisions] = useState<
+    ComponentMatchDecision[]
+  >([]);
 
-  const { createQuote, addComponentHistory, processQuoteWithMatching } = useSupplierQuotes();
+  const { createQuote, addComponentHistory, processQuoteWithMatching } =
+    useSupplierQuotes();
   const { addComponent } = useComponents();
 
   /**
@@ -67,7 +78,7 @@ export const SupplierQuoteImport: React.FC<SupplierQuoteImportProps> = ({
         .from('supplier-quotes')
         .upload(filePath, file, {
           cacheControl: '3600',
-          upsert: false
+          upsert: false,
         });
 
       if (error) {
@@ -93,7 +104,10 @@ export const SupplierQuoteImport: React.FC<SupplierQuoteImportProps> = ({
   /**
    * Handle extraction complete - save file, create quote, and run smart matching
    */
-  const handleExtractionComplete = async (result: AIExtractionResult, file: File) => {
+  const handleExtractionComplete = async (
+    result: AIExtractionResult,
+    file: File
+  ) => {
     logger.debug('📋 Extraction complete:', result);
 
     setExtractionResult(result);
@@ -114,7 +128,8 @@ export const SupplierQuoteImport: React.FC<SupplierQuoteImportProps> = ({
       fileSizeKb: Math.round(file.size / 1024),
       status: 'completed',
       documentType: (result.metadata.documentType as any) || 'unknown',
-      extractionMethod: (getExtractionMethod(result.metadata) as any) || 'native',
+      extractionMethod:
+        (getExtractionMethod(result.metadata) as any) || 'native',
       confidenceScore: result.confidence,
       totalComponents: result.components.length,
       supplierName: result.metadata.supplier,
@@ -151,17 +166,26 @@ export const SupplierQuoteImport: React.FC<SupplierQuoteImportProps> = ({
    */
   const runSmartMatching = async (quote: SupplierQuote, components: any[]) => {
     try {
-      logger.debug('🔍 Running smart matching for', components.length, 'components...');
+      logger.debug(
+        '🔍 Running smart matching for',
+        components.length,
+        'components...'
+      );
 
       const decisions: ComponentMatchDecision[] = [];
 
       // Process each component with smart matching
       for (let i = 0; i < components.length; i++) {
         const component = components[i];
-        logger.debug(`\n🔍 Matching component ${i + 1}/${components.length}:`, component.name);
+        logger.debug(
+          `\n🔍 Matching component ${i + 1}/${components.length}:`,
+          component.name
+        );
 
         // Run smart matching (3-tier: exact/fuzzy/AI)
-        const matchResults = await processQuoteWithMatching(quote.id, [component]);
+        const matchResults = await processQuoteWithMatching(quote.id, [
+          component,
+        ]);
         const matchResult = matchResults[0];
 
         if (!matchResult) {
@@ -181,7 +205,10 @@ export const SupplierQuoteImport: React.FC<SupplierQuoteImportProps> = ({
           matchType: matchResult.matchType,
           matches: matchResult.matches,
           userDecision: 'pending', // Always pending - user must decide
-          selectedMatchId: matchResult.matches.length > 0 ? matchResult.matches[0].component.id : undefined,
+          selectedMatchId:
+            matchResult.matches.length > 0
+              ? matchResult.matches[0].component.id
+              : undefined,
         };
 
         decisions.push(decision);
@@ -204,7 +231,6 @@ export const SupplierQuoteImport: React.FC<SupplierQuoteImportProps> = ({
         ai: decisions.filter(d => d.matchType === 'ai').length,
         none: decisions.filter(d => d.matchType === 'none').length,
       });
-
     } catch (error) {
       logger.error('❌ Smart matching failed:', error);
       toast.error('שגיאה בזיהוי רכיבים קיימים');
@@ -217,7 +243,10 @@ export const SupplierQuoteImport: React.FC<SupplierQuoteImportProps> = ({
   /**
    * Handle import confirmation with user decisions
    */
-  const handleConfirm = async (components: Partial<Component>[], decisions: ComponentMatchDecision[]) => {
+  const handleConfirm = async (
+    components: Partial<Component>[],
+    decisions: ComponentMatchDecision[]
+  ) => {
     if (!createdQuote) {
       toast.error('שגיאה: הצעה לא נמצאה');
       return;
@@ -236,20 +265,34 @@ export const SupplierQuoteImport: React.FC<SupplierQuoteImportProps> = ({
         const comp = components[i];
         const decision = decisions.find(d => d.componentIndex === i);
 
-        logger.debug(`\n📦 Processing component ${i + 1}/${components.length}:`, comp.name);
+        logger.debug(
+          `\n📦 Processing component ${i + 1}/${components.length}:`,
+          comp.name
+        );
 
         // Check user decision
-        if (decision && decision.userDecision === 'accept_match' && decision.matches.length > 0) {
+        if (
+          decision &&
+          decision.userDecision === 'accept_match' &&
+          decision.matches.length > 0
+        ) {
           // User accepted the match - add to history
           const matchedComponent = decision.selectedMatchId
-            ? decision.matches.find(m => m.component.id === decision.selectedMatchId)?.component
+            ? decision.matches.find(
+                m => m.component.id === decision.selectedMatchId
+              )?.component
             : decision.matches[0].component;
 
           if (matchedComponent) {
-            logger.debug(`✅ User accepted match: ${matchedComponent.name} (${decision.matchType} match)`);
+            logger.debug(
+              `✅ User accepted match: ${matchedComponent.name} (${decision.matchType} match)`
+            );
 
             // First, clear the "current price" flag from ALL previous quotes for this component
-            logger.debug(`🔄 Clearing 'current price' from previous quotes for component:`, matchedComponent.id);
+            logger.debug(
+              `🔄 Clearing 'current price' from previous quotes for component:`,
+              matchedComponent.id
+            );
             await supabase
               .from('component_quote_history')
               .update({ is_current_price: false })
@@ -277,7 +320,7 @@ export const SupplierQuoteImport: React.FC<SupplierQuoteImportProps> = ({
                 unit_cost_usd: comp.unitCostUSD,
                 unit_cost_eur: comp.unitCostEUR,
                 currency: comp.currency || 'USD',
-                updated_at: new Date().toISOString()
+                updated_at: new Date().toISOString(),
               })
               .eq('id', matchedComponent.id);
 
@@ -301,7 +344,8 @@ export const SupplierQuoteImport: React.FC<SupplierQuoteImportProps> = ({
             unitCostEUR: comp.unitCostEUR || 0,
             currency: comp.currency || 'USD',
             originalCost: comp.unitCostUSD || comp.unitCostNIS || 0,
-            quoteDate: createdQuote.quoteDate || new Date().toISOString().split('T')[0],
+            quoteDate:
+              createdQuote.quoteDate || new Date().toISOString().split('T')[0],
             quoteFileUrl: createdQuote.fileUrl,
             notes: comp.notes || '',
           });

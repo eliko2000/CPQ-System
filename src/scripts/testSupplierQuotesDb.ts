@@ -17,14 +17,18 @@ export async function testSupplierQuotesDb() {
   const results = {
     passed: 0,
     failed: 0,
-    tests: [] as Array<{ name: string; status: 'PASS' | 'FAIL'; message: string }>
+    tests: [] as Array<{
+      name: string;
+      status: 'PASS' | 'FAIL';
+      message: string;
+    }>,
   };
 
   // ============================================
   // Test 1: Check supplier_quotes table exists
   // ============================================
   try {
-    const { data, error } = await supabase
+    const { data: _data, error } = await supabase
       .from('supplier_quotes')
       .select('count')
       .limit(1);
@@ -34,14 +38,14 @@ export async function testSupplierQuotesDb() {
     results.tests.push({
       name: 'supplier_quotes table access',
       status: 'PASS',
-      message: 'Table exists and is accessible'
+      message: 'Table exists and is accessible',
     });
     results.passed++;
   } catch (error) {
     results.tests.push({
       name: 'supplier_quotes table access',
       status: 'FAIL',
-      message: `Error: ${error}`
+      message: `Error: ${error}`,
     });
     results.failed++;
   }
@@ -50,7 +54,7 @@ export async function testSupplierQuotesDb() {
   // Test 2: Check component_quote_history table exists
   // ============================================
   try {
-    const { data, error } = await supabase
+    const { data: _data, error } = await supabase
       .from('component_quote_history')
       .select('count')
       .limit(1);
@@ -60,14 +64,14 @@ export async function testSupplierQuotesDb() {
     results.tests.push({
       name: 'component_quote_history table access',
       status: 'PASS',
-      message: 'Table exists and is accessible'
+      message: 'Table exists and is accessible',
     });
     results.passed++;
   } catch (error) {
     results.tests.push({
       name: 'component_quote_history table access',
       status: 'FAIL',
-      message: `Error: ${error}`
+      message: `Error: ${error}`,
     });
     results.failed++;
   }
@@ -76,7 +80,7 @@ export async function testSupplierQuotesDb() {
   // Test 3: Check components table has new columns
   // ============================================
   try {
-    const { data, error } = await supabase
+    const { data: _data, error } = await supabase
       .from('components')
       .select('current_quote_id, currency, original_cost')
       .limit(1);
@@ -86,14 +90,14 @@ export async function testSupplierQuotesDb() {
     results.tests.push({
       name: 'components table new columns',
       status: 'PASS',
-      message: 'New columns (current_quote_id, currency, original_cost) exist'
+      message: 'New columns (current_quote_id, currency, original_cost) exist',
     });
     results.passed++;
   } catch (error) {
     results.tests.push({
       name: 'components table new columns',
       status: 'FAIL',
-      message: `Error: ${error}`
+      message: `Error: ${error}`,
     });
     results.failed++;
   }
@@ -105,16 +109,18 @@ export async function testSupplierQuotesDb() {
   try {
     const { data, error } = await supabase
       .from('supplier_quotes')
-      .insert([{
-        quote_number: 'TEST-001',
-        supplier_name: 'Test Supplier',
-        file_name: 'test_quote.xlsx',
-        file_url: '/test/quote.xlsx',
-        file_type: 'excel',
-        status: 'completed',
-        total_components: 0,
-        confidence_score: 0.95
-      }])
+      .insert([
+        {
+          quote_number: 'TEST-001',
+          supplier_name: 'Test Supplier',
+          file_name: 'test_quote.xlsx',
+          file_url: '/test/quote.xlsx',
+          file_type: 'excel',
+          status: 'completed',
+          total_components: 0,
+          confidence_score: 0.95,
+        },
+      ])
       .select()
       .single();
 
@@ -126,14 +132,14 @@ export async function testSupplierQuotesDb() {
     results.tests.push({
       name: 'Create supplier quote',
       status: 'PASS',
-      message: `Successfully created test quote with ID: ${testQuoteId}`
+      message: `Successfully created test quote with ID: ${testQuoteId}`,
     });
     results.passed++;
   } catch (error) {
     results.tests.push({
       name: 'Create supplier quote',
       status: 'FAIL',
-      message: `Error: ${error}`
+      message: `Error: ${error}`,
     });
     results.failed++;
   }
@@ -155,14 +161,14 @@ export async function testSupplierQuotesDb() {
       results.tests.push({
         name: 'Read supplier quote',
         status: 'PASS',
-        message: `Successfully read quote: ${data.quote_number}`
+        message: `Successfully read quote: ${data.quote_number}`,
       });
       results.passed++;
     } catch (error) {
       results.tests.push({
         name: 'Read supplier quote',
         status: 'FAIL',
-        message: `Error: ${error}`
+        message: `Error: ${error}`,
       });
       results.failed++;
     }
@@ -186,14 +192,14 @@ export async function testSupplierQuotesDb() {
       results.tests.push({
         name: 'Update supplier quote',
         status: 'PASS',
-        message: 'Successfully updated quote notes'
+        message: 'Successfully updated quote notes',
       });
       results.passed++;
     } catch (error) {
       results.tests.push({
         name: 'Update supplier quote',
         status: 'FAIL',
-        message: `Error: ${error}`
+        message: `Error: ${error}`,
       });
       results.failed++;
     }
@@ -215,14 +221,16 @@ export async function testSupplierQuotesDb() {
       if (components) {
         const { data, error } = await supabase
           .from('component_quote_history')
-          .insert([{
-            component_id: components.id,
-            quote_id: testQuoteId,
-            unit_price_usd: 100.00,
-            currency: 'USD',
-            is_current_price: false,
-            confidence_score: 0.95
-          }])
+          .insert([
+            {
+              component_id: components.id,
+              quote_id: testQuoteId,
+              unit_price_usd: 100.0,
+              currency: 'USD',
+              is_current_price: false,
+              confidence_score: 0.95,
+            },
+          ])
           .select()
           .single();
 
@@ -234,14 +242,15 @@ export async function testSupplierQuotesDb() {
         results.tests.push({
           name: 'Create component quote history',
           status: 'PASS',
-          message: 'Successfully created history entry'
+          message: 'Successfully created history entry',
         });
         results.passed++;
       } else {
         results.tests.push({
           name: 'Create component quote history',
           status: 'FAIL',
-          message: 'No components found to link to (skip this test if library is empty)'
+          message:
+            'No components found to link to (skip this test if library is empty)',
         });
         results.failed++;
       }
@@ -249,7 +258,7 @@ export async function testSupplierQuotesDb() {
       results.tests.push({
         name: 'Create component quote history',
         status: 'FAIL',
-        message: `Error: ${error}`
+        message: `Error: ${error}`,
       });
       results.failed++;
     }
@@ -262,11 +271,13 @@ export async function testSupplierQuotesDb() {
     try {
       const { data, error } = await supabase
         .from('component_quote_history')
-        .select(`
+        .select(
+          `
           *,
           quote:supplier_quotes(*),
           component:components(*)
-        `)
+        `
+        )
         .eq('id', testHistoryId)
         .single();
 
@@ -276,14 +287,14 @@ export async function testSupplierQuotesDb() {
       results.tests.push({
         name: 'Foreign key relationships',
         status: 'PASS',
-        message: 'Successfully joined tables via foreign keys'
+        message: 'Successfully joined tables via foreign keys',
       });
       results.passed++;
     } catch (error) {
       results.tests.push({
         name: 'Foreign key relationships',
         status: 'FAIL',
-        message: `Error: ${error}`
+        message: `Error: ${error}`,
       });
       results.failed++;
     }
@@ -302,14 +313,14 @@ export async function testSupplierQuotesDb() {
       results.tests.push({
         name: 'Cleanup: Delete test history',
         status: 'PASS',
-        message: 'Test history deleted'
+        message: 'Test history deleted',
       });
       results.passed++;
     } catch (error) {
       results.tests.push({
         name: 'Cleanup: Delete test history',
         status: 'FAIL',
-        message: `Error: ${error}`
+        message: `Error: ${error}`,
       });
       results.failed++;
     }
@@ -317,22 +328,19 @@ export async function testSupplierQuotesDb() {
 
   if (testQuoteId) {
     try {
-      await supabase
-        .from('supplier_quotes')
-        .delete()
-        .eq('id', testQuoteId);
+      await supabase.from('supplier_quotes').delete().eq('id', testQuoteId);
 
       results.tests.push({
         name: 'Cleanup: Delete test quote',
         status: 'PASS',
-        message: 'Test quote deleted'
+        message: 'Test quote deleted',
       });
       results.passed++;
     } catch (error) {
       results.tests.push({
         name: 'Cleanup: Delete test quote',
         status: 'FAIL',
-        message: `Error: ${error}`
+        message: `Error: ${error}`,
       });
       results.failed++;
     }
@@ -354,7 +362,9 @@ export async function testSupplierQuotesDb() {
   console.log('='.repeat(60));
   console.log(`✅ Passed: ${results.passed}`);
   console.log(`❌ Failed: ${results.failed}`);
-  console.log(`📈 Success Rate: ${((results.passed / (results.passed + results.failed)) * 100).toFixed(0)}%`);
+  console.log(
+    `📈 Success Rate: ${((results.passed / (results.passed + results.failed)) * 100).toFixed(0)}%`
+  );
   console.log('='.repeat(60) + '\n');
 
   if (results.failed === 0) {

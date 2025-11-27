@@ -19,12 +19,6 @@ import {
   groupQuotationsByMonth,
   getPredefinedDateRange,
   type DateRange,
-  type RevenueMetrics,
-  type MarginMetrics,
-  type ComponentAnalytics,
-  type LaborMetrics,
-  type TrendMetrics,
-  type CustomerMetrics
 } from '../analyticsCalculations';
 import type { QuotationProject, QuotationItem } from '../../types';
 
@@ -33,7 +27,9 @@ import type { QuotationProject, QuotationItem } from '../../types';
 /**
  * Create a mock quotation with sensible defaults
  */
-function createMockQuotation(overrides: Partial<QuotationProject> = {}): QuotationProject {
+function createMockQuotation(
+  overrides: Partial<QuotationProject> = {}
+): QuotationProject {
   return {
     id: 'test-' + Math.random().toString(36).substr(2, 9),
     name: 'Test Project',
@@ -49,7 +45,7 @@ function createMockQuotation(overrides: Partial<QuotationProject> = {}): Quotati
       profitPercent: 25,
       riskPercent: 5,
       includeVAT: false,
-      vatRate: 17
+      vatRate: 17,
     },
     calculations: {
       totalHardwareUSD: 10000,
@@ -71,11 +67,11 @@ function createMockQuotation(overrides: Partial<QuotationProject> = {}): Quotati
       finalTotalILS: 72844,
       totalCostILS: 55500,
       totalProfitILS: 17344,
-      profitMarginPercent: 23.8
+      profitMarginPercent: 23.8,
     },
     createdAt: new Date('2025-01-15').toISOString(),
     updatedAt: new Date('2025-01-15').toISOString(),
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -102,7 +98,7 @@ function createMockItem(overrides: Partial<QuotationItem> = {}): QuotationItem {
     customerPriceILS: 462.5,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -116,7 +112,7 @@ describe('Date Range Filtering', () => {
 
     const quotations = [
       createMockQuotation({ createdAt: recent.toISOString() }),
-      createMockQuotation({ createdAt: old.toISOString() })
+      createMockQuotation({ createdAt: old.toISOString() }),
     ];
 
     const dateRange = getPredefinedDateRange('30d');
@@ -133,7 +129,7 @@ describe('Date Range Filtering', () => {
 
     const quotations = [
       createMockQuotation({ createdAt: recent.toISOString() }),
-      createMockQuotation({ createdAt: old.toISOString() })
+      createMockQuotation({ createdAt: old.toISOString() }),
     ];
 
     const dateRange = getPredefinedDateRange('90d');
@@ -147,12 +143,12 @@ describe('Date Range Filtering', () => {
     const quotations = [
       createMockQuotation({ createdAt: new Date('2025-01-15').toISOString() }),
       createMockQuotation({ createdAt: new Date('2025-02-15').toISOString() }),
-      createMockQuotation({ createdAt: new Date('2025-03-15').toISOString() })
+      createMockQuotation({ createdAt: new Date('2025-03-15').toISOString() }),
     ];
 
     const dateRange: DateRange = {
       start: new Date('2025-01-01'),
-      end: new Date('2025-02-28')
+      end: new Date('2025-02-28'),
     };
 
     const filtered = filterQuotationsByDateRange(quotations, dateRange);
@@ -162,12 +158,12 @@ describe('Date Range Filtering', () => {
 
   it('should return empty array when no quotations match date range', () => {
     const quotations = [
-      createMockQuotation({ createdAt: new Date('2024-01-15').toISOString() })
+      createMockQuotation({ createdAt: new Date('2024-01-15').toISOString() }),
     ];
 
     const dateRange: DateRange = {
       start: new Date('2025-01-01'),
-      end: new Date('2025-12-31')
+      end: new Date('2025-12-31'),
     };
 
     const filtered = filterQuotationsByDateRange(quotations, dateRange);
@@ -185,26 +181,29 @@ describe('Revenue Metrics', () => {
         status: 'won',
         calculations: {
           ...createMockQuotation().calculations,
-          finalTotalILS: 50000
-        }
+          finalTotalILS: 50000,
+        },
       }),
       createMockQuotation({
         status: 'won',
         calculations: {
           ...createMockQuotation().calculations,
-          finalTotalILS: 30000
-        }
+          finalTotalILS: 30000,
+        },
       }),
       createMockQuotation({
         status: 'lost',
         calculations: {
           ...createMockQuotation().calculations,
-          finalTotalILS: 20000
-        }
-      })
+          finalTotalILS: 20000,
+        },
+      }),
     ];
 
-    const metrics = calculateRevenueMetrics(quotations, getPredefinedDateRange('all'));
+    const metrics = calculateRevenueMetrics(
+      quotations,
+      getPredefinedDateRange('all')
+    );
 
     expect(metrics.totalRevenue).toBe(80000);
     expect(metrics.wonCount).toBe(2);
@@ -217,26 +216,29 @@ describe('Revenue Metrics', () => {
         status: 'draft',
         calculations: {
           ...createMockQuotation().calculations,
-          finalTotalILS: 40000
-        }
+          finalTotalILS: 40000,
+        },
       }),
       createMockQuotation({
         status: 'sent',
         calculations: {
           ...createMockQuotation().calculations,
-          finalTotalILS: 60000
-        }
+          finalTotalILS: 60000,
+        },
       }),
       createMockQuotation({
         status: 'won',
         calculations: {
           ...createMockQuotation().calculations,
-          finalTotalILS: 50000
-        }
-      })
+          finalTotalILS: 50000,
+        },
+      }),
     ];
 
-    const metrics = calculateRevenueMetrics(quotations, getPredefinedDateRange('all'));
+    const metrics = calculateRevenueMetrics(
+      quotations,
+      getPredefinedDateRange('all')
+    );
 
     expect(metrics.pipelineValue).toBe(100000); // 40000 + 60000
     expect(metrics.draftCount).toBe(1);
@@ -264,28 +266,31 @@ describe('Revenue Metrics', () => {
         createdAt: new Date('2025-01-15').toISOString(),
         calculations: {
           ...createMockQuotation().calculations,
-          finalTotalILS: 50000
-        }
+          finalTotalILS: 50000,
+        },
       }),
       createMockQuotation({
         status: 'won',
         createdAt: new Date('2025-01-20').toISOString(),
         calculations: {
           ...createMockQuotation().calculations,
-          finalTotalILS: 30000
-        }
+          finalTotalILS: 30000,
+        },
       }),
       createMockQuotation({
         status: 'won',
         createdAt: new Date('2025-02-10').toISOString(),
         calculations: {
           ...createMockQuotation().calculations,
-          finalTotalILS: 40000
-        }
-      })
+          finalTotalILS: 40000,
+        },
+      }),
     ];
 
-    const metrics = calculateRevenueMetrics(quotations, getPredefinedDateRange('all'));
+    const metrics = calculateRevenueMetrics(
+      quotations,
+      getPredefinedDateRange('all')
+    );
 
     expect(metrics.revenueByMonth.length).toBe(2);
     expect(metrics.revenueByMonth[0].month).toBe('2025-01');
@@ -300,26 +305,29 @@ describe('Revenue Metrics', () => {
         status: 'won',
         calculations: {
           ...createMockQuotation().calculations,
-          finalTotalILS: 60000
-        }
+          finalTotalILS: 60000,
+        },
       }),
       createMockQuotation({
         status: 'won',
         calculations: {
           ...createMockQuotation().calculations,
-          finalTotalILS: 40000
-        }
+          finalTotalILS: 40000,
+        },
       }),
       createMockQuotation({
         status: 'draft',
         calculations: {
           ...createMockQuotation().calculations,
-          finalTotalILS: 50000
-        }
-      })
+          finalTotalILS: 50000,
+        },
+      }),
     ];
 
-    const metrics = calculateRevenueMetrics(quotations, getPredefinedDateRange('all'));
+    const metrics = calculateRevenueMetrics(
+      quotations,
+      getPredefinedDateRange('all')
+    );
 
     expect(metrics.averageValue).toBe(50000); // (60000 + 40000 + 50000) / 3
     expect(metrics.averageWonValue).toBe(50000); // (60000 + 40000) / 2
@@ -335,30 +343,30 @@ describe('Margin Analysis', () => {
         calculations: {
           ...createMockQuotation().calculations,
           finalTotalILS: 100000,
-          profitMarginPercent: 5
-        }
+          profitMarginPercent: 5,
+        },
       }),
       createMockQuotation({
         calculations: {
           ...createMockQuotation().calculations,
           finalTotalILS: 100000,
-          profitMarginPercent: 15
-        }
+          profitMarginPercent: 15,
+        },
       }),
       createMockQuotation({
         calculations: {
           ...createMockQuotation().calculations,
           finalTotalILS: 100000,
-          profitMarginPercent: 25
-        }
+          profitMarginPercent: 25,
+        },
       }),
       createMockQuotation({
         calculations: {
           ...createMockQuotation().calculations,
           finalTotalILS: 100000,
-          profitMarginPercent: 35
-        }
-      })
+          profitMarginPercent: 35,
+        },
+      }),
     ];
 
     const metrics = calculateMarginAnalysis(quotations);
@@ -372,27 +380,27 @@ describe('Margin Analysis', () => {
       createMockQuotation({
         calculations: {
           ...createMockQuotation().calculations,
-          profitMarginPercent: 5
-        }
+          profitMarginPercent: 5,
+        },
       }),
       createMockQuotation({
         calculations: {
           ...createMockQuotation().calculations,
-          profitMarginPercent: 15
-        }
+          profitMarginPercent: 15,
+        },
       }),
       createMockQuotation({
         calculations: {
           ...createMockQuotation().calculations,
-          profitMarginPercent: 25
-        }
+          profitMarginPercent: 25,
+        },
       }),
       createMockQuotation({
         calculations: {
           ...createMockQuotation().calculations,
-          profitMarginPercent: 35
-        }
-      })
+          profitMarginPercent: 35,
+        },
+      }),
     ];
 
     const metrics = calculateMarginAnalysis(quotations);
@@ -401,7 +409,7 @@ describe('Margin Analysis', () => {
       { range: '0-10%', count: 1 },
       { range: '10-20%', count: 1 },
       { range: '20-30%', count: 1 },
-      { range: '30%+', count: 1 }
+      { range: '30%+', count: 1 },
     ]);
   });
 
@@ -412,23 +420,23 @@ describe('Margin Analysis', () => {
         name: 'Low Margin Project',
         calculations: {
           ...createMockQuotation().calculations,
-          profitMarginPercent: 8
-        }
+          profitMarginPercent: 8,
+        },
       }),
       createMockQuotation({
         id: 'high-margin',
         name: 'High Margin Project',
         calculations: {
           ...createMockQuotation().calculations,
-          profitMarginPercent: 35
-        }
+          profitMarginPercent: 35,
+        },
       }),
       createMockQuotation({
         calculations: {
           ...createMockQuotation().calculations,
-          profitMarginPercent: 20
-        }
-      })
+          profitMarginPercent: 20,
+        },
+      }),
     ];
 
     const metrics = calculateMarginAnalysis(quotations);
@@ -447,23 +455,23 @@ describe('Margin Analysis', () => {
         status: 'won',
         calculations: {
           ...createMockQuotation().calculations,
-          profitMarginPercent: 30
-        }
+          profitMarginPercent: 30,
+        },
       }),
       createMockQuotation({
         status: 'won',
         calculations: {
           ...createMockQuotation().calculations,
-          profitMarginPercent: 20
-        }
+          profitMarginPercent: 20,
+        },
       }),
       createMockQuotation({
         status: 'draft',
         calculations: {
           ...createMockQuotation().calculations,
-          profitMarginPercent: 15
-        }
-      })
+          profitMarginPercent: 15,
+        },
+      }),
     ];
 
     const metrics = calculateMarginAnalysis(quotations);
@@ -484,20 +492,20 @@ describe('Margin Analysis', () => {
           createMockItem({
             itemType: 'hardware',
             totalPriceILS: 1000,
-            customerPriceILS: 1250 // 20% margin
+            customerPriceILS: 1250, // 20% margin
           }),
           createMockItem({
             itemType: 'software',
             totalPriceILS: 500,
-            customerPriceILS: 600 // 16.67% margin
+            customerPriceILS: 600, // 16.67% margin
           }),
           createMockItem({
             itemType: 'labor',
             totalPriceILS: 2000,
-            customerPriceILS: 2400 // 16.67% margin
-          })
-        ]
-      })
+            customerPriceILS: 2400, // 16.67% margin
+          }),
+        ],
+      }),
     ];
 
     const metrics = calculateMarginAnalysis(quotations);
@@ -525,11 +533,13 @@ describe('Component Analytics', () => {
   it('should identify top 10 components by quantity', () => {
     const items: QuotationItem[] = [];
     for (let i = 0; i < 15; i++) {
-      items.push(createMockItem({
-        componentId: `comp-${i}`,
-        componentName: `Component ${i}`,
-        quantity: 15 - i // Descending quantities
-      }));
+      items.push(
+        createMockItem({
+          componentId: `comp-${i}`,
+          componentName: `Component ${i}`,
+          quantity: 15 - i, // Descending quantities
+        })
+      );
     }
 
     const quotations = [createMockQuotation({ items })];
@@ -549,32 +559,36 @@ describe('Component Analytics', () => {
           createMockItem({
             componentId: 'comp-1',
             componentCategory: 'בקרים',
-            totalPriceILS: 1000
+            totalPriceILS: 1000,
           }),
           createMockItem({
             componentId: 'comp-2', // Different component ID
             componentCategory: 'בקרים',
-            totalPriceILS: 1500
+            totalPriceILS: 1500,
           }),
           createMockItem({
             componentId: 'comp-3',
             componentCategory: 'חיישנים',
-            totalPriceILS: 800
-          })
-        ]
-      })
+            totalPriceILS: 800,
+          }),
+        ],
+      }),
     ];
 
     const analytics = calculateComponentAnalytics(quotations);
 
     expect(analytics.usageByCategory.length).toBe(2);
 
-    const controllers = analytics.usageByCategory.find(c => c.category === 'בקרים');
+    const controllers = analytics.usageByCategory.find(
+      c => c.category === 'בקרים'
+    );
     expect(controllers?.count).toBe(2); // 2 unique components
     expect(controllers?.totalSpendILS).toBe(2500);
     expect(controllers?.percentOfTotal).toBeCloseTo(75.8, 0);
 
-    const sensors = analytics.usageByCategory.find(c => c.category === 'חיישנים');
+    const sensors = analytics.usageByCategory.find(
+      c => c.category === 'חיישנים'
+    );
     expect(sensors?.count).toBe(1);
     expect(sensors?.totalSpendILS).toBe(800);
     expect(sensors?.percentOfTotal).toBeCloseTo(24.2, 0);
@@ -587,9 +601,9 @@ describe('Component Analytics', () => {
           ...createMockQuotation().calculations,
           totalHardwareILS: 50000,
           totalSoftwareILS: 10000,
-          totalLaborILS: 40000
-        }
-      })
+          totalLaborILS: 40000,
+        },
+      }),
     ];
 
     const analytics = calculateComponentAnalytics(quotations);
@@ -606,15 +620,15 @@ describe('Component Analytics', () => {
           createMockItem({
             componentCategory: 'בקרים',
             componentName: 'PLC',
-            totalPriceILS: 1000
+            totalPriceILS: 1000,
           }),
           createMockItem({
             componentCategory: 'חיישנים',
             componentName: 'Sensor',
-            totalPriceILS: 500
-          })
-        ]
-      })
+            totalPriceILS: 500,
+          }),
+        ],
+      }),
     ];
 
     const analytics = calculateComponentAnalytics(quotations, 'בקרים');
@@ -626,17 +640,19 @@ describe('Component Analytics', () => {
   });
 
   it('should handle quotations with no items gracefully', () => {
-    const quotations = [createMockQuotation({
-      items: [],
-      calculations: {
-        ...createMockQuotation().calculations,
-        totalHardwareILS: 0,
-        totalSoftwareILS: 0,
-        totalLaborILS: 0,
-        totalCostILS: 0,
-        finalTotalILS: 0
-      }
-    })];
+    const quotations = [
+      createMockQuotation({
+        items: [],
+        calculations: {
+          ...createMockQuotation().calculations,
+          totalHardwareILS: 0,
+          totalSoftwareILS: 0,
+          totalLaborILS: 0,
+          totalCostILS: 0,
+          finalTotalILS: 0,
+        },
+      }),
+    ];
     const analytics = calculateComponentAnalytics(quotations);
 
     expect(analytics.topComponents).toEqual([]);
@@ -663,23 +679,23 @@ describe('Labor Metrics', () => {
       createMockQuotation({
         parameters: {
           ...createMockQuotation().parameters,
-          dayWorkCost: 2000
+          dayWorkCost: 2000,
         },
         calculations: {
           ...createMockQuotation().calculations,
-          totalLaborILS: 10000 // 5 days
-        }
+          totalLaborILS: 10000, // 5 days
+        },
       }),
       createMockQuotation({
         parameters: {
           ...createMockQuotation().parameters,
-          dayWorkCost: 2000
+          dayWorkCost: 2000,
         },
         calculations: {
           ...createMockQuotation().calculations,
-          totalLaborILS: 6000 // 3 days
-        }
-      })
+          totalLaborILS: 6000, // 3 days
+        },
+      }),
     ];
 
     const metrics = calculateLaborMetrics(quotations);
@@ -696,9 +712,9 @@ describe('Labor Metrics', () => {
           totalLaborILS: 10000,
           totalEngineeringILS: 5000,
           totalCommissioningILS: 3000,
-          totalInstallationILS: 2000
-        }
-      })
+          totalInstallationILS: 2000,
+        },
+      }),
     ];
 
     const metrics = calculateLaborMetrics(quotations);
@@ -719,8 +735,8 @@ describe('Labor Metrics', () => {
           subtotalILS: 100000,
           totalHardwareILS: 70000,
           totalSoftwareILS: 10000,
-          totalLaborILS: 20000
-        }
+          totalLaborILS: 20000,
+        },
       }),
       createMockQuotation({
         calculations: {
@@ -728,9 +744,9 @@ describe('Labor Metrics', () => {
           subtotalILS: 100000,
           totalHardwareILS: 20000,
           totalSoftwareILS: 10000,
-          totalLaborILS: 70000
-        }
-      })
+          totalLaborILS: 70000,
+        },
+      }),
     ];
 
     const metrics = calculateLaborMetrics(quotations);
@@ -745,23 +761,23 @@ describe('Labor Metrics', () => {
         createdAt: new Date('2025-01-15').toISOString(),
         calculations: {
           ...createMockQuotation().calculations,
-          totalLaborILS: 5000
-        }
+          totalLaborILS: 5000,
+        },
       }),
       createMockQuotation({
         createdAt: new Date('2025-01-20').toISOString(),
         calculations: {
           ...createMockQuotation().calculations,
-          totalLaborILS: 3000
-        }
+          totalLaborILS: 3000,
+        },
       }),
       createMockQuotation({
         createdAt: new Date('2025-02-10').toISOString(),
         calculations: {
           ...createMockQuotation().calculations,
-          totalLaborILS: 7000
-        }
-      })
+          totalLaborILS: 7000,
+        },
+      }),
     ];
 
     const metrics = calculateLaborMetrics(quotations);
@@ -796,17 +812,17 @@ describe('Trend Analysis', () => {
         createdAt: new Date('2025-01-15').toISOString(),
         calculations: {
           ...createMockQuotation().calculations,
-          finalTotalILS: 50000
-        }
+          finalTotalILS: 50000,
+        },
       }),
       createMockQuotation({
         status: 'won',
         createdAt: new Date('2025-02-15').toISOString(),
         calculations: {
           ...createMockQuotation().calculations,
-          finalTotalILS: 60000
-        }
-      })
+          finalTotalILS: 60000,
+        },
+      }),
     ];
 
     const trends = calculateTrends(quotations, getPredefinedDateRange('all'));
@@ -821,7 +837,7 @@ describe('Trend Analysis', () => {
       createMockQuotation({ status: 'won' }),
       createMockQuotation({ status: 'won' }),
       createMockQuotation({ status: 'lost' }),
-      createMockQuotation({ status: 'draft' }) // Not included
+      createMockQuotation({ status: 'draft' }), // Not included
     ];
 
     const trends = calculateTrends(quotations, getPredefinedDateRange('all'));
@@ -837,9 +853,9 @@ describe('Trend Analysis', () => {
         createdAt: new Date('2025-01-15').toISOString(),
         calculations: {
           ...createMockQuotation().calculations,
-          finalTotalILS: 50000
-        }
-      })
+          finalTotalILS: 50000,
+        },
+      }),
     ];
 
     const trends = calculateTrends(quotations, getPredefinedDateRange('all'));
@@ -858,8 +874,8 @@ describe('Trend Analysis', () => {
           createdAt: new Date(2024, month, 15).toISOString(),
           calculations: {
             ...createMockQuotation().calculations,
-            finalTotalILS: 50000 + (month * 5000) // Increasing revenue
-          }
+            finalTotalILS: 50000 + month * 5000, // Increasing revenue
+          },
         })
       );
     }
@@ -876,12 +892,12 @@ describe('Trend Analysis', () => {
     const quotations = [
       createMockQuotation({
         status: 'won',
-        createdAt: new Date('2025-01-15').toISOString()
+        createdAt: new Date('2025-01-15').toISOString(),
       }),
       createMockQuotation({
         status: 'won',
-        createdAt: new Date('2025-02-15').toISOString()
-      })
+        createdAt: new Date('2025-02-15').toISOString(),
+      }),
     ];
 
     const trends = calculateTrends(quotations, getPredefinedDateRange('all'));
@@ -909,28 +925,30 @@ describe('Customer Metrics', () => {
         customerName: 'Customer A',
         calculations: {
           ...createMockQuotation().calculations,
-          finalTotalILS: 50000
-        }
+          finalTotalILS: 50000,
+        },
       }),
       createMockQuotation({
         customerName: 'Customer A',
         calculations: {
           ...createMockQuotation().calculations,
-          finalTotalILS: 30000
-        }
+          finalTotalILS: 30000,
+        },
       }),
       createMockQuotation({
         customerName: 'Customer B',
         calculations: {
           ...createMockQuotation().calculations,
-          finalTotalILS: 40000
-        }
-      })
+          finalTotalILS: 40000,
+        },
+      }),
     ];
 
     const metrics = calculateCustomerMetrics(quotations);
 
-    const customerA = metrics.topCustomers.find(c => c.customerName === 'Customer A');
+    const customerA = metrics.topCustomers.find(
+      c => c.customerName === 'Customer A'
+    );
     expect(customerA?.totalValueILS).toBe(80000);
     expect(customerA?.quotationCount).toBe(2);
   });
@@ -944,8 +962,8 @@ describe('Customer Metrics', () => {
           customerName: `Customer ${i}`,
           calculations: {
             ...createMockQuotation().calculations,
-            finalTotalILS: (15 - i) * 10000 // Descending values
-          }
+            finalTotalILS: (15 - i) * 10000, // Descending values
+          },
         })
       );
     }
@@ -964,7 +982,7 @@ describe('Customer Metrics', () => {
       createMockQuotation({ customerName: 'Customer A' }), // Repeat
       createMockQuotation({ customerName: 'Customer B' }),
       createMockQuotation({ customerName: 'Customer B' }), // Repeat
-      createMockQuotation({ customerName: 'Customer C' }) // Single
+      createMockQuotation({ customerName: 'Customer C' }), // Single
     ];
 
     const metrics = calculateCustomerMetrics(quotations);
@@ -1004,10 +1022,10 @@ describe('Edge Cases', () => {
 
     const revenue = calculateRevenueMetrics(quotations);
     const margin = calculateMarginAnalysis(quotations);
-    const _components = calculateComponentAnalytics(quotations);
+    const __components = calculateComponentAnalytics(quotations);
     const labor = calculateLaborMetrics(quotations);
-    const _trends = calculateTrends(quotations);
-    const _customers = calculateCustomerMetrics(quotations);
+    const __trends = calculateTrends(quotations);
+    const __customers = calculateCustomerMetrics(quotations);
 
     expect(revenue.averageValue).toBeGreaterThan(0);
     expect(margin.averageMargin).toBeGreaterThan(0);
@@ -1017,8 +1035,8 @@ describe('Edge Cases', () => {
   it('should handle quotations with missing calculations object', () => {
     const quotations = [
       createMockQuotation({
-        calculations: undefined as any
-      })
+        calculations: undefined as any,
+      }),
     ];
 
     const revenue = calculateRevenueMetrics(quotations);
@@ -1037,28 +1055,32 @@ describe('Edge Cases', () => {
           subtotalILS: 0,
           totalHardwareILS: 0,
           totalSoftwareILS: 0,
-          totalLaborILS: 0
-        }
-      })
+          totalLaborILS: 0,
+        },
+      }),
     ];
 
     const revenue = calculateRevenueMetrics(quotations);
     expect(revenue.totalRevenue).toBe(0);
 
     const components = calculateComponentAnalytics(quotations);
-    expect(components.typeRatio).toEqual({ hardware: 0, software: 0, labor: 0 });
+    expect(components.typeRatio).toEqual({
+      hardware: 0,
+      software: 0,
+      labor: 0,
+    });
   });
 
   it('should handle date range with no matching quotations', () => {
     const quotations = [
       createMockQuotation({
-        createdAt: new Date('2024-01-15').toISOString()
-      })
+        createdAt: new Date('2024-01-15').toISOString(),
+      }),
     ];
 
     const dateRange: DateRange = {
       start: new Date('2025-01-01'),
-      end: new Date('2025-12-31')
+      end: new Date('2025-12-31'),
     };
 
     const revenue = calculateRevenueMetrics(quotations, dateRange);
@@ -1077,14 +1099,17 @@ describe('Helper Functions', () => {
       createMockQuotation({ status: 'draft' }),
       createMockQuotation({ status: 'sent' }),
       createMockQuotation({ status: 'won' }),
-      createMockQuotation({ status: 'lost' })
+      createMockQuotation({ status: 'lost' }),
     ];
 
     const wonOnly = filterQuotationsByStatus(quotations, ['won']);
     expect(wonOnly.length).toBe(1);
     expect(wonOnly[0].status).toBe('won');
 
-    const draftAndSent = filterQuotationsByStatus(quotations, ['draft', 'sent']);
+    const draftAndSent = filterQuotationsByStatus(quotations, [
+      'draft',
+      'sent',
+    ]);
     expect(draftAndSent.length).toBe(2);
   });
 
@@ -1092,7 +1117,7 @@ describe('Helper Functions', () => {
     const quotations = [
       createMockQuotation({ createdAt: new Date('2025-01-05').toISOString() }),
       createMockQuotation({ createdAt: new Date('2025-01-20').toISOString() }),
-      createMockQuotation({ createdAt: new Date('2025-02-10').toISOString() })
+      createMockQuotation({ createdAt: new Date('2025-02-10').toISOString() }),
     ];
 
     const grouped = groupQuotationsByMonth(quotations, 'createdAt');
@@ -1108,7 +1133,7 @@ describe('Helper Functions', () => {
       createMockQuotation({ status: 'won' }),
       createMockQuotation({ status: 'lost' }),
       createMockQuotation({ status: 'sent' }),
-      createMockQuotation({ status: 'draft' })
+      createMockQuotation({ status: 'draft' }),
     ];
 
     const winRate = calculateWinRate(quotations);
@@ -1120,7 +1145,7 @@ describe('Helper Functions', () => {
   it('should return zero win rate for quotations with no sent/won/lost', () => {
     const quotations = [
       createMockQuotation({ status: 'draft' }),
-      createMockQuotation({ status: 'draft' })
+      createMockQuotation({ status: 'draft' }),
     ];
 
     const winRate = calculateWinRate(quotations);

@@ -38,7 +38,7 @@ function componentToDb(component: Partial<Component>): Partial<DbComponent> {
 }
 
 // Transform DB format to UI Component
-function dbToComponent(dbComp: DbComponent): Component {
+function __dbToComponent(dbComp: DbComponent): Component {
   logger.debug('📥 dbToComponent converting:', {
     id: dbComp.id,
     name: dbComp.name,

@@ -148,7 +148,7 @@ export function ComponentAnalytics({ data }: ComponentAnalyticsProps) {
                   }}
                   labelLine={{ stroke: '#888', strokeWidth: 1 }}
                 >
-                  {data.usageByCategory.map((entry, index) => (
+                  {data.usageByCategory.map((_entry, index) => (
                     <Cell
                       key={`cell-${index}`}
                       fill={CATEGORY_COLORS[index % CATEGORY_COLORS.length]}

@@ -37,7 +37,7 @@ describe('useComponents', () => {
     manufacturer_part_number: '6ES7512-1DK01-0AB0',
     category: 'בקרים',
     component_type: 'hardware',
-    labor_subtype: null,
+    labor_subtype: undefined,
     description: 'Industrial PLC controller',
     unit_cost_ils: 9250,
     unit_cost_usd: 2500,
@@ -59,7 +59,7 @@ describe('useComponents', () => {
       manufacturer_part_number: 'Q45BB6AF300',
       category: 'חיישנים',
       component_type: 'hardware',
-      labor_subtype: null,
+      labor_subtype: undefined,
       description: 'Photoelectric sensor',
       unit_cost_ils: 555,
       unit_cost_usd: 150,
@@ -281,7 +281,7 @@ describe('useComponents', () => {
         select: mockInsertSelect,
       });
 
-      vi.mocked(supabase.from).mockImplementation((table: string) => {
+      vi.mocked(supabase.from).mockImplementation((_table: string) => {
         return {
           select: mockSelect.mockReturnValue({ order: mockOrder }),
           insert: mockInsert,
@@ -352,10 +352,13 @@ describe('useComponents', () => {
         eq: mockEq,
       });
 
-      vi.mocked(supabase.from).mockImplementation(() => ({
-        select: mockSelect.mockReturnValue({ order: mockOrder }),
-        update: mockUpdate,
-      } as any));
+      vi.mocked(supabase.from).mockImplementation(
+        () =>
+          ({
+            select: mockSelect.mockReturnValue({ order: mockOrder }),
+            update: mockUpdate,
+          }) as any
+      );
 
       const { result } = renderHook(() => useComponents());
 
@@ -401,10 +404,13 @@ describe('useComponents', () => {
         eq: mockEq,
       });
 
-      vi.mocked(supabase.from).mockImplementation(() => ({
-        select: mockSelect.mockReturnValue({ order: mockOrder }),
-        update: mockUpdate,
-      } as any));
+      vi.mocked(supabase.from).mockImplementation(
+        () =>
+          ({
+            select: mockSelect.mockReturnValue({ order: mockOrder }),
+            update: mockUpdate,
+          }) as any
+      );
 
       const { result } = renderHook(() => useComponents());
 
@@ -458,10 +464,13 @@ describe('useComponents', () => {
         eq: mockEq,
       });
 
-      vi.mocked(supabase.from).mockImplementation(() => ({
-        select: mockSelect.mockReturnValue({ order: mockOrder }),
-        update: mockUpdate,
-      } as any));
+      vi.mocked(supabase.from).mockImplementation(
+        () =>
+          ({
+            select: mockSelect.mockReturnValue({ order: mockOrder }),
+            update: mockUpdate,
+          }) as any
+      );
 
       const { result } = renderHook(() => useComponents());
 
@@ -509,10 +518,13 @@ describe('useComponents', () => {
         eq: mockEq,
       });
 
-      vi.mocked(supabase.from).mockImplementation(() => ({
-        select: mockSelect.mockReturnValue({ order: mockOrder }),
-        delete: mockDelete,
-      } as any));
+      vi.mocked(supabase.from).mockImplementation(
+        () =>
+          ({
+            select: mockSelect.mockReturnValue({ order: mockOrder }),
+            delete: mockDelete,
+          }) as any
+      );
 
       const { result } = renderHook(() => useComponents());
 
@@ -551,10 +563,13 @@ describe('useComponents', () => {
         eq: mockEq,
       });
 
-      vi.mocked(supabase.from).mockImplementation(() => ({
-        select: mockSelect.mockReturnValue({ order: mockOrder }),
-        delete: mockDelete,
-      } as any));
+      vi.mocked(supabase.from).mockImplementation(
+        () =>
+          ({
+            select: mockSelect.mockReturnValue({ order: mockOrder }),
+            delete: mockDelete,
+          }) as any
+      );
 
       const { result } = renderHook(() => useComponents());
 
@@ -587,12 +602,15 @@ describe('useComponents', () => {
         order: mockOrder,
       });
 
-      vi.mocked(supabase.from).mockImplementation(() => ({
-        select: mockSelect.mockReturnValue({
-          order: mockOrder,
-          or: mockOr,
-        }),
-      } as any));
+      vi.mocked(supabase.from).mockImplementation(
+        () =>
+          ({
+            select: mockSelect.mockReturnValue({
+              order: mockOrder,
+              or: mockOr,
+            }),
+          }) as any
+      );
 
       const { result } = renderHook(() => useComponents());
 
@@ -623,12 +641,15 @@ describe('useComponents', () => {
         order: mockOrder,
       });
 
-      vi.mocked(supabase.from).mockImplementation(() => ({
-        select: mockSelect.mockReturnValue({
-          order: mockOrder,
-          eq: mockEq,
-        }),
-      } as any));
+      vi.mocked(supabase.from).mockImplementation(
+        () =>
+          ({
+            select: mockSelect.mockReturnValue({
+              order: mockOrder,
+              eq: mockEq,
+            }),
+          }) as any
+      );
 
       const { result } = renderHook(() => useComponents());
 
@@ -636,7 +657,8 @@ describe('useComponents', () => {
         expect(result.current.loading).toBe(false);
       });
 
-      const categoryResults = await result.current.getComponentsByCategory('בקרים');
+      const categoryResults =
+        await result.current.getComponentsByCategory('בקרים');
 
       expect(mockEq).toHaveBeenCalledWith('category', 'בקרים');
       expect(categoryResults).toHaveLength(1);
@@ -665,12 +687,15 @@ describe('useComponents', () => {
         order: mockSearchOrder,
       });
 
-      vi.mocked(supabase.from).mockImplementation(() => ({
-        select: mockSelect.mockReturnValue({
-          order: mockOrder,
-          or: mockOr,
-        }),
-      } as any));
+      vi.mocked(supabase.from).mockImplementation(
+        () =>
+          ({
+            select: mockSelect.mockReturnValue({
+              order: mockOrder,
+              or: mockOr,
+            }),
+          }) as any
+      );
 
       const { result } = renderHook(() => useComponents());
 
@@ -715,25 +740,27 @@ describe('useComponents', () => {
       expect(component.id).toBe(mockDbComponent.id);
       expect(component.name).toBe(mockDbComponent.name);
       expect(component.manufacturer).toBe(mockDbComponent.manufacturer);
-      expect(component.manufacturer_part_number).toBe(mockDbComponent.manufacturer_part_number);
+      expect(component.manufacturer_part_number).toBe(
+        mockDbComponent.manufacturer_part_number
+      );
     });
 
     it('should handle missing optional fields', async () => {
       const sparseComponent: DbComponent = {
         id: 'comp-sparse',
         name: 'Minimal Component',
-        manufacturer: null,
-        manufacturer_part_number: null,
-        category: null,
+        manufacturer: undefined,
+        manufacturer_part_number: undefined,
+        category: undefined,
         component_type: 'hardware',
-        labor_subtype: null,
-        description: null,
+        labor_subtype: undefined,
+        description: undefined,
         unit_cost_ils: 100,
-        unit_cost_usd: null,
-        unit_cost_eur: null,
+        unit_cost_usd: undefined,
+        unit_cost_eur: undefined,
         currency: undefined,
-        original_cost: null,
-        supplier: null,
+        original_cost: undefined,
+        supplier: undefined,
         notes: undefined,
         created_at: '2024-01-20T10:00:00Z',
         updated_at: '2024-01-20T10:00:00Z',
@@ -768,7 +795,7 @@ describe('useComponents', () => {
       const componentWithoutCurrency: DbComponent = {
         ...mockDbComponent,
         currency: undefined,
-        original_cost: null,
+        original_cost: undefined,
         unit_cost_usd: 2500,
         unit_cost_ils: 9250, // ILS = USD * 3.7 (typical exchange rate)
       };
@@ -858,10 +885,13 @@ describe('useComponents', () => {
         eq: mockEq,
       });
 
-      vi.mocked(supabase.from).mockImplementation(() => ({
-        select: mockSelect.mockReturnValue({ order: mockOrder }),
-        update: mockUpdate,
-      } as any));
+      vi.mocked(supabase.from).mockImplementation(
+        () =>
+          ({
+            select: mockSelect.mockReturnValue({ order: mockOrder }),
+            update: mockUpdate,
+          }) as any
+      );
 
       const { result } = renderHook(() => useComponents());
 
@@ -915,7 +945,7 @@ describe('useComponents', () => {
   describe('Loading States', () => {
     it('should show loading state during fetch', async () => {
       let resolvePromise: any;
-      const promise = new Promise((resolve) => {
+      const promise = new Promise(resolve => {
         resolvePromise = resolve;
       });
 

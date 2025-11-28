@@ -15,6 +15,7 @@ import { calculateAssemblyPricing } from '../../utils/assemblyCalculations';
 import { renumberItems } from '../../utils/quotationCalculations';
 import { useQuotations } from '../useQuotations';
 import { logger } from '@/lib/logger';
+import { CustomItemData } from '../../components/quotations/CustomItemForm';
 
 export interface QuotationActionsProps {
   currentQuotation: QuotationProject | null;
@@ -315,6 +316,124 @@ export function useQuotationActions({
     ]
   );
 
+  // Add custom item to system
+  const addCustomItemToSystem = useCallback(
+    async (customItemData: CustomItemData) => {
+      if (!currentQuotation || !selectedSystemId) return;
+
+      const system = currentQuotation.systems.find(
+        s => s.id === selectedSystemId
+      );
+      if (!system) return;
+
+      const itemOrder =
+        currentQuotation.items.filter(
+          item => item.systemId === selectedSystemId
+        ).length + 1;
+
+      const quotationRates: ExchangeRates = {
+        usdToIlsRate: currentQuotation.parameters.usdToIlsRate,
+        eurToIlsRate: currentQuotation.parameters.eurToIlsRate,
+      };
+
+      try {
+        // Convert prices from original currency to all currencies
+        const convertedPrices = convertToAllCurrencies(
+          customItemData.unitCost,
+          customItemData.currency,
+          quotationRates
+        );
+
+        // Calculate totals
+        const totalPriceUSD =
+          convertedPrices.unitCostUSD * customItemData.quantity;
+        const totalPriceILS =
+          convertedPrices.unitCostNIS * customItemData.quantity;
+        const markupPercent = currentQuotation.parameters.markupPercent || 0.75;
+        const customerPriceILS = totalPriceILS * (1 + markupPercent);
+
+        // Persist to database
+        const dbItem = await quotationsHook.addQuotationItem({
+          quotation_system_id: selectedSystemId,
+          component_id: undefined, // No library component
+          assembly_id: undefined,
+          is_custom_item: true, // Mark as custom item
+          item_name: customItemData.name,
+          manufacturer: undefined,
+          manufacturer_part_number: undefined,
+          item_type: customItemData.componentType,
+          labor_subtype: customItemData.laborSubtype,
+          quantity: customItemData.quantity,
+          unit_cost: convertedPrices.unitCostNIS,
+          total_cost: totalPriceILS,
+          unit_price: convertedPrices.unitCostNIS,
+          total_price: totalPriceILS,
+          margin_percentage: markupPercent,
+          notes: customItemData.description,
+          sort_order: itemOrder,
+          original_currency: customItemData.currency,
+          original_cost: customItemData.unitCost,
+        });
+
+        if (!dbItem) {
+          throw new Error('Failed to create custom item in database');
+        }
+
+        // Create local item
+        const newItem: QuotationItem = {
+          id: dbItem.id,
+          systemId: selectedSystemId,
+          systemOrder: system.order,
+          itemOrder,
+          displayNumber: `${system.order}.${itemOrder}`,
+          componentId: undefined, // No library component
+          isCustomItem: true, // Mark as custom
+          componentName: customItemData.name,
+          componentCategory: customItemData.category,
+          itemType: customItemData.componentType,
+          laborSubtype: customItemData.laborSubtype,
+          quantity: customItemData.quantity,
+          unitPriceUSD: convertedPrices.unitCostUSD,
+          unitPriceILS: convertedPrices.unitCostNIS,
+          unitPriceEUR: convertedPrices.unitCostEUR,
+          totalPriceUSD,
+          totalPriceILS,
+          originalCurrency: customItemData.currency,
+          originalCost: customItemData.unitCost,
+          itemMarkupPercent: markupPercent,
+          customerPriceILS,
+          notes: customItemData.description,
+          createdAt: dbItem.created_at,
+          updatedAt: dbItem.updated_at,
+        };
+
+        // Renumber items
+        const updatedItems = [...currentQuotation.items, newItem];
+        const renumberedItems = renumberItems(updatedItems);
+
+        const updatedQuotation = {
+          ...currentQuotation,
+          items: renumberedItems,
+        };
+
+        setCurrentQuotation(updatedQuotation);
+        updateQuotation(currentQuotation.id, { items: renumberedItems });
+        setShowComponentSelector(false);
+      } catch (error) {
+        logger.error('Failed to add custom item:', error);
+        alert('שגיאה בהוספת פריט מותאם אישית. נסה שוב.');
+      }
+    },
+    [
+      currentQuotation,
+      selectedSystemId,
+      setCurrentQuotation,
+      updateQuotation,
+      quotationsHook,
+      setShowComponentSelector,
+    ]
+  );
+
   // Delete item
   const deleteItem = useCallback(
     async (itemId: string) => {
@@ -527,6 +646,7 @@ export function useQuotationActions({
     addSystem,
     addComponentToSystem,
     addAssemblyToSystem,
+    addCustomItemToSystem,
     deleteItem,
     updateItem,
     updateParameters,

@@ -4,6 +4,7 @@ import {
   calculateSystemTotals,
   calculateQuotationTotals,
   renumberItems,
+  renumberSystems,
   convertUSDtoILS,
   convertEURtoILS,
   validateQuotationItem,
@@ -12,7 +13,7 @@ import {
   formatPercent,
   formatNumber,
   generateDisplayNumber,
-  getDefaultQuotationParameters
+  getDefaultQuotationParameters,
 } from '../quotationCalculations';
 import {
   QuotationProject,
@@ -33,10 +34,12 @@ const createDefaultParameters = (): QuotationParameters => ({
   paymentTerms: '30 days',
   deliveryTime: '4-6 weeks',
   includeVAT: true,
-  vatRate: 17
+  vatRate: 17,
 });
 
-const createHardwareItem = (overrides?: Partial<QuotationItem>): QuotationItem => ({
+const createHardwareItem = (
+  overrides?: Partial<QuotationItem>
+): QuotationItem => ({
   id: 'item-1',
   systemId: 'system-1',
   systemOrder: 1,
@@ -56,10 +59,12 @@ const createHardwareItem = (overrides?: Partial<QuotationItem>): QuotationItem =
   notes: '',
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
-  ...overrides
+  ...overrides,
 });
 
-const createLaborItem = (overrides?: Partial<QuotationItem>): QuotationItem => ({
+const createLaborItem = (
+  overrides?: Partial<QuotationItem>
+): QuotationItem => ({
   id: 'item-2',
   systemId: 'system-1',
   systemOrder: 1,
@@ -79,17 +84,19 @@ const createLaborItem = (overrides?: Partial<QuotationItem>): QuotationItem => (
   notes: '',
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
-  ...overrides
+  ...overrides,
 });
 
-const createSystem = (overrides?: Partial<QuotationSystem>): QuotationSystem => ({
+const createSystem = (
+  overrides?: Partial<QuotationSystem>
+): QuotationSystem => ({
   id: 'system-1',
   name: 'Main System',
   description: 'Primary automation system',
   order: 1,
   quantity: 1,
   createdAt: new Date().toISOString(),
-  ...overrides
+  ...overrides,
 });
 
 const createQuotation = (
@@ -126,8 +133,8 @@ const createQuotation = (
     finalTotalILS: 0,
     totalCostILS: 0,
     totalProfitILS: 0,
-    profitMarginPercent: 0
-  }
+    profitMarginPercent: 0,
+  },
 });
 
 // ============ Display Number Tests ============
@@ -149,7 +156,7 @@ describe('calculateItemTotals', () => {
     const item = createHardwareItem({
       quantity: 2,
       unitPriceUSD: 500,
-      unitPriceILS: 1850
+      unitPriceILS: 1850,
     });
 
     const result = calculateItemTotals(item, params);
@@ -162,7 +169,7 @@ describe('calculateItemTotals', () => {
   it('should calculate labor item totals at cost (no markup)', () => {
     const item = createLaborItem({
       quantity: 3,
-      unitPriceILS: 1200
+      unitPriceILS: 1200,
     });
 
     const result = calculateItemTotals(item, params);
@@ -184,7 +191,7 @@ describe('calculateItemTotals', () => {
     const item = createHardwareItem({
       unitPriceUSD: 0,
       unitPriceILS: 0,
-      quantity: 5
+      quantity: 5,
     });
 
     const result = calculateItemTotals(item, params);
@@ -197,7 +204,7 @@ describe('calculateItemTotals', () => {
   it('should generate display number', () => {
     const item = createHardwareItem({
       systemOrder: 3,
-      itemOrder: 7
+      itemOrder: 7,
     });
 
     const result = calculateItemTotals(item, params);
@@ -219,7 +226,7 @@ describe('calculateItemTotals', () => {
   it('should handle very large quantities', () => {
     const item = createHardwareItem({
       quantity: 1000,
-      unitPriceILS: 100
+      unitPriceILS: 100,
     });
 
     const result = calculateItemTotals(item, params);
@@ -231,7 +238,7 @@ describe('calculateItemTotals', () => {
   it('should handle very small prices', () => {
     const item = createHardwareItem({
       quantity: 1,
-      unitPriceILS: 0.05
+      unitPriceILS: 0.05,
     });
 
     const result = calculateItemTotals(item, params);
@@ -249,8 +256,17 @@ describe('calculateSystemTotals', () => {
 
   it('should calculate totals for system with hardware items', () => {
     const items = [
-      createHardwareItem({ systemId: system.id, unitPriceILS: 1000, quantity: 2 }),
-      createHardwareItem({ systemId: system.id, unitPriceILS: 500, quantity: 3, itemOrder: 2 })
+      createHardwareItem({
+        systemId: system.id,
+        unitPriceILS: 1000,
+        quantity: 2,
+      }),
+      createHardwareItem({
+        systemId: system.id,
+        unitPriceILS: 500,
+        quantity: 3,
+        itemOrder: 2,
+      }),
     ];
 
     const result = calculateSystemTotals(system, items, params);
@@ -266,15 +282,15 @@ describe('calculateSystemTotals', () => {
         systemId: system.id,
         laborSubtype: 'engineering',
         unitPriceILS: 1200,
-        quantity: 5
+        quantity: 5,
       }),
       createLaborItem({
         systemId: system.id,
         laborSubtype: 'commissioning',
         unitPriceILS: 1200,
         quantity: 3,
-        itemOrder: 2
-      })
+        itemOrder: 2,
+      }),
     ];
 
     const result = calculateSystemTotals(system, items, params);
@@ -287,8 +303,17 @@ describe('calculateSystemTotals', () => {
 
   it('should calculate totals for mixed hardware and labor', () => {
     const items = [
-      createHardwareItem({ systemId: system.id, unitPriceILS: 10000, quantity: 1 }),
-      createLaborItem({ systemId: system.id, unitPriceILS: 1200, quantity: 5, itemOrder: 2 })
+      createHardwareItem({
+        systemId: system.id,
+        unitPriceILS: 10000,
+        quantity: 1,
+      }),
+      createLaborItem({
+        systemId: system.id,
+        unitPriceILS: 1200,
+        quantity: 5,
+        itemOrder: 2,
+      }),
     ];
 
     const result = calculateSystemTotals(system, items, params);
@@ -302,7 +327,11 @@ describe('calculateSystemTotals', () => {
   it('should multiply totals by system quantity', () => {
     const systemWith2Qty = createSystem({ quantity: 2 });
     const items = [
-      createHardwareItem({ systemId: systemWith2Qty.id, unitPriceILS: 1000, quantity: 1 })
+      createHardwareItem({
+        systemId: systemWith2Qty.id,
+        unitPriceILS: 1000,
+        quantity: 1,
+      }),
     ];
 
     const result = calculateSystemTotals(systemWith2Qty, items, params);
@@ -321,9 +350,26 @@ describe('calculateSystemTotals', () => {
 
   it('should track labor subtypes correctly', () => {
     const items = [
-      createLaborItem({ systemId: system.id, laborSubtype: 'engineering', unitPriceILS: 1200, quantity: 2 }),
-      createLaborItem({ systemId: system.id, laborSubtype: 'commissioning', unitPriceILS: 1200, quantity: 3, itemOrder: 2 }),
-      createLaborItem({ systemId: system.id, laborSubtype: 'installation', unitPriceILS: 1200, quantity: 1, itemOrder: 3 })
+      createLaborItem({
+        systemId: system.id,
+        laborSubtype: 'engineering',
+        unitPriceILS: 1200,
+        quantity: 2,
+      }),
+      createLaborItem({
+        systemId: system.id,
+        laborSubtype: 'commissioning',
+        unitPriceILS: 1200,
+        quantity: 3,
+        itemOrder: 2,
+      }),
+      createLaborItem({
+        systemId: system.id,
+        laborSubtype: 'installation',
+        unitPriceILS: 1200,
+        quantity: 1,
+        itemOrder: 3,
+      }),
     ];
 
     const result = calculateSystemTotals(system, items, params);
@@ -340,8 +386,8 @@ describe('calculateSystemTotals', () => {
         systemId: system.id,
         laborSubtype: undefined,
         unitPriceILS: 1200,
-        quantity: 2
-      })
+        quantity: 2,
+      }),
     ];
 
     const result = calculateSystemTotals(system, items, params);
@@ -353,8 +399,12 @@ describe('calculateSystemTotals', () => {
 
   it('should calculate software totals', () => {
     const softwareItem: QuotationItem = {
-      ...createHardwareItem({ systemId: system.id, unitPriceILS: 5000, quantity: 1 }),
-      itemType: 'software'
+      ...createHardwareItem({
+        systemId: system.id,
+        unitPriceILS: 5000,
+        quantity: 1,
+      }),
+      itemType: 'software',
     };
 
     const result = calculateSystemTotals(system, [softwareItem], params);
@@ -371,8 +421,17 @@ describe('calculateQuotationTotals', () => {
   it('should calculate totals for quotation with hardware only', () => {
     const system = createSystem();
     const items = [
-      createHardwareItem({ systemId: system.id, unitPriceILS: 10000, quantity: 1 }),
-      createHardwareItem({ systemId: system.id, unitPriceILS: 5000, quantity: 2, itemOrder: 2 })
+      createHardwareItem({
+        systemId: system.id,
+        unitPriceILS: 10000,
+        quantity: 1,
+      }),
+      createHardwareItem({
+        systemId: system.id,
+        unitPriceILS: 5000,
+        quantity: 2,
+        itemOrder: 2,
+      }),
     ];
     const quotation = createQuotation(items, [system]);
 
@@ -402,7 +461,7 @@ describe('calculateQuotationTotals', () => {
   it('should calculate totals for quotation with labor only', () => {
     const system = createSystem();
     const items = [
-      createLaborItem({ systemId: system.id, unitPriceILS: 1200, quantity: 5 })
+      createLaborItem({ systemId: system.id, unitPriceILS: 1200, quantity: 5 }),
     ];
     const quotation = createQuotation(items, [system]);
 
@@ -417,8 +476,17 @@ describe('calculateQuotationTotals', () => {
   it('should calculate totals for mixed hardware and labor', () => {
     const system = createSystem();
     const items = [
-      createHardwareItem({ systemId: system.id, unitPriceILS: 10000, quantity: 1 }),
-      createLaborItem({ systemId: system.id, unitPriceILS: 1200, quantity: 5, itemOrder: 2 })
+      createHardwareItem({
+        systemId: system.id,
+        unitPriceILS: 10000,
+        quantity: 1,
+      }),
+      createLaborItem({
+        systemId: system.id,
+        unitPriceILS: 1200,
+        quantity: 5,
+        itemOrder: 2,
+      }),
     ];
     const quotation = createQuotation(items, [system]);
 
@@ -434,8 +502,17 @@ describe('calculateQuotationTotals', () => {
     const system1 = createSystem({ id: 'sys-1', order: 1 });
     const system2 = createSystem({ id: 'sys-2', order: 2 });
     const items = [
-      createHardwareItem({ systemId: system1.id, unitPriceILS: 5000, quantity: 1 }),
-      createHardwareItem({ systemId: system2.id, unitPriceILS: 3000, quantity: 1, systemOrder: 2 })
+      createHardwareItem({
+        systemId: system1.id,
+        unitPriceILS: 5000,
+        quantity: 1,
+      }),
+      createHardwareItem({
+        systemId: system2.id,
+        unitPriceILS: 3000,
+        quantity: 1,
+        systemOrder: 2,
+      }),
     ];
     const quotation = createQuotation(items, [system1, system2]);
 
@@ -447,7 +524,11 @@ describe('calculateQuotationTotals', () => {
   it('should multiply by system quantity', () => {
     const system = createSystem({ quantity: 3 });
     const items = [
-      createHardwareItem({ systemId: system.id, unitPriceILS: 1000, quantity: 1 })
+      createHardwareItem({
+        systemId: system.id,
+        unitPriceILS: 1000,
+        quantity: 1,
+      }),
     ];
     const quotation = createQuotation(items, [system]);
 
@@ -460,7 +541,11 @@ describe('calculateQuotationTotals', () => {
   it('should handle zero markup correctly', () => {
     const system = createSystem();
     const items = [
-      createHardwareItem({ systemId: system.id, unitPriceILS: 10000, quantity: 1 })
+      createHardwareItem({
+        systemId: system.id,
+        unitPriceILS: 10000,
+        quantity: 1,
+      }),
     ];
     const quotation = createQuotation(items, [system], { markupPercent: 0 });
 
@@ -481,7 +566,11 @@ describe('calculateQuotationTotals', () => {
   it('should handle 100% markup correctly', () => {
     const system = createSystem();
     const items = [
-      createHardwareItem({ systemId: system.id, unitPriceILS: 10000, quantity: 1 })
+      createHardwareItem({
+        systemId: system.id,
+        unitPriceILS: 10000,
+        quantity: 1,
+      }),
     ];
     const quotation = createQuotation(items, [system], { markupPercent: 0.5 });
 
@@ -494,7 +583,11 @@ describe('calculateQuotationTotals', () => {
   it('should handle zero risk percentage', () => {
     const system = createSystem();
     const items = [
-      createHardwareItem({ systemId: system.id, unitPriceILS: 10000, quantity: 1 })
+      createHardwareItem({
+        systemId: system.id,
+        unitPriceILS: 10000,
+        quantity: 1,
+      }),
     ];
     const quotation = createQuotation(items, [system], { riskPercent: 0 });
 
@@ -506,7 +599,11 @@ describe('calculateQuotationTotals', () => {
   it('should handle high risk percentage (50%)', () => {
     const system = createSystem();
     const items = [
-      createHardwareItem({ systemId: system.id, unitPriceILS: 10000, quantity: 1 })
+      createHardwareItem({
+        systemId: system.id,
+        unitPriceILS: 10000,
+        quantity: 1,
+      }),
     ];
     const quotation = createQuotation(items, [system], { riskPercent: 50 });
 
@@ -522,7 +619,11 @@ describe('calculateQuotationTotals', () => {
   it('should not include VAT when disabled', () => {
     const system = createSystem();
     const items = [
-      createHardwareItem({ systemId: system.id, unitPriceILS: 10000, quantity: 1 })
+      createHardwareItem({
+        systemId: system.id,
+        unitPriceILS: 10000,
+        quantity: 1,
+      }),
     ];
     const quotation = createQuotation(items, [system], { includeVAT: false });
 
@@ -535,15 +636,25 @@ describe('calculateQuotationTotals', () => {
   it('should calculate VAT correctly when enabled', () => {
     const system = createSystem();
     const items = [
-      createHardwareItem({ systemId: system.id, unitPriceILS: 10000, quantity: 1 })
+      createHardwareItem({
+        systemId: system.id,
+        unitPriceILS: 10000,
+        quantity: 1,
+      }),
     ];
-    const quotation = createQuotation(items, [system], { includeVAT: true, vatRate: 17 });
+    const quotation = createQuotation(items, [system], {
+      includeVAT: true,
+      vatRate: 17,
+    });
 
     const result = calculateQuotationTotals(quotation);
 
     const expectedVAT = result.totalQuoteILS * 0.17;
     expect(result.totalVATILS).toBeCloseTo(expectedVAT, 1);
-    expect(result.finalTotalILS).toBeCloseTo(result.totalQuoteILS + expectedVAT, 1);
+    expect(result.finalTotalILS).toBeCloseTo(
+      result.totalQuoteILS + expectedVAT,
+      1
+    );
   });
 
   it('should handle empty quotation', () => {
@@ -562,7 +673,11 @@ describe('calculateQuotationTotals', () => {
   it('should handle single item quotation', () => {
     const system = createSystem();
     const items = [
-      createHardwareItem({ systemId: system.id, unitPriceILS: 1000, quantity: 1 })
+      createHardwareItem({
+        systemId: system.id,
+        unitPriceILS: 1000,
+        quantity: 1,
+      }),
     ];
     const quotation = createQuotation(items, [system]);
 
@@ -580,7 +695,7 @@ describe('calculateQuotationTotals', () => {
         systemId: system.id,
         unitPriceILS: 100,
         quantity: 1,
-        itemOrder: i + 1
+        itemOrder: i + 1,
       })
     );
     const quotation = createQuotation(items, [system]);
@@ -593,7 +708,11 @@ describe('calculateQuotationTotals', () => {
   it('should handle very large totals (₪1,000,000+)', () => {
     const system = createSystem();
     const items = [
-      createHardwareItem({ systemId: system.id, unitPriceILS: 1000000, quantity: 1 })
+      createHardwareItem({
+        systemId: system.id,
+        unitPriceILS: 1000000,
+        quantity: 1,
+      }),
     ];
     const quotation = createQuotation(items, [system]);
 
@@ -606,11 +725,15 @@ describe('calculateQuotationTotals', () => {
   it('should calculate profit margin percentage correctly', () => {
     const system = createSystem();
     const items = [
-      createHardwareItem({ systemId: system.id, unitPriceILS: 10000, quantity: 1 })
+      createHardwareItem({
+        systemId: system.id,
+        unitPriceILS: 10000,
+        quantity: 1,
+      }),
     ];
     const quotation = createQuotation(items, [system], {
       markupPercent: 0.75,
-      riskPercent: 10
+      riskPercent: 10,
     });
 
     const result = calculateQuotationTotals(quotation);
@@ -638,8 +761,8 @@ describe('calculateQuotationTotals', () => {
         systemId: system.id,
         unitPriceUSD: 1000,
         unitPriceILS: 3700,
-        quantity: 2
-      })
+        quantity: 2,
+      }),
     ];
     const quotation = createQuotation(items, [system]);
 
@@ -650,11 +773,22 @@ describe('calculateQuotationTotals', () => {
 
   it('should separate hardware, software, and labor correctly', () => {
     const system = createSystem();
-    const hardwareItem = createHardwareItem({ systemId: system.id, unitPriceILS: 5000 });
-    const softwareItem: QuotationItem = { ...hardwareItem, id: 'sw-1', itemType: 'software', itemOrder: 2 };
+    const hardwareItem = createHardwareItem({
+      systemId: system.id,
+      unitPriceILS: 5000,
+    });
+    const softwareItem: QuotationItem = {
+      ...hardwareItem,
+      id: 'sw-1',
+      itemType: 'software',
+      itemOrder: 2,
+    };
     const laborItem = createLaborItem({ systemId: system.id, itemOrder: 3 });
 
-    const quotation = createQuotation([hardwareItem, softwareItem, laborItem], [system]);
+    const quotation = createQuotation(
+      [hardwareItem, softwareItem, laborItem],
+      [system]
+    );
 
     const result = calculateQuotationTotals(quotation);
 
@@ -692,7 +826,7 @@ describe('renumberItems', () => {
     const items = [
       createHardwareItem({ systemId: 'sys-1', itemOrder: 5 }),
       createHardwareItem({ id: 'item-2', systemId: 'sys-1', itemOrder: 3 }),
-      createHardwareItem({ id: 'item-3', systemId: 'sys-1', itemOrder: 8 })
+      createHardwareItem({ id: 'item-3', systemId: 'sys-1', itemOrder: 8 }),
     ];
 
     const result = renumberItems(items);
@@ -708,8 +842,18 @@ describe('renumberItems', () => {
   it('should renumber items across multiple systems', () => {
     const items = [
       createHardwareItem({ systemId: 'sys-1', systemOrder: 1, itemOrder: 1 }),
-      createHardwareItem({ id: 'item-2', systemId: 'sys-2', systemOrder: 2, itemOrder: 1 }),
-      createHardwareItem({ id: 'item-3', systemId: 'sys-1', systemOrder: 1, itemOrder: 2 })
+      createHardwareItem({
+        id: 'item-2',
+        systemId: 'sys-2',
+        systemOrder: 2,
+        itemOrder: 1,
+      }),
+      createHardwareItem({
+        id: 'item-3',
+        systemId: 'sys-1',
+        systemOrder: 1,
+        itemOrder: 2,
+      }),
     ];
 
     const result = renumberItems(items);
@@ -722,11 +866,11 @@ describe('renumberItems', () => {
   it('should update system orders when systems provided', () => {
     const systems = [
       { id: 'sys-1', order: 2 },
-      { id: 'sys-2', order: 1 }
+      { id: 'sys-2', order: 1 },
     ];
     const items = [
       createHardwareItem({ systemId: 'sys-1', systemOrder: 1 }),
-      createHardwareItem({ id: 'item-2', systemId: 'sys-2', systemOrder: 2 })
+      createHardwareItem({ id: 'item-2', systemId: 'sys-2', systemOrder: 2 }),
     ];
 
     const result = renumberItems(items, systems);
@@ -882,7 +1026,11 @@ describe('Business Logic Edge Cases', () => {
   it('should handle quotation with only labor (no hardware)', () => {
     const system = createSystem();
     const items = [
-      createLaborItem({ systemId: system.id, unitPriceILS: 1200, quantity: 10 })
+      createLaborItem({
+        systemId: system.id,
+        unitPriceILS: 1200,
+        quantity: 10,
+      }),
     ];
     const quotation = createQuotation(items, [system]);
 
@@ -896,13 +1044,17 @@ describe('Business Logic Edge Cases', () => {
   it('should verify calculation order: cost → profit → risk → VAT', () => {
     const system = createSystem();
     const items = [
-      createHardwareItem({ systemId: system.id, unitPriceILS: 10000, quantity: 1 })
+      createHardwareItem({
+        systemId: system.id,
+        unitPriceILS: 10000,
+        quantity: 1,
+      }),
     ];
     const quotation = createQuotation(items, [system], {
       markupPercent: 0.75,
       riskPercent: 10,
       includeVAT: true,
-      vatRate: 17
+      vatRate: 17,
     });
 
     const result = calculateQuotationTotals(quotation);
@@ -929,8 +1081,18 @@ describe('Business Logic Edge Cases', () => {
   it('should ensure markup is applied to subtotal, not individual items', () => {
     const system = createSystem();
     const items = [
-      createHardwareItem({ systemId: system.id, unitPriceILS: 5000, quantity: 1 }),
-      createHardwareItem({ systemId: system.id, unitPriceILS: 3000, quantity: 1, itemOrder: 2, id: 'item-2' })
+      createHardwareItem({
+        systemId: system.id,
+        unitPriceILS: 5000,
+        quantity: 1,
+      }),
+      createHardwareItem({
+        systemId: system.id,
+        unitPriceILS: 3000,
+        quantity: 1,
+        itemOrder: 2,
+        id: 'item-2',
+      }),
     ];
     const quotation = createQuotation(items, [system]);
 
@@ -945,7 +1107,11 @@ describe('Business Logic Edge Cases', () => {
   it('should ensure risk is applied to (cost + profit), not just cost', () => {
     const system = createSystem();
     const items = [
-      createHardwareItem({ systemId: system.id, unitPriceILS: 10000, quantity: 1 })
+      createHardwareItem({
+        systemId: system.id,
+        unitPriceILS: 10000,
+        quantity: 1,
+      }),
     ];
     const quotation = createQuotation(items, [system], { riskPercent: 10 });
 
@@ -955,21 +1121,26 @@ describe('Business Logic Edge Cases', () => {
     // Profit: 3333.33
     // Risk base: 10000 + 3333.33 = 13333.33
     // Risk: 13333.33 * 0.10 = 1333.33
-    const expectedRisk = (result.totalCostILS + result.totalProfitILS) * 0.10;
+    const expectedRisk = (result.totalCostILS + result.totalProfitILS) * 0.1;
     expect(result.riskAdditionILS).toBeCloseTo(expectedRisk, 1);
   });
 
   it('should ensure VAT is applied last, after all other calculations', () => {
     const system = createSystem();
     const items = [
-      createHardwareItem({ systemId: system.id, unitPriceILS: 10000, quantity: 1 })
+      createHardwareItem({
+        systemId: system.id,
+        unitPriceILS: 10000,
+        quantity: 1,
+      }),
     ];
     const quotation = createQuotation(items, [system]);
 
     const result = calculateQuotationTotals(quotation);
 
     // Total before VAT should be cost + profit + risk
-    const totalBeforeVAT = result.totalCostILS + result.totalProfitILS + result.riskAdditionILS;
+    const totalBeforeVAT =
+      result.totalCostILS + result.totalProfitILS + result.riskAdditionILS;
     expect(result.totalQuoteILS).toBeCloseTo(totalBeforeVAT, 1);
 
     // VAT should be applied to totalQuoteILS
@@ -981,11 +1152,21 @@ describe('Business Logic Edge Cases', () => {
     const system = createSystem();
     const items1 = [
       createHardwareItem({ id: 'a', systemId: system.id, unitPriceILS: 1000 }),
-      createHardwareItem({ id: 'b', systemId: system.id, unitPriceILS: 2000, itemOrder: 2 })
+      createHardwareItem({
+        id: 'b',
+        systemId: system.id,
+        unitPriceILS: 2000,
+        itemOrder: 2,
+      }),
     ];
     const items2 = [
-      createHardwareItem({ id: 'b', systemId: system.id, unitPriceILS: 2000, itemOrder: 2 }),
-      createHardwareItem({ id: 'a', systemId: system.id, unitPriceILS: 1000 })
+      createHardwareItem({
+        id: 'b',
+        systemId: system.id,
+        unitPriceILS: 2000,
+        itemOrder: 2,
+      }),
+      createHardwareItem({ id: 'a', systemId: system.id, unitPriceILS: 1000 }),
     ];
 
     const quotation1 = createQuotation(items1, [system]);
@@ -1006,7 +1187,11 @@ describe('Precision and Rounding', () => {
   it('should maintain 2 decimal precision for currency', () => {
     const system = createSystem();
     const items = [
-      createHardwareItem({ systemId: system.id, unitPriceILS: 99.999, quantity: 1 })
+      createHardwareItem({
+        systemId: system.id,
+        unitPriceILS: 99.999,
+        quantity: 1,
+      }),
     ];
     const quotation = createQuotation(items, [system]);
 
@@ -1019,7 +1204,11 @@ describe('Precision and Rounding', () => {
   it('should avoid floating-point errors', () => {
     const system = createSystem();
     const items = [
-      createHardwareItem({ systemId: system.id, unitPriceILS: 0.1, quantity: 3 })
+      createHardwareItem({
+        systemId: system.id,
+        unitPriceILS: 0.1,
+        quantity: 3,
+      }),
     ];
     const quotation = createQuotation(items, [system]);
 
@@ -1032,7 +1221,11 @@ describe('Precision and Rounding', () => {
   it('should handle division with repeating decimals', () => {
     const system = createSystem();
     const items = [
-      createHardwareItem({ systemId: system.id, unitPriceILS: 100, quantity: 1 })
+      createHardwareItem({
+        systemId: system.id,
+        unitPriceILS: 100,
+        quantity: 1,
+      }),
     ];
     // Markup that causes repeating decimals
     const quotation = createQuotation(items, [system], { markupPercent: 0.6 });
@@ -1066,5 +1259,168 @@ describe('Default Parameters', () => {
     expect(params.markupPercent).toBeGreaterThanOrEqual(0);
     expect(params.dayWorkCost).toBeGreaterThan(0);
     expect(params.vatRate).toBeGreaterThanOrEqual(0);
+  });
+});
+
+// ============ System Renumbering Tests ============
+describe('renumberSystems', () => {
+  it('should renumber systems sequentially starting from 1', () => {
+    const systems: QuotationSystem[] = [
+      {
+        id: 'sys-1',
+        name: 'System A',
+        description: '',
+        order: 5,
+        quantity: 1,
+        createdAt: '2024-01-01',
+      },
+      {
+        id: 'sys-2',
+        name: 'System B',
+        description: '',
+        order: 10,
+        quantity: 1,
+        createdAt: '2024-01-02',
+      },
+      {
+        id: 'sys-3',
+        name: 'System C',
+        description: '',
+        order: 15,
+        quantity: 1,
+        createdAt: '2024-01-03',
+      },
+    ];
+
+    const renumbered = renumberSystems(systems);
+
+    expect(renumbered[0].order).toBe(1);
+    expect(renumbered[1].order).toBe(2);
+    expect(renumbered[2].order).toBe(3);
+  });
+
+  it('should preserve all system properties except order', () => {
+    const systems: QuotationSystem[] = [
+      {
+        id: 'sys-1',
+        name: 'System A',
+        description: 'Desc A',
+        order: 10,
+        quantity: 2,
+        createdAt: '2024-01-01',
+      },
+    ];
+
+    const renumbered = renumberSystems(systems);
+
+    expect(renumbered[0].id).toBe('sys-1');
+    expect(renumbered[0].name).toBe('System A');
+    expect(renumbered[0].description).toBe('Desc A');
+    expect(renumbered[0].quantity).toBe(2);
+    expect(renumbered[0].createdAt).toBe('2024-01-01');
+    expect(renumbered[0].order).toBe(1); // Only order changes
+  });
+
+  it('should handle empty systems array', () => {
+    const systems: QuotationSystem[] = [];
+    const renumbered = renumberSystems(systems);
+    expect(renumbered).toEqual([]);
+  });
+
+  it('should handle single system', () => {
+    const systems: QuotationSystem[] = [
+      {
+        id: 'sys-1',
+        name: 'System A',
+        description: '',
+        order: 99,
+        quantity: 1,
+        createdAt: '2024-01-01',
+      },
+    ];
+
+    const renumbered = renumberSystems(systems);
+    expect(renumbered[0].order).toBe(1);
+  });
+
+  it('should renumber after simulated deletion (gap in orders)', () => {
+    // Simulate: Originally had systems with order 1, 2, 3, 4, 5
+    // Then deleted system 1 and system 3
+    // Remaining systems have order 2, 4, 5
+    const systemsAfterDeletion: QuotationSystem[] = [
+      {
+        id: 'sys-2',
+        name: 'System 2',
+        description: '',
+        order: 2,
+        quantity: 1,
+        createdAt: '2024-01-01',
+      },
+      {
+        id: 'sys-4',
+        name: 'System 4',
+        description: '',
+        order: 4,
+        quantity: 1,
+        createdAt: '2024-01-02',
+      },
+      {
+        id: 'sys-5',
+        name: 'System 5',
+        description: '',
+        order: 5,
+        quantity: 1,
+        createdAt: '2024-01-03',
+      },
+    ];
+
+    const renumbered = renumberSystems(systemsAfterDeletion);
+
+    // After renumbering, should be 1, 2, 3
+    expect(renumbered[0].order).toBe(1);
+    expect(renumbered[0].id).toBe('sys-2');
+    expect(renumbered[1].order).toBe(2);
+    expect(renumbered[1].id).toBe('sys-4');
+    expect(renumbered[2].order).toBe(3);
+    expect(renumbered[2].id).toBe('sys-5');
+  });
+
+  it('should work with systems in any order', () => {
+    const systems: QuotationSystem[] = [
+      {
+        id: 'sys-c',
+        name: 'System C',
+        description: '',
+        order: 100,
+        quantity: 1,
+        createdAt: '2024-01-03',
+      },
+      {
+        id: 'sys-a',
+        name: 'System A',
+        description: '',
+        order: 50,
+        quantity: 1,
+        createdAt: '2024-01-01',
+      },
+      {
+        id: 'sys-b',
+        name: 'System B',
+        description: '',
+        order: 75,
+        quantity: 1,
+        createdAt: '2024-01-02',
+      },
+    ];
+
+    const renumbered = renumberSystems(systems);
+
+    // Should renumber based on array position (C=1, A=2, B=3)
+    expect(renumbered[0].order).toBe(1);
+    expect(renumbered[0].id).toBe('sys-c');
+    expect(renumbered[1].order).toBe(2);
+    expect(renumbered[1].id).toBe('sys-a');
+    expect(renumbered[2].order).toBe(3);
+    expect(renumbered[2].id).toBe('sys-b');
   });
 });

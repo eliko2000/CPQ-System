@@ -55,6 +55,9 @@ export interface QuotationItem {
   // Assembly tracking
   assemblyId?: string; // Link to assembly in library if this is an assembly line item
 
+  // Custom item flag (for items created directly in quotation, not from library)
+  isCustomItem?: boolean; // If true, componentId will be null/undefined
+
   // Quantities and pricing
   quantity: number;
   unitPriceUSD: number;
@@ -188,6 +191,7 @@ export interface DbQuotationItem {
   quotation_system_id: string;
   component_id?: string;
   assembly_id?: string; // Link to assembly if this item represents an assembly
+  is_custom_item?: boolean; // Custom items created directly in quotation (not from library)
   item_name: string;
   manufacturer?: string;
   manufacturer_part_number?: string;

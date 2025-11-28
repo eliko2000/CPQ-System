@@ -232,15 +232,15 @@ export function ComponentForm({
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <Card
         ref={modalRef}
-        className="w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+        className="w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden"
       >
-        <CardHeader>
+        <CardHeader className="flex-shrink-0">
           <CardTitle>
             {component && 'id' in component ? 'עריכת רכיב' : 'הוספת רכיב חדש'}
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+        <CardContent className="flex-1 overflow-y-auto">
+          <form onSubmit={handleSubmit} className="space-y-4 pb-4">
             {/* Basic Information */}
             <div className="space-y-3">
               <div className="border-b pb-2">
@@ -503,13 +503,13 @@ export function ComponentForm({
                   </label>
                   <Input
                     type="number"
-                    step="0.01"
+                    step="1"
                     min="0"
-                    value={formData.unitCostNIS}
+                    value={Math.round(formData.unitCostNIS)}
                     onChange={e =>
-                      handlePriceChange('NIS', parseFloat(e.target.value) || 0)
+                      handlePriceChange('NIS', parseInt(e.target.value) || 0)
                     }
-                    placeholder="0.00"
+                    placeholder="0"
                     className={
                       priceInputField === 'NIS'
                         ? 'bg-green-100 border-green-400'
@@ -524,13 +524,13 @@ export function ComponentForm({
                   </label>
                   <Input
                     type="number"
-                    step="0.01"
+                    step="1"
                     min="0"
-                    value={formData.unitCostUSD}
+                    value={Math.round(formData.unitCostUSD || 0)}
                     onChange={e =>
-                      handlePriceChange('USD', parseFloat(e.target.value) || 0)
+                      handlePriceChange('USD', parseInt(e.target.value) || 0)
                     }
-                    placeholder="0.00"
+                    placeholder="0"
                     className={
                       priceInputField === 'USD'
                         ? 'bg-green-100 border-green-400'
@@ -545,13 +545,13 @@ export function ComponentForm({
                   </label>
                   <Input
                     type="number"
-                    step="0.01"
+                    step="1"
                     min="0"
-                    value={formData.unitCostEUR}
+                    value={Math.round(formData.unitCostEUR || 0)}
                     onChange={e =>
-                      handlePriceChange('EUR', parseFloat(e.target.value) || 0)
+                      handlePriceChange('EUR', parseInt(e.target.value) || 0)
                     }
-                    placeholder="0.00"
+                    placeholder="0"
                     className={
                       priceInputField === 'EUR'
                         ? 'bg-green-100 border-green-400'
@@ -616,27 +616,33 @@ export function ComponentForm({
                 />
               </div>
             </div>
-
-            {/* Form Actions */}
-            <div className="flex justify-end gap-3 pt-2 border-t">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleClose}
-                disabled={isSubmitting}
-              >
-                ביטול
-              </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting
-                  ? 'שומר...'
-                  : component && 'id' in component
-                    ? 'עדכן רכיב'
-                    : 'הוסף רכיב'}
-              </Button>
-            </div>
           </form>
         </CardContent>
+
+        {/* Form Actions - Sticky at bottom */}
+        <div className="flex-shrink-0 border-t bg-white p-4">
+          <div className="flex justify-end gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleClose}
+              disabled={isSubmitting}
+            >
+              ביטול
+            </Button>
+            <Button
+              type="submit"
+              disabled={isSubmitting}
+              onClick={handleSubmit}
+            >
+              {isSubmitting
+                ? 'שומר...'
+                : component && 'id' in component
+                  ? 'עדכן רכיב'
+                  : 'הוסף רכיב'}
+            </Button>
+          </div>
+        </div>
       </Card>
     </div>
   );

@@ -14,6 +14,7 @@ import { QuotationItemsGrid } from './QuotationItemsGrid';
 import { QuotationSummary } from './QuotationSummary';
 import { AddItemDialog } from './AddItemDialog';
 import { QuotationModals } from './QuotationModals';
+import { createQuotationItemColumnDefs } from './quotationItemGridColumns';
 
 export function QuotationEditor() {
   const {
@@ -86,12 +87,179 @@ export function QuotationEditor() {
   // TODO Phase 5: Wire up openComponentSelector and deleteSystem handlers to UI components
   // These handlers were extracted during refactoring but not yet connected to the new modular components
 
-  // TODO: Extract grid configuration to useQuotationGrid hook (Phase 5 continuation)
-  // For now, using inline placeholder values to fix TypeScript error
-  const gridData = currentQuotation?.items || [];
-  const columnDefs: any[] = []; // TODO: Import from quotationGridColumns.ts
-  const autoGroupColumnDef: any = {}; // TODO: Configure properly
-  const gridOptions: any = {}; // TODO: Configure properly
+  // Open component selector popup
+  const openComponentSelector = useCallback(
+    (systemId: string) => {
+      state.setSelectedSystemId(systemId);
+      state.setComponentSearchText('');
+      state.setShowComponentSelector(true);
+    },
+    [state]
+  );
+
+  // Delete item
+  const deleteItem = useCallback(
+    async (itemId: string) => {
+      if (!currentQuotation) return;
+
+      // Delete from Supabase first
+      try {
+        await quotationsHook.deleteQuotationItem(itemId);
+      } catch (error) {
+        logger.error('Failed to delete item:', error);
+      }
+
+      // Remove from local state
+      const updatedItems = currentQuotation.items.filter(
+        item => item.id !== itemId
+      );
+
+      // Renumber items
+      const { renumberItems: renumber } = await import(
+        '../../utils/quotationCalculations'
+      );
+      const renumberedItems = renumber(updatedItems);
+
+      const updatedQuotation = {
+        ...currentQuotation,
+        items: renumberedItems,
+      };
+
+      setCurrentQuotation(updatedQuotation);
+      updateQuotation(currentQuotation.id, { items: renumberedItems });
+    },
+    [currentQuotation, quotationsHook, setCurrentQuotation, updateQuotation]
+  );
+
+  // Prepare grid data with tree structure
+  const gridData = useMemo(() => {
+    if (!currentQuotation) return [];
+
+    const data: any[] = [];
+    const profitCoefficient =
+      currentQuotation.parameters?.markupPercent ?? 0.75;
+
+    // Defensive: ensure systems and items arrays exist
+    const systems = currentQuotation.systems || [];
+    const items = currentQuotation.items || [];
+
+    // Create tree structure with systems as parent nodes
+    systems.forEach(system => {
+      const systemItems = items.filter(item => item.systemId === system.id);
+
+      // Calculate system totals with current profit coefficient
+      const systemTotalCost = systemItems.reduce(
+        (sum, item) => sum + (item.unitPriceILS || 0) * (item.quantity || 1),
+        0
+      );
+      const systemCustomerPrice = systemTotalCost / profitCoefficient;
+
+      // Create system node
+      const systemNode = {
+        id: system.id,
+        systemName: system.name,
+        systemId: system.id,
+        isSystemGroup: true,
+        displayNumber: system.order.toString(),
+        componentName: system.name,
+        componentCategory: 'מערכת',
+        quantity: system.quantity || 1,
+        unitPriceUSD: 0,
+        unitPriceILS: 0,
+        totalPriceUSD:
+          systemItems.reduce(
+            (sum, item) =>
+              sum + (item.unitPriceUSD || 0) * (item.quantity || 1),
+            0
+          ) * (system.quantity || 1),
+        totalPriceILS: systemTotalCost * (system.quantity || 1),
+        customerPriceILS: systemCustomerPrice * (system.quantity || 1),
+        notes: system.description || '',
+      };
+
+      data.push(systemNode);
+
+      // Add existing items with updated customer prices
+      systemItems.forEach(item => {
+        const unitPrice = item.unitPriceILS || 0;
+        const quantity = item.quantity || 1;
+        const customerPrice = (unitPrice * quantity) / profitCoefficient;
+
+        data.push({
+          ...item,
+          systemName: system.name,
+          customerPriceILS: customerPrice,
+        });
+      });
+    });
+
+    return data;
+  }, [currentQuotation]);
+
+  // Get unique values for filtering
+  const getUniqueValues = useCallback(
+    (field: string): string[] => {
+      if (!currentQuotation) return [];
+      const values = currentQuotation.items
+        .map(item => String(item[field as keyof typeof item] || ''))
+        .filter(Boolean);
+      return Array.from(new Set(values)).sort();
+    },
+    [currentQuotation]
+  );
+
+  // Handle column menu click
+  const handleColumnMenuClick = useCallback((columnId: string) => {
+    logger.debug('Column menu clicked:', columnId);
+  }, []);
+
+  // Handle filter click
+  const handleFilterClick = useCallback((columnId: string) => {
+    logger.debug('Filter clicked:', columnId);
+  }, []);
+
+  // Grid column definitions
+  const columnDefs = useMemo(
+    () =>
+      createQuotationItemColumnDefs({
+        currentQuotation,
+        gridData,
+        getUniqueValues,
+        handleColumnMenuClick,
+        handleFilterClick,
+        openComponentSelector,
+        deleteItem,
+        components,
+        assemblies,
+        setModal,
+        setSelectedAssemblyForDetail: state.setSelectedAssemblyForDetail,
+        setShowAssemblyDetail: state.setShowAssemblyDetail,
+        quotationsHook,
+        setCurrentQuotation,
+        updateQuotation,
+      }),
+    [
+      currentQuotation,
+      gridData,
+      getUniqueValues,
+      handleColumnMenuClick,
+      handleFilterClick,
+      openComponentSelector,
+      deleteItem,
+      components,
+      assemblies,
+      setModal,
+      state.setSelectedAssemblyForDetail,
+      state.setShowAssemblyDetail,
+      quotationsHook,
+      setCurrentQuotation,
+      updateQuotation,
+    ]
+  );
+
+  // Grid options
+  const gridOptions: any = {};
+  const autoGroupColumnDef: any = {};
 
   // Filter components for popup
   const filteredComponents = useMemo(() => {
@@ -370,6 +538,8 @@ export function QuotationEditor() {
         filteredAssemblies={filteredAssemblies}
         onAddComponent={actions.addComponentToSystem}
         onAddAssembly={actions.addAssemblyToSystem}
+        onAddCustomItem={actions.addCustomItemToSystem}
+        defaultMarkup={currentQuotation?.parameters?.markupPercent}
       />
 
       {/* Modals */}

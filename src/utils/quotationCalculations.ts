@@ -3,17 +3,23 @@ import {
   QuotationItem,
   QuotationSystem,
   QuotationCalculations,
-  QuotationParameters
+  QuotationParameters,
 } from '../types';
 import { logger } from '@/lib/logger';
 
 // ============ Display Number Generation ============
-export function generateDisplayNumber(systemOrder: number, itemOrder: number): string {
+export function generateDisplayNumber(
+  systemOrder: number,
+  itemOrder: number
+): string {
   return `${systemOrder}.${itemOrder}`;
 }
 
 // ============ Item Calculations ============
-export function calculateItemTotals(item: QuotationItem, parameters: QuotationParameters): QuotationItem {
+export function calculateItemTotals(
+  item: QuotationItem,
+  parameters: QuotationParameters
+): QuotationItem {
   // Calculate total prices
   const totalPriceUSD = item.quantity * item.unitPriceUSD;
   const totalPriceILS = item.quantity * item.unitPriceILS;
@@ -21,16 +27,17 @@ export function calculateItemTotals(item: QuotationItem, parameters: QuotationPa
   // Apply profit coefficient to customer price (divide by coefficient)
   // IMPORTANT: Labor items are sold at cost (no markup)
   const profitCoefficient = parameters.markupPercent ?? 0.75;
-  const customerPriceILS = item.itemType === 'labor'
-    ? totalPriceILS  // Labor sold at cost
-    : totalPriceILS / profitCoefficient;  // Hardware/Software get markup
+  const customerPriceILS =
+    item.itemType === 'labor'
+      ? totalPriceILS // Labor sold at cost
+      : totalPriceILS / profitCoefficient; // Hardware/Software get markup
 
   return {
     ...item,
     totalPriceUSD,
     totalPriceILS,
     customerPriceILS,
-    displayNumber: generateDisplayNumber(item.systemOrder, item.itemOrder)
+    displayNumber: generateDisplayNumber(item.systemOrder, item.itemOrder),
   };
 }
 
@@ -60,7 +67,7 @@ export function calculateSystemTotals(
 ): SystemTotals {
   const systemItems = items.filter(item => item.systemId === system.id);
   const systemQuantity = system.quantity || 1;
-  
+
   const totals = systemItems.reduce(
     (acc, item) => {
       const calculatedItem = calculateItemTotals(item, parameters);
@@ -116,10 +123,10 @@ export function calculateSystemTotals(
       commissioningILS: 0,
       installationILS: 0,
       programmingILS: 0,
-      itemCount: 0
+      itemCount: 0,
     }
   );
-  
+
   // Multiply totals by system quantity
   return {
     systemId: system.id,
@@ -136,27 +143,31 @@ export function calculateSystemTotals(
     commissioningILS: totals.commissioningILS * systemQuantity,
     installationILS: totals.installationILS * systemQuantity,
     programmingILS: totals.programmingILS * systemQuantity,
-    itemCount: totals.itemCount
+    itemCount: totals.itemCount,
   };
 }
 
 // ============ Project Calculations ============
-export function calculateQuotationTotals(project: QuotationProject): QuotationCalculations {
+export function calculateQuotationTotals(
+  project: QuotationProject
+): QuotationCalculations {
   const { items = [], systems = [], parameters } = project;
-  
+
   // Validate inputs
   if (!parameters) {
     throw new Error('Quotation parameters are required for calculations');
   }
-  
+
   // Calculate all items with markup
-  const calculatedItems = items.map(item => calculateItemTotals(item, parameters));
-  
+  const calculatedItems = items.map(item =>
+    calculateItemTotals(item, parameters)
+  );
+
   // Calculate system totals
-  const systemTotals = systems.map(system => 
+  const systemTotals = systems.map(system =>
     calculateSystemTotals(system, calculatedItems, parameters)
   );
-  
+
   // Aggregate cost totals (without markup)
   const costAggregates = systemTotals.reduce(
     (acc, system) => {
@@ -186,17 +197,17 @@ export function calculateQuotationTotals(project: QuotationProject): QuotationCa
       totalInstallationILS: 0,
       totalProgrammingILS: 0,
       subtotalUSD: 0,
-      subtotalILS: 0
+      subtotalILS: 0,
     }
   );
-  
 
   // Get total cost (all hardware/software costs)
   const totalCostILS = costAggregates.subtotalILS;
 
   // Calculate profit: (cost / profit_coefficient) - cost
   const profitCoefficient = parameters.markupPercent || 0.75;
-  const totalProfitILS = profitCoefficient > 0 ? (totalCostILS / profitCoefficient) - totalCostILS : 0;
+  const totalProfitILS =
+    profitCoefficient > 0 ? totalCostILS / profitCoefficient - totalCostILS : 0;
 
   // Calculate risk addition: (cost + profit) × risk%
   const baseForRisk = totalCostILS + totalProfitILS;
@@ -207,18 +218,28 @@ export function calculateQuotationTotals(project: QuotationProject): QuotationCa
 
   // Keep customer price calculation for backward compatibility
   const totalCustomerPriceILS = systems.reduce((total, system) => {
-    const systemItems = calculatedItems.filter(item => item.systemId === system.id);
-    const systemCustomerPrice = systemItems.reduce((sum, item) => sum + item.customerPriceILS, 0);
-    return total + (systemCustomerPrice * (system.quantity || 1));
+    const systemItems = calculatedItems.filter(
+      item => item.systemId === system.id
+    );
+    const systemCustomerPrice = systemItems.reduce(
+      (sum, item) => sum + item.customerPriceILS,
+      0
+    );
+    return total + systemCustomerPrice * (system.quantity || 1);
   }, 0);
 
   // Calculate VAT
-  const totalVATILS = parameters.includeVAT ? totalQuoteILS * (parameters.vatRate / 100) : 0;
+  const totalVATILS = parameters.includeVAT
+    ? totalQuoteILS * (parameters.vatRate / 100)
+    : 0;
   const finalTotalILS = totalQuoteILS + totalVATILS;
 
   // Calculate profit margin: (profit + risk) / total before VAT
-  const profitMarginPercent = totalQuoteILS > 0 ? ((totalProfitILS + riskAdditionILS) / totalQuoteILS) * 100 : 0;
-  
+  const profitMarginPercent =
+    totalQuoteILS > 0
+      ? ((totalProfitILS + riskAdditionILS) / totalQuoteILS) * 100
+      : 0;
+
   return {
     totalHardwareUSD: costAggregates.totalHardwareUSD,
     totalHardwareILS: costAggregates.totalHardwareILS,
@@ -239,12 +260,27 @@ export function calculateQuotationTotals(project: QuotationProject): QuotationCa
     finalTotalILS,
     totalCostILS,
     totalProfitILS,
-    profitMarginPercent
+    profitMarginPercent,
   };
 }
 
+// ============ System Renumbering ============
+/**
+ * Renumber systems to be sequential (1, 2, 3...)
+ * This ensures numbering is always continuous even after deletions
+ */
+export function renumberSystems(systems: QuotationSystem[]): QuotationSystem[] {
+  return systems.map((system, index) => ({
+    ...system,
+    order: index + 1,
+  }));
+}
+
 // ============ Item Renumbering ============
-export function renumberItems(items: QuotationItem[], systems?: { id: string; order: number }[]): QuotationItem[] {
+export function renumberItems(
+  items: QuotationItem[],
+  systems?: { id: string; order: number }[]
+): QuotationItem[] {
   // Create systemId to order mapping if systems provided
   const systemOrderMap: Record<string, number> = {};
   if (systems) {
@@ -254,20 +290,25 @@ export function renumberItems(items: QuotationItem[], systems?: { id: string; or
   }
 
   // Group items by system
-  const itemsBySystem = items.reduce((acc, item) => {
-    if (!acc[item.systemId]) {
-      acc[item.systemId] = [];
-    }
-    acc[item.systemId].push(item);
-    return acc;
-  }, {} as Record<string, QuotationItem[]>);
+  const itemsBySystem = items.reduce(
+    (acc, item) => {
+      if (!acc[item.systemId]) {
+        acc[item.systemId] = [];
+      }
+      acc[item.systemId].push(item);
+      return acc;
+    },
+    {} as Record<string, QuotationItem[]>
+  );
 
   // Sort items within each system and renumber
   const renumberedItems: QuotationItem[] = [];
 
   Object.keys(itemsBySystem).forEach(systemId => {
     // Get the correct system order (either from map or from first item)
-    const systemOrder = systems ? systemOrderMap[systemId] : itemsBySystem[systemId][0]?.systemOrder || 1;
+    const systemOrder = systems
+      ? systemOrderMap[systemId]
+      : itemsBySystem[systemId][0]?.systemOrder || 1;
 
     const systemItems = itemsBySystem[systemId]
       .sort((a, b) => a.itemOrder - b.itemOrder)
@@ -275,7 +316,7 @@ export function renumberItems(items: QuotationItem[], systems?: { id: string; or
         ...item,
         systemOrder: systemOrder, // Update system order
         itemOrder: index + 1,
-        displayNumber: generateDisplayNumber(systemOrder, index + 1)
+        displayNumber: generateDisplayNumber(systemOrder, index + 1),
       }));
 
     renumberedItems.push(...systemItems);
@@ -285,11 +326,17 @@ export function renumberItems(items: QuotationItem[], systems?: { id: string; or
 }
 
 // ============ Currency Conversion ============
-export function convertUSDtoILS(usdAmount: number, exchangeRate: number): number {
+export function convertUSDtoILS(
+  usdAmount: number,
+  exchangeRate: number
+): number {
   return usdAmount * exchangeRate;
 }
 
-export function convertEURtoILS(eurAmount: number, exchangeRate: number): number {
+export function convertEURtoILS(
+  eurAmount: number,
+  exchangeRate: number
+): number {
   return eurAmount * exchangeRate;
 }
 
@@ -317,7 +364,7 @@ export function getDefaultQuotationParameters(): QuotationParameters {
           paymentTerms: '30 יום מהחשבונית',
           deliveryTime: pricing.deliveryTime ?? '4-6 שבועות',
           includeVAT: true,
-          vatRate: pricing.vatRate ?? 17
+          vatRate: pricing.vatRate ?? 17,
         };
       }
     }
@@ -336,7 +383,7 @@ export function getDefaultQuotationParameters(): QuotationParameters {
     paymentTerms: '30 יום מהחשבונית',
     deliveryTime: '4-6 שבועות',
     includeVAT: true,
-    vatRate: 17
+    vatRate: 17,
   };
 }
 
@@ -369,7 +416,7 @@ export async function loadDefaultQuotationParameters(): Promise<QuotationParamet
         paymentTerms: '30 יום מהחשבונית',
         deliveryTime: pricing.deliveryTime,
         includeVAT: true,
-        vatRate: pricing.vatRate
+        vatRate: pricing.vatRate,
       };
     }
   } catch (error) {
@@ -383,61 +430,66 @@ export async function loadDefaultQuotationParameters(): Promise<QuotationParamet
 // ============ Validation ============
 export function validateQuotationItem(item: Partial<QuotationItem>): string[] {
   const errors: string[] = [];
-  
+
   if (!item.componentName || item.componentName.trim() === '') {
     errors.push('Item name is required');
   }
-  
+
   if (!item.quantity || item.quantity <= 0) {
     errors.push('Quantity must be greater than 0');
   }
-  
+
   if (!item.unitPriceUSD || item.unitPriceUSD < 0) {
     errors.push('USD unit price must be non-negative');
   }
-  
+
   if (!item.unitPriceILS || item.unitPriceILS < 0) {
     errors.push('ILS unit price must be non-negative');
   }
-  
+
   if (item.itemMarkupPercent !== undefined && item.itemMarkupPercent < 0) {
     errors.push('Markup percent cannot be negative');
   }
-  
+
   return errors;
 }
 
-export function validateQuotationParameters(parameters: Partial<QuotationParameters>): string[] {
+export function validateQuotationParameters(
+  parameters: Partial<QuotationParameters>
+): string[] {
   const errors: string[] = [];
-  
+
   if (parameters.usdToIlsRate !== undefined && parameters.usdToIlsRate <= 0) {
     errors.push('USD to ILS exchange rate must be positive');
   }
-  
+
   if (parameters.eurToIlsRate !== undefined && parameters.eurToIlsRate <= 0) {
     errors.push('EUR to ILS exchange rate must be positive');
   }
-  
+
   if (parameters.dayWorkCost !== undefined && parameters.dayWorkCost < 0) {
     errors.push('Day work cost cannot be negative');
   }
-  
+
   if (parameters.riskPercent !== undefined && parameters.riskPercent < 0) {
     errors.push('Risk percent cannot be negative');
   }
-  
+
   return errors;
 }
 
 // ============ Formatting Utilities ============
-export function formatCurrency(amount: number, currency: 'USD' | 'ILS' | 'EUR'): string {
+export function formatCurrency(
+  amount: number,
+  currency: 'USD' | 'ILS' | 'EUR'
+): string {
   const formatter = new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: currency,
     minimumFractionDigits: 2,
-    maximumFractionDigits: 2
+    maximumFractionDigits: 2,
   });
-  
+
   return formatter.format(amount);
 }
 
@@ -448,6 +500,6 @@ export function formatPercent(value: number): string {
 export function formatNumber(value: number, decimals: number = 2): string {
   return new Intl.NumberFormat('en-US', {
     minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals
+    maximumFractionDigits: decimals,
   }).format(value);
 }

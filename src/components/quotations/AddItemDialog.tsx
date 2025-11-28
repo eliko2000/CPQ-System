@@ -6,13 +6,14 @@ import {
   calculateAssemblyPricing,
   formatAssemblyPricing,
 } from '../../utils/assemblyCalculations';
-import { useClickOutside } from '../../hooks/useClickOutside';
+import { useEffect, useRef } from 'react';
+import { CustomItemForm, CustomItemData } from './CustomItemForm';
 
 interface AddItemDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  tab: 'components' | 'assemblies';
-  onTabChange: (tab: 'components' | 'assemblies') => void;
+  tab: 'components' | 'assemblies' | 'custom';
+  onTabChange: (tab: 'components' | 'assemblies' | 'custom') => void;
   searchText: string;
   onSearchChange: (text: string) => void;
   components: Component[];
@@ -21,6 +22,8 @@ interface AddItemDialogProps {
   filteredAssemblies: Assembly[];
   onAddComponent: (component: Component) => void;
   onAddAssembly: (assembly: Assembly) => void;
+  onAddCustomItem: (data: CustomItemData) => void;
+  defaultMarkup?: number;
 }
 
 export function AddItemDialog({
@@ -36,8 +39,45 @@ export function AddItemDialog({
   filteredAssemblies,
   onAddComponent,
   onAddAssembly,
+  onAddCustomItem,
+  defaultMarkup: __defaultMarkup,
 }: AddItemDialogProps) {
-  const componentSelectorRef = useClickOutside<HTMLDivElement>(onClose);
+  const componentSelectorRef = useRef<HTMLDivElement>(null);
+
+  // Custom click outside handler that ignores Radix UI portals
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+
+      // Ignore clicks on Radix UI portals (Select dropdowns, etc.)
+      if (target.closest('[data-radix-popper-content-wrapper]')) {
+        return;
+      }
+
+      // Ignore clicks on Radix Select triggers and content
+      if (
+        target.closest('[role="combobox"]') ||
+        target.closest('[role="listbox"]')
+      ) {
+        return;
+      }
+
+      // Close if clicked outside the dialog
+      if (
+        componentSelectorRef.current &&
+        !componentSelectorRef.current.contains(target as Node)
+      ) {
+        onClose();
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -65,7 +105,9 @@ export function AddItemDialog({
           {/* Tabs */}
           <Tabs
             value={tab}
-            onValueChange={v => onTabChange(v as 'components' | 'assemblies')}
+            onValueChange={v =>
+              onTabChange(v as 'components' | 'assemblies' | 'custom')
+            }
           >
             <TabsList className="mb-4">
               <TabsTrigger value="components">
@@ -74,22 +116,26 @@ export function AddItemDialog({
               <TabsTrigger value="assemblies">
                 הרכבות ({assemblies.length})
               </TabsTrigger>
+              <TabsTrigger value="custom">פריט מותאם אישית</TabsTrigger>
             </TabsList>
 
-            <div className="mb-4">
-              <input
-                type="text"
-                value={searchText}
-                onChange={e => onSearchChange(e.target.value)}
-                placeholder={
-                  tab === 'components'
-                    ? 'חפש לפי שם, יצרן או קטגוריה...'
-                    : 'חפש הרכבה לפי שם או תיאור...'
-                }
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                autoFocus
-              />
-            </div>
+            {/* Hide search input for custom item tab */}
+            {tab !== 'custom' && (
+              <div className="mb-4">
+                <input
+                  type="text"
+                  value={searchText}
+                  onChange={e => onSearchChange(e.target.value)}
+                  placeholder={
+                    tab === 'components'
+                      ? 'חפש לפי שם, יצרן או קטגוריה...'
+                      : 'חפש הרכבה לפי שם או תיאור...'
+                  }
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  autoFocus
+                />
+              </div>
+            )}
 
             {/* Components Tab */}
             <TabsContent value="components" className="mt-0">
@@ -126,16 +172,16 @@ export function AddItemDialog({
                             <span className="text-gray-600">מחיר יחידה:</span>
                             <span className="font-mono">
                               ₪
-                              {component.unitCostNIS?.toLocaleString('he-IL', {
-                                minimumFractionDigits: 2,
-                              }) || '0.00'}
+                              {Math.round(
+                                component.unitCostNIS || 0
+                              ).toLocaleString('he-IL')}
                             </span>
                           </div>
                           {component.unitCostUSD && (
                             <div className="flex justify-between">
                               <span className="text-gray-600">מחיר דולר:</span>
                               <span className="font-mono">
-                                ${component.unitCostUSD.toFixed(2)}
+                                ${Math.round(component.unitCostUSD)}
                               </span>
                             </div>
                           )}
@@ -204,6 +250,19 @@ export function AddItemDialog({
                     })}
                   </div>
                 )}
+              </div>
+            </TabsContent>
+
+            {/* Custom Item Tab */}
+            <TabsContent value="custom" className="mt-0">
+              <div className="h-[55vh]">
+                <CustomItemForm
+                  onSubmit={data => {
+                    onAddCustomItem(data);
+                    onClose();
+                  }}
+                  onCancel={onClose}
+                />
               </div>
             </TabsContent>
           </Tabs>

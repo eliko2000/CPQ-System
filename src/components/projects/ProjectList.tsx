@@ -106,7 +106,11 @@ export function ProjectList({ onViewProject }: ProjectListProps = {}) {
   });
 
   // Use table configuration hook for persistence
-  const { config, saveConfig } = useTableConfig('projects_list', {
+  const {
+    config,
+    saveConfig,
+    loading: configLoading,
+  } = useTableConfig('projects_list', {
     columnOrder: [
       'projectName',
       'companyName',
@@ -116,7 +120,14 @@ export function ProjectList({ onViewProject }: ProjectListProps = {}) {
       'actions',
     ],
     columnWidths: {},
-    visibleColumns: [] as string[],
+    visibleColumns: [
+      'projectName',
+      'companyName',
+      'status',
+      'quotationCount',
+      'createdAt',
+      'actions',
+    ],
     filterState: {},
   });
 
@@ -441,6 +452,10 @@ export function ProjectList({ onViewProject }: ProjectListProps = {}) {
           {loading ? (
             <div className="text-center py-8">
               <p className="text-muted-foreground">טוען פרויקטים...</p>
+            </div>
+          ) : configLoading ? (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">טוען הגדרות...</p>
             </div>
           ) : filteredProjects.length === 0 ? (
             <div className="text-center py-8">

@@ -4,24 +4,74 @@ import type { Component, ExtractedItem } from '../types';
 import { getComponentCategories } from '../constants/settings';
 import { logger } from '@/lib/logger';
 import { config } from '@/lib/config';
+import { loadSetting } from '@/services/settingsService';
 
-// Get API key from validated config
-const ANTHROPIC_API_KEY = config.anthropic.apiKey;
-
-// Initialize Anthropic client only if API key is available
-// Note: This will be null if API key is not configured, which is acceptable
-// Excel and CSV parsing will still work, only AI Vision features will be disabled
+// Initialize Anthropic client with dynamic API key loading
 let anthropic: Anthropic | null = null;
+let currentApiKey: string | null = null;
 
-if (ANTHROPIC_API_KEY) {
-  anthropic = new Anthropic({
-    apiKey: ANTHROPIC_API_KEY,
-    dangerouslyAllowBrowser: true, // Only for development - move to backend in production
+/**
+ * Initialize or reinitialize Anthropic client
+ * Can be called on app start or when API key changes
+ */
+async function initializeAnthropicClient(): Promise<void> {
+  try {
+    // Try to load from settings first
+    const settingsResult = await loadSetting<{ apiKey: string }>(
+      'anthropicApiKey'
+    );
+
+    if (settingsResult.success && settingsResult.data?.apiKey) {
+      currentApiKey = settingsResult.data.apiKey;
+      logger.info('Loaded Anthropic API key from settings');
+    } else {
+      // Fallback to environment variable
+      currentApiKey = config.anthropic.apiKey;
+      if (currentApiKey) {
+        logger.info('Using Anthropic API key from environment');
+      }
+    }
+
+    if (currentApiKey) {
+      anthropic = new Anthropic({
+        apiKey: currentApiKey,
+        dangerouslyAllowBrowser: true, // Only for development - move to backend in production
+      });
+      logger.info(
+        'Anthropic client initialized - AI Vision features available'
+      );
+    } else {
+      anthropic = null;
+      logger.warn(
+        'Anthropic API key not configured - AI Vision features disabled'
+      );
+      logger.warn(
+        'Configure in Settings or set VITE_ANTHROPIC_API_KEY in .env.local'
+      );
+    }
+  } catch (error) {
+    logger.error('Error initializing Anthropic client:', error);
+    anthropic = null;
+  }
+}
+
+// Initialize on module load
+initializeAnthropicClient();
+
+// Listen for API key updates from settings
+if (typeof window !== 'undefined') {
+  window.addEventListener('cpq-api-key-updated', () => {
+    logger.info('API key updated, reinitializing Anthropic client');
+    initializeAnthropicClient();
   });
-  logger.info('Anthropic client initialized - AI Vision features available');
-} else {
-  logger.warn('Anthropic client not initialized - AI Vision features disabled');
-  logger.warn('To enable AI Vision, set VITE_ANTHROPIC_API_KEY in .env.local');
+}
+
+/**
+ * Get current Anthropic client instance
+ * Returns null if not initialized
+ */
+export function getAnthropicClient(): Anthropic | null {
+  return anthropic;
 }
 
 // Response type from Claude

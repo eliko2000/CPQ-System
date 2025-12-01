@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react'
-import { useCPQ } from '../../contexts/CPQContext'
-import { loadSetting } from '../../services/settingsService'
+import React, { useState, useEffect } from 'react';
+import { useCPQ } from '../../contexts/CPQContext';
+import { loadSetting } from '../../services/settingsService';
 import {
   LayoutDashboard,
   FileText,
@@ -10,17 +10,25 @@ import {
   BarChart3,
   Settings,
   Menu,
-  X
-} from 'lucide-react'
-import { cn } from '../../lib/utils'
-import { Button } from '../ui/button'
-import { logger } from '@/lib/logger'
+  X,
+} from 'lucide-react';
+import { cn } from '../../lib/utils';
+import { Button } from '../ui/button';
+import { logger } from '@/lib/logger';
+import { UserMenu } from './UserMenu';
+import { TeamSwitcher } from '../teams/TeamSwitcher';
 
 export function Sidebar() {
-  const { uiState, setActiveView, toggleSidebar, currentQuotation, setCurrentQuotation } = useCPQ()
-  const [showNavigationConfirm, setShowNavigationConfirm] = useState(false)
-  const [pendingView, setPendingView] = useState<string | null>(null)
-  const [logoUrl, setLogoUrl] = useState<string | null>(null)
+  const {
+    uiState,
+    setActiveView,
+    toggleSidebar,
+    currentQuotation,
+    setCurrentQuotation,
+  } = useCPQ();
+  const [showNavigationConfirm, setShowNavigationConfirm] = useState(false);
+  const [pendingView, setPendingView] = useState<string | null>(null);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
 
   const navigation = [
     {
@@ -58,69 +66,71 @@ export function Sidebar() {
       icon: Settings,
       view: 'settings' as const,
     },
-  ]
+  ];
 
   // Handle navigation with quotation check
   const handleNavigation = (view: string) => {
     if (currentQuotation) {
       // Show confirmation dialog
-      setPendingView(view)
-      setShowNavigationConfirm(true)
+      setPendingView(view);
+      setShowNavigationConfirm(true);
     } else {
-      setActiveView(view as any)
+      setActiveView(view as any);
     }
-  }
+  };
 
   // Confirm navigation and close quotation
   const confirmNavigation = () => {
-    setCurrentQuotation(null)
+    setCurrentQuotation(null);
     if (pendingView) {
-      setActiveView(pendingView as any)
+      setActiveView(pendingView as any);
     }
-    setShowNavigationConfirm(false)
-    setPendingView(null)
-  }
+    setShowNavigationConfirm(false);
+    setPendingView(null);
+  };
 
   // Cancel navigation
   const cancelNavigation = () => {
-    setShowNavigationConfirm(false)
-    setPendingView(null)
-  }
+    setShowNavigationConfirm(false);
+    setPendingView(null);
+  };
 
   // Load company logo on mount
   useEffect(() => {
     async function loadLogo() {
       try {
-        const result = await loadSetting<{ logoUrl: string }>('companyLogo')
+        const result = await loadSetting<{ logoUrl: string }>('companyLogo');
         if (result.success && result.data?.logoUrl) {
-          setLogoUrl(result.data.logoUrl)
+          setLogoUrl(result.data.logoUrl);
         }
       } catch (error) {
-        logger.error('Error loading logo:', error)
+        logger.error('Error loading logo:', error);
       }
     }
-    loadLogo()
+    loadLogo();
 
     // Listen for logo updates
     const handleLogoUpdate = (event: any) => {
-      setLogoUrl(event.detail?.logoUrl || null)
-    }
-    window.addEventListener('cpq-logo-updated', handleLogoUpdate)
+      setLogoUrl(event.detail?.logoUrl || null);
+    };
+    window.addEventListener('cpq-logo-updated', handleLogoUpdate);
 
     return () => {
-      window.removeEventListener('cpq-logo-updated', handleLogoUpdate)
-    }
-  }, [])
+      window.removeEventListener('cpq-logo-updated', handleLogoUpdate);
+    };
+  }, []);
 
   return (
     <>
-      <div className={cn(
-        "flex flex-col bg-card border-l border-border transition-all duration-300",
-        uiState.sidebarCollapsed ? "w-16" : "w-64"
-      )}>
+      <div
+        className={cn(
+          'flex flex-col bg-card border-l border-border transition-all duration-300',
+          uiState.sidebarCollapsed ? 'w-16' : 'w-64'
+        )}
+      >
         {/* Header - Blue Background with White Text */}
         <div className="bg-primary p-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mb-4">
             {!uiState.sidebarCollapsed && (
               <h1 className="text-lg font-bold text-primary-foreground w-full text-center">
                 RadiaQ AI
@@ -137,14 +147,19 @@ export function Sidebar() {
               )}
             </button>
           </div>
+
+          {/* Team Switcher */}
+          <div className="w-full">
+            <TeamSwitcher collapsed={uiState.sidebarCollapsed} />
+          </div>
         </div>
 
         {/* Navigation */}
         <nav className="flex-1 p-4 space-y-2">
           {navigation.map((item, _index) => {
-            const Icon = item.icon
-            const isActive = uiState.activeView === item.view
-            const isSettings = item.view === 'settings'
+            const Icon = item.icon;
+            const isActive = uiState.activeView === item.view;
+            const isSettings = item.view === 'settings';
 
             return (
               <React.Fragment key={item.name}>
@@ -156,10 +171,10 @@ export function Sidebar() {
                 <button
                   onClick={() => handleNavigation(item.view)}
                   className={cn(
-                    "w-full flex items-center space-x-reverse space-x-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                    'w-full flex items-center space-x-reverse space-x-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
                     isActive
-                      ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:bg-accent hover:text-foreground'
                   )}
                   title={uiState.sidebarCollapsed ? item.name : undefined}
                 >
@@ -169,37 +184,43 @@ export function Sidebar() {
                   )}
                 </button>
               </React.Fragment>
-            )
+            );
           })}
         </nav>
 
-        {/* Footer - Company Logo */}
-        {!uiState.sidebarCollapsed && logoUrl && (
-          <div className="p-6 border-t border-border">
-            <div className="w-full flex items-center justify-center">
-              <img
-                src={logoUrl}
-                alt="Company Logo"
-                className="max-h-24 w-full object-contain"
-              />
-            </div>
+        {/* Footer - User Menu & Company Logo */}
+        <div className="border-t border-border">
+          <div className="p-4 flex justify-center">
+            <UserMenu />
           </div>
-        )}
+
+          {!uiState.sidebarCollapsed && logoUrl && (
+            <div className="px-6 pb-6">
+              <div className="w-full flex items-center justify-center">
+                <img
+                  src={logoUrl}
+                  alt="Company Logo"
+                  className="max-h-24 w-full object-contain"
+                />
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Navigation Confirmation Dialog */}
       {showNavigationConfirm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">סגירת הצעת מחיר</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              סגירת הצעת מחיר
+            </h3>
             <p className="text-gray-600 mb-6">
-              האם אתה בטוח שברצונך לסגור את הצעת המחיר ולנווט לדף אחר? השינויים נשמרים באופן אוטומטי.
+              האם אתה בטוח שברצונך לסגור את הצעת המחיר ולנווט לדף אחר? השינויים
+              נשמרים באופן אוטומטי.
             </p>
             <div className="flex justify-end gap-3">
-              <Button
-                onClick={cancelNavigation}
-                variant="outline"
-              >
+              <Button onClick={cancelNavigation} variant="outline">
                 ביטול
               </Button>
               <Button
@@ -213,5 +234,5 @@ export function Sidebar() {
         </div>
       )}
     </>
-  )
+  );
 }

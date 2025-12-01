@@ -1,4 +1,5 @@
 import { lazy, Suspense } from 'react';
+import { Routes, Route } from 'react-router-dom';
 import { useCPQ } from '../../contexts/CPQContext';
 import { useQuotations } from '../../hooks/useQuotations';
 import { useProjects } from '../../hooks/useProjects';
@@ -8,6 +9,13 @@ import { supabase } from '../../supabaseClient';
 import { toast } from 'sonner';
 import { SectionErrorBoundary } from '../error/ErrorBoundary';
 import { useErrorHandler } from '../../hooks/useErrorHandler';
+import { MainLayout } from './MainLayout';
+import { AuthGuard } from '../auth/AuthGuard';
+
+import LoginPage from '../../pages/auth/LoginPage';
+import SignupPage from '../../pages/auth/SignupPage';
+import ForgotPasswordPage from '../../pages/auth/ForgotPasswordPage';
+import AuthCallback from '../../pages/auth/AuthCallback';
 
 // Lazy load heavy components for code splitting
 const Dashboard = lazy(() =>
@@ -61,7 +69,7 @@ const LoadingFallback = () => (
   </div>
 );
 
-export function AppRoutes() {
+function AuthenticatedApp() {
   const {
     uiState,
     currentProject,
@@ -73,24 +81,6 @@ export function AppRoutes() {
   const { getQuotation } = useQuotations();
   const { getProject } = useProjects();
   const { handleError } = useErrorHandler();
-
-  // If we have a current quotation, show quotation editor
-  if (currentQuotation) {
-    return (
-      <Suspense fallback={<LoadingFallback />}>
-        <QuotationEditor />
-      </Suspense>
-    );
-  }
-
-  // If we have a current project, show BOM editor
-  if (currentProject) {
-    return (
-      <Suspense fallback={<LoadingFallback />}>
-        <BOMEditor />
-      </Suspense>
-    );
-  }
 
   // Handle quotation viewing
   const handleViewQuotation = async (quotationId: string) => {
@@ -162,87 +152,129 @@ export function AppRoutes() {
     }
   };
 
-  // If viewing a project detail page
-  if (viewingProjectId && uiState.activeView === 'projects') {
-    return (
-      <Suspense fallback={<LoadingFallback />}>
-        <ProjectDetailPage
-          projectId={viewingProjectId}
-          onBack={() => setViewingProjectId(null)}
-          onViewQuotation={handleViewQuotation}
-          onCreateQuotation={handleCreateQuotation}
-        />
-      </Suspense>
-    );
-  }
+  const getContent = () => {
+    // If we have a current quotation, show quotation editor
+    if (currentQuotation) {
+      return (
+        <Suspense fallback={<LoadingFallback />}>
+          <QuotationEditor />
+        </Suspense>
+      );
+    }
 
-  // Otherwise, show view based on active state
-  switch (uiState.activeView) {
-    case 'dashboard':
+    // If we have a current project, show BOM editor
+    if (currentProject) {
       return (
-        <SectionErrorBoundary>
-          <Suspense fallback={<LoadingFallback />}>
-            <Dashboard />
-          </Suspense>
-        </SectionErrorBoundary>
+        <Suspense fallback={<LoadingFallback />}>
+          <BOMEditor />
+        </Suspense>
       );
-    case 'quotes':
+    }
+
+    // If viewing a project detail page
+    if (viewingProjectId && uiState.activeView === 'projects') {
       return (
-        <SectionErrorBoundary>
-          <Suspense fallback={<LoadingFallback />}>
-            <SupplierQuotesPage />
-          </Suspense>
-        </SectionErrorBoundary>
+        <Suspense fallback={<LoadingFallback />}>
+          <ProjectDetailPage
+            projectId={viewingProjectId}
+            onBack={() => setViewingProjectId(null)}
+            onViewQuotation={handleViewQuotation}
+            onCreateQuotation={handleCreateQuotation}
+          />
+        </Suspense>
       );
-    case 'quotations':
-      return (
-        <SectionErrorBoundary>
-          <Suspense fallback={<LoadingFallback />}>
-            <QuotationList />
-          </Suspense>
-        </SectionErrorBoundary>
-      );
-    case 'components':
-      return (
-        <SectionErrorBoundary>
-          <Suspense fallback={<LoadingFallback />}>
-            <ComponentLibrary />
-          </Suspense>
-        </SectionErrorBoundary>
-      );
-    case 'projects':
-      return (
-        <SectionErrorBoundary>
-          <Suspense fallback={<LoadingFallback />}>
-            <ProjectList
-              onViewProject={projectId => setViewingProjectId(projectId)}
-            />
-          </Suspense>
-        </SectionErrorBoundary>
-      );
-    case 'analytics':
-      return (
-        <SectionErrorBoundary>
-          <Suspense fallback={<LoadingFallback />}>
-            <Analytics />
-          </Suspense>
-        </SectionErrorBoundary>
-      );
-    case 'settings':
-      return (
-        <SectionErrorBoundary>
-          <Suspense fallback={<LoadingFallback />}>
-            <SettingsPage />
-          </Suspense>
-        </SectionErrorBoundary>
-      );
-    default:
-      return (
-        <SectionErrorBoundary>
-          <Suspense fallback={<LoadingFallback />}>
-            <Dashboard />
-          </Suspense>
-        </SectionErrorBoundary>
-      );
-  }
+    }
+
+    // Otherwise, show view based on active state
+    switch (uiState.activeView) {
+      case 'dashboard':
+        return (
+          <SectionErrorBoundary>
+            <Suspense fallback={<LoadingFallback />}>
+              <Dashboard />
+            </Suspense>
+          </SectionErrorBoundary>
+        );
+      case 'quotes':
+        return (
+          <SectionErrorBoundary>
+            <Suspense fallback={<LoadingFallback />}>
+              <SupplierQuotesPage />
+            </Suspense>
+          </SectionErrorBoundary>
+        );
+      case 'quotations':
+        return (
+          <SectionErrorBoundary>
+            <Suspense fallback={<LoadingFallback />}>
+              <QuotationList />
+            </Suspense>
+          </SectionErrorBoundary>
+        );
+      case 'components':
+        return (
+          <SectionErrorBoundary>
+            <Suspense fallback={<LoadingFallback />}>
+              <ComponentLibrary />
+            </Suspense>
+          </SectionErrorBoundary>
+        );
+      case 'projects':
+        return (
+          <SectionErrorBoundary>
+            <Suspense fallback={<LoadingFallback />}>
+              <ProjectList
+                onViewProject={projectId => setViewingProjectId(projectId)}
+              />
+            </Suspense>
+          </SectionErrorBoundary>
+        );
+      case 'analytics':
+        return (
+          <SectionErrorBoundary>
+            <Suspense fallback={<LoadingFallback />}>
+              <Analytics />
+            </Suspense>
+          </SectionErrorBoundary>
+        );
+      case 'settings':
+        return (
+          <SectionErrorBoundary>
+            <Suspense fallback={<LoadingFallback />}>
+              <SettingsPage />
+            </Suspense>
+          </SectionErrorBoundary>
+        );
+      default:
+        return (
+          <SectionErrorBoundary>
+            <Suspense fallback={<LoadingFallback />}>
+              <Dashboard />
+            </Suspense>
+          </SectionErrorBoundary>
+        );
+    }
+  };
+
+  return <MainLayout>{getContent()}</MainLayout>;
+}
+
+export function AppRoutes() {
+  return (
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/signup" element={<SignupPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/auth/callback" element={<AuthCallback />} />
+
+      <Route
+        path="/*"
+        element={
+          <AuthGuard>
+            <AuthenticatedApp />
+          </AuthGuard>
+        }
+      />
+    </Routes>
+  );
 }

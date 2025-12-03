@@ -10,6 +10,7 @@ export type ProjectStatus = 'active' | 'on-hold' | 'completed' | 'cancelled';
 
 export interface ProjectMetadata {
   id: string;
+  projectNumber?: string; // Custom project number (e.g., PRJ-0001)
   companyName: string;
   projectName: string;
   description?: string;
@@ -27,12 +28,14 @@ export interface ProjectSummary extends ProjectMetadata {
 // Database schema type for projects
 export interface DbProject {
   id: string;
+  project_number?: string;
   company_name: string;
   project_name: string;
   description?: string;
   status: ProjectStatus;
   created_at: string;
   updated_at: string;
+  team_id?: string;
 }
 
 // Form data for creating/editing projects

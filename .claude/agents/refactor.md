@@ -194,7 +194,7 @@ ls -lh dist/assets/
 - Configuration changes
 
 ### 🔴 HIGH RISK (Require manual testing + user approval)
-- Database schema changes
+- Database schema changes (requires migration)
 - Authentication/authorization changes
 - Pricing calculation changes
 - Currency conversion changes
@@ -303,27 +303,58 @@ function ParentComponent() {
 
 ### Pattern 4: Database Migration
 **BEFORE Testing:**
-- Backup database
+- Backup database (if critical data)
 - Document current schema
 - Test all queries work
 - Note data in affected tables
+- Review existing RLS policies
 
-**Change:**
+**Creating Migration:**
+1. Create migration file in `supabase/migrations/`
+   - Format: `YYYYMMDDHHMMSS_description.sql`
+   - Example: `20241203114500_add_currency_tracking.sql`
+
+2. Write idempotent migration:
 ```sql
 -- Migration: Add original_currency tracking
+-- Purpose: Support multi-currency pricing with original currency preservation
+-- Project: CPQ System (uxkvfghfcwnynshmzeck)
+
+BEGIN;
+
+-- Add columns if they don't exist
 ALTER TABLE components
-ADD COLUMN currency TEXT CHECK (currency IN ('NIS', 'USD', 'EUR'));
+ADD COLUMN IF NOT EXISTS currency TEXT CHECK (currency IN ('NIS', 'USD', 'EUR')) DEFAULT 'NIS';
 
 ALTER TABLE components
-ADD COLUMN original_cost DECIMAL(12,2);
+ADD COLUMN IF NOT EXISTS original_cost DECIMAL(12,2);
+
+-- Add helpful comment
+COMMENT ON COLUMN components.currency IS 'Original currency of the component price';
+COMMENT ON COLUMN components.original_cost IS 'Original price in the original currency';
+
+COMMIT;
+
+-- Rollback (for reference, not executed):
+-- BEGIN;
+-- ALTER TABLE components DROP COLUMN IF EXISTS currency;
+-- ALTER TABLE components DROP COLUMN IF EXISTS original_cost;
+-- COMMIT;
 ```
 
+3. Inform user to push migration:
+   - "Migration created at: `supabase/migrations/<filename>.sql`"
+   - "Run `/migrate` to push this to the remote database"
+   - "Or push manually: `npx supabase db push`"
+
 **AFTER Testing:**
-- Verify column exists
+- Verify migration pushed successfully
+- Verify columns exist in remote DB
 - Test existing queries still work
 - Test new functionality works
-- Verify data integrity
-- Test RLS policies still work
+- Verify data integrity preserved
+- Test RLS policies still enforce correctly
+- Check no performance degradation
 
 ---
 

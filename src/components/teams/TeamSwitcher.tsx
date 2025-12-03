@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTeam } from '../../contexts/TeamContext';
 import { CreateTeamDialog } from './CreateTeamDialog';
+import { JoinTeamDialog } from './JoinTeamDialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -44,6 +45,12 @@ export function TeamSwitcher({ collapsed = false }: { collapsed?: boolean }) {
             </DropdownMenuItem>
           ))}
           <DropdownMenuSeparator />
+          <JoinTeamDialog>
+            <DropdownMenuItem onSelect={(e: Event) => e.preventDefault()}>
+              <Users className="mr-2 h-4 w-4" />
+              Join Team
+            </DropdownMenuItem>
+          </JoinTeamDialog>
           <CreateTeamDialog>
             <DropdownMenuItem onSelect={(e: Event) => e.preventDefault()}>
               <Plus className="mr-2 h-4 w-4" />
@@ -95,6 +102,15 @@ export function TeamSwitcher({ collapsed = false }: { collapsed?: boolean }) {
           ))
         )}
         <DropdownMenuSeparator />
+        <JoinTeamDialog>
+          <DropdownMenuItem
+            onSelect={(e: Event) => e.preventDefault()}
+            className="cursor-pointer"
+          >
+            <Users className="mr-2 h-4 w-4" />
+            Join Existing Team
+          </DropdownMenuItem>
+        </JoinTeamDialog>
         <CreateTeamDialog>
           <DropdownMenuItem
             onSelect={(e: Event) => e.preventDefault()}

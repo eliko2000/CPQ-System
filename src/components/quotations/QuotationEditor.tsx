@@ -297,38 +297,36 @@ export function QuotationEditor() {
     (params: any) => {
       if (!params.api) return;
 
-      // Apply saved column widths
-      if (Object.keys(config.columnWidths).length > 0) {
-        params.api.getAllDisplayedColumns()?.forEach((col: any) => {
-          const fieldId = col.getColId();
-          if (config.columnWidths[fieldId]) {
-            params.api.setColumnWidth(
-              col.getColId(),
-              config.columnWidths[fieldId]
-            );
-          }
-        });
-      }
+      // Widths are already applied via columnDefs in QuotationItemsGrid's visibleColumnDefs
+      // No need to re-apply them here as it causes a flash
 
       // Apply saved filter state
       if (Object.keys(config.filterState).length > 0) {
         params.api.setFilterModel(config.filterState);
       }
 
-      params.api.sizeColumnsToFit();
+      // DON'T call sizeColumnsToFit - it interferes with saved widths
     },
-    [config.columnWidths, config.filterState]
+    [config.filterState]
   );
 
   // Handle column resize
   const onColumnResized = useCallback(
     (params: any) => {
-      if (params.finished && params.api) {
+      // ONLY save if this was a user drag - ignore all automatic resizes
+      const isUserResize =
+        params.source === 'uiColumnResized' ||
+        params.source === 'uiColumnDragged';
+
+      if (params.finished && isUserResize && params.api) {
         const widths: Record<string, number> = {};
         params.api.getAllDisplayedColumns()?.forEach((col: any) => {
           widths[col.getColId()] = col.getActualWidth();
         });
+        logger.debug('User resized column, saving widths:', widths);
         saveConfig({ columnWidths: widths });
+      } else if (params.finished) {
+        logger.debug('Ignoring automatic resize, source:', params.source);
       }
     },
     [saveConfig]
@@ -337,12 +335,23 @@ export function QuotationEditor() {
   // Handle column move
   const onColumnMoved = useCallback(
     (params: any) => {
-      if (params.finished && params.api) {
-        const order =
+      // ONLY save if this was a user drag - ignore automatic column reordering
+      const isUserMove =
+        params.source === 'uiColumnMoved' ||
+        params.source === 'uiColumnDragged';
+
+      if (params.finished && isUserMove && params.api) {
+        const displayedOrder =
           params.api
             .getAllDisplayedColumns()
             ?.map((col: any) => col.getColId()) || [];
-        saveConfig({ columnOrder: order });
+
+        // In RTL mode with AG Grid, we don't need to reverse the order
+        // AG Grid gives us the logical order, which matches how we store it
+        logger.debug('User moved column, saving order:', displayedOrder);
+        saveConfig({ columnOrder: displayedOrder });
+      } else if (params.finished) {
+        logger.debug('Ignoring automatic column move, source:', params.source);
       }
     },
     [saveConfig]

@@ -122,6 +122,41 @@ const customerPrice = applyMarkup(componentPrice, markupRate);
 
 **When to validate:** Changes to `cpqService.ts`, new pricing queries, schema modifications, RLS policy changes
 
+### Database Migration Requirements
+
+**IMPORTANT**: When implementing features that require database schema changes:
+
+1. **Create Migration Files**: Write migration SQL files in `supabase/migrations/`
+   - Use naming format: `YYYYMMDDHHMMSS_description.sql`
+   - Example: `20241203120000_add_currency_tracking.sql`
+
+2. **Migration Template**:
+```sql
+-- Migration: <Description>
+-- Purpose: <Why this change is needed>
+BEGIN;
+
+-- Your DDL changes here
+ALTER TABLE components ADD COLUMN IF NOT EXISTS currency TEXT;
+
+-- Add constraints
+ALTER TABLE components ADD CONSTRAINT currency_check
+  CHECK (currency IN ('NIS', 'USD', 'EUR'));
+
+COMMIT;
+```
+
+3. **Push Migrations**: After creating migration files, inform the user:
+   - "I've created a migration file at `supabase/migrations/<filename>.sql`"
+   - "Run `/migrate` to review and push this migration to the remote database"
+   - "Or manually push with: `npx supabase db push`"
+
+4. **Migration Best Practices**:
+   - Always use `IF NOT EXISTS` / `IF EXISTS` for idempotency
+   - Wrap DDL in transactions when possible
+   - Include rollback plan as comments
+   - Test locally before pushing: `npx supabase db reset`
+
 ### Using Supabase MCP for Backend Validation
 
 Before implementing cpqService functions, validate PostgREST queries directly:

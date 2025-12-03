@@ -5,7 +5,6 @@ import { useQuotations } from '../../hooks/useQuotations';
 import { useProjects } from '../../hooks/useProjects';
 import { convertDbQuotationToQuotationProject } from '../../lib/utils';
 import { loadDefaultQuotationParameters } from '../../utils/quotationCalculations';
-import { supabase } from '../../supabaseClient';
 import { toast } from 'sonner';
 import { SectionErrorBoundary } from '../error/ErrorBoundary';
 import { useErrorHandler } from '../../hooks/useErrorHandler';
@@ -16,6 +15,8 @@ import LoginPage from '../../pages/auth/LoginPage';
 import SignupPage from '../../pages/auth/SignupPage';
 import ForgotPasswordPage from '../../pages/auth/ForgotPasswordPage';
 import AuthCallback from '../../pages/auth/AuthCallback';
+import { UserProfilePage } from '../../pages/profile/UserProfilePage';
+import { TeamOnboardingPage } from '../../pages/onboarding/TeamOnboardingPage';
 
 // Lazy load heavy components for code splitting
 const Dashboard = lazy(() =>
@@ -58,6 +59,11 @@ const QuotationList = lazy(() =>
 const SettingsPage = lazy(() =>
   import('../settings/SettingsPage').then(m => ({ default: m.SettingsPage }))
 );
+const SystemAdminPage = lazy(() =>
+  import('../../pages/admin/SystemAdminPage').then(m => ({
+    default: m.SystemAdminPage,
+  }))
+);
 
 // Loading fallback component
 const LoadingFallback = () => (
@@ -78,7 +84,7 @@ function AuthenticatedApp() {
     viewingProjectId,
     setViewingProjectId,
   } = useCPQ();
-  const { getQuotation } = useQuotations();
+  const { getQuotation, addQuotation } = useQuotations();
   const { getProject } = useProjects();
   const { handleError } = useErrorHandler();
 
@@ -105,38 +111,19 @@ function AuthenticatedApp() {
       // Load default parameters
       const defaultParams = await loadDefaultQuotationParameters();
 
-      // Create new quotation with project data
-      const { data: newQuotation, error } = await supabase
-        .from('quotations')
-        .insert([
-          {
-            quotation_number: `Q-${Date.now()}`,
-            customer_name: project.company_name,
-            project_name: project.project_name,
-            project_id: projectId,
-            currency: 'ILS',
-            exchange_rate: defaultParams.usdToIlsRate,
-            margin_percentage: defaultParams.markupPercent,
-            status: 'draft',
-            total_cost: 0,
-            total_price: 0,
-          },
-        ])
-        .select(
-          `
-          *,
-          quotation_systems (
-            *,
-            quotation_items (
-              *,
-              component:components (*)
-            )
-          )
-        `
-        )
-        .single();
-
-      if (error) throw error;
+      // Use the hook's addQuotation function (includes team_id automatically)
+      const newQuotation = await addQuotation({
+        quotation_number: `Q-${Date.now()}`,
+        customer_name: project.company_name,
+        project_name: project.project_name,
+        project_id: projectId,
+        currency: 'ILS',
+        exchange_rate: defaultParams.usdToIlsRate,
+        margin_percentage: defaultParams.markupPercent,
+        status: 'draft',
+        total_cost: 0,
+        total_price: 0,
+      });
 
       if (newQuotation) {
         const quotationProject =
@@ -266,6 +253,50 @@ export function AppRoutes() {
       <Route path="/signup" element={<SignupPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
+
+      <Route
+        path="/onboarding"
+        element={
+          <AuthGuard>
+            <TeamOnboardingPage />
+          </AuthGuard>
+        }
+      />
+
+      <Route
+        path="/profile"
+        element={
+          <AuthGuard>
+            <MainLayout>
+              <UserProfilePage />
+            </MainLayout>
+          </AuthGuard>
+        }
+      />
+
+      <Route
+        path="/settings"
+        element={
+          <AuthGuard>
+            <MainLayout>
+              <Suspense fallback={<LoadingFallback />}>
+                <SettingsPage />
+              </Suspense>
+            </MainLayout>
+          </AuthGuard>
+        }
+      />
+
+      <Route
+        path="/admin"
+        element={
+          <AuthGuard>
+            <MainLayout>
+              <SystemAdminPage />
+            </MainLayout>
+          </AuthGuard>
+        }
+      />
 
       <Route
         path="/*"

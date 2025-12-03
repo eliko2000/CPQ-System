@@ -15,12 +15,27 @@ import {
 import { Loader2, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
-export function CreateTeamDialog({ children }: { children?: React.ReactNode }) {
-  const [open, setOpen] = useState(false);
+interface CreateTeamDialogProps {
+  children?: React.ReactNode;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  onTeamCreated?: () => void;
+}
+
+export function CreateTeamDialog({
+  children,
+  open: controlledOpen,
+  onOpenChange,
+  onTeamCreated,
+}: CreateTeamDialogProps) {
+  const [internalOpen, setInternalOpen] = useState(false);
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
   const [loading, setLoading] = useState(false);
   const { createTeam } = useTeam();
+
+  const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
+  const setOpen = onOpenChange || setInternalOpen;
 
   const generateSlug = (value: string) => {
     return value
@@ -49,6 +64,11 @@ export function CreateTeamDialog({ children }: { children?: React.ReactNode }) {
       setOpen(false);
       setName('');
       setSlug('');
+
+      // Call the callback if provided
+      if (onTeamCreated) {
+        onTeamCreated();
+      }
     } catch (err: any) {
       toast.error(err.message || 'Failed to create team');
     } finally {

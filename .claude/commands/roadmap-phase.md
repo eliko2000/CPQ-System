@@ -215,6 +215,10 @@ Agent: [Shows progress across all phases]
 3. **ALWAYS wait for user confirmation** before proceeding
 4. **NEVER execute HIGH RISK tasks without explicit approval**
 5. **ALWAYS document completion** in git commits
+6. **DATABASE MIGRATIONS**: If a task requires schema changes:
+   - Refactor agent creates migration file in `supabase/migrations/`
+   - Tell user: "Migration created, run `/migrate` to push to remote DB"
+   - Do NOT continue until user confirms migration pushed successfully
 
 ---
 

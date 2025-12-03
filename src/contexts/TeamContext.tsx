@@ -30,7 +30,6 @@ export function TeamProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      // Fetch teams the user is a member of
       const { data: teamMembers, error } = await supabase
         .from('team_members')
         .select(
@@ -45,13 +44,11 @@ export function TeamProvider({ children }: { children: React.ReactNode }) {
 
       const userTeams = teamMembers
         .map((tm: any) => tm.team)
-        .filter((t: any) => t && !t.deleted_at); // Filter out deleted teams
+        .filter((t: any) => t && !t.deleted_at);
 
       setTeams(userTeams);
 
-      // Set current team if not set or if current team is not in the list
       if (userTeams.length > 0) {
-        // Try to recover last active team from local storage
         const lastTeamId = localStorage.getItem('cpq_last_team_id');
         const lastTeam = userTeams.find(t => t.id === lastTeamId);
 
@@ -78,7 +75,6 @@ export function TeamProvider({ children }: { children: React.ReactNode }) {
     refreshTeams();
   }, [user]);
 
-  // Persist current team selection
   useEffect(() => {
     if (currentTeam) {
       localStorage.setItem('cpq_last_team_id', currentTeam.id);
@@ -89,23 +85,67 @@ export function TeamProvider({ children }: { children: React.ReactNode }) {
     if (!user) return { error: 'Not authenticated' };
 
     try {
-      // 1. Create the team
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      console.log('🔍 DEBUG: Current session:', session);
+      console.log('🔍 DEBUG: User from context:', user);
+
+      if (!session) {
+        console.error('❌ No session found!');
+        toast.error('No active session. Please try logging out and back in.');
+        return { error: 'No active session' };
+      }
+
+      // Create the team
       const { data: team, error: teamError } = await supabase
         .from('teams')
-        .insert([{ name, slug }])
+        .insert([
+          {
+            name,
+            slug,
+            created_by: user.id,
+          },
+        ])
         .select()
         .single();
 
-      if (teamError) throw teamError;
+      if (teamError) {
+        console.error('❌ Team creation failed:', teamError);
+        throw teamError;
+      }
 
-      // 2. Add user as admin member (this might be handled by a trigger, but let's be safe)
-      // Actually, our RLS policy for 'teams' INSERT usually requires the user to be added as a member
-      // Let's check if the trigger handled it or if we need to do it manually.
-      // Based on our schema, we have a trigger `on_team_created_add_creator`
+      console.log('✅ Team created successfully:', team);
+
+      // DEBUG: Check the current session before team_members insert
+      const {
+        data: { session: session2 },
+      } = await supabase.auth.getSession();
+      console.log('🔍 Session before team_members insert:', session2);
+
+      // Manually add creator as admin (no trigger)
+      console.log('📝 Attempting to add creator as admin...');
+      const { error: memberError } = await supabase
+        .from('team_members')
+        .insert([
+          {
+            team_id: team.id,
+            user_id: user.id,
+            role: 'admin',
+          },
+        ]);
+
+      if (memberError) {
+        console.error('❌ Failed to add creator as admin:', memberError);
+        // Try to clean up the team
+        await supabase.from('teams').delete().eq('id', team.id);
+        throw memberError;
+      }
+
+      console.log('✅ Added creator as admin');
 
       await refreshTeams();
 
-      // Set the new team as current
       if (team) {
         setCurrentTeam(team);
       }

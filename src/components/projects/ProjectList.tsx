@@ -99,10 +99,12 @@ export function ProjectList({ onViewProject }: ProjectListProps = {}) {
     isOpen: boolean;
     projectId: string | null;
     projectName: string;
+    quotationCount: number;
   }>({
     isOpen: false,
     projectId: null,
     projectName: '',
+    quotationCount: 0,
   });
 
   // Use table configuration hook for persistence
@@ -112,6 +114,7 @@ export function ProjectList({ onViewProject }: ProjectListProps = {}) {
     loading: configLoading,
   } = useTableConfig('projects_list', {
     columnOrder: [
+      'projectNumber',
       'projectName',
       'companyName',
       'status',
@@ -121,6 +124,7 @@ export function ProjectList({ onViewProject }: ProjectListProps = {}) {
     ],
     columnWidths: {},
     visibleColumns: [
+      'projectNumber',
       'projectName',
       'companyName',
       'status',
@@ -167,6 +171,34 @@ export function ProjectList({ onViewProject }: ProjectListProps = {}) {
   // Column definitions with CustomHeader for enhanced filtering
   const columnDefs = useMemo<ColDef<ProjectSummary>[]>(
     () => [
+      {
+        field: 'projectNumber',
+        headerName: 'מספר פרויקט',
+        sortable: true,
+        filter: 'agTextColumnFilter',
+        flex: 1,
+        minWidth: 120,
+        headerComponent: CustomHeader,
+        headerComponentParams: (params: any) => ({
+          displayName: 'מספר פרויקט',
+          onMenuClick: handleColumnMenuClick,
+          onFilterClick: handleFilterClick,
+          api: params.api,
+          columnApi: params.columnApi,
+          column: params.column,
+          uniqueValues: getUniqueValues('projectNumber'),
+        }),
+        filterParams: {
+          values: () => getUniqueValues('projectNumber'),
+        },
+        cellRenderer: (params: any) => {
+          return (
+            params.value || (
+              <span className="text-gray-400 text-xs">לא הוקצה</span>
+            )
+          );
+        },
+      },
       {
         field: 'projectName',
         headerName: 'שם פרויקט',
@@ -352,31 +384,54 @@ export function ProjectList({ onViewProject }: ProjectListProps = {}) {
   // Handle delete project
   const handleDeleteProject = useCallback(
     (projectId: string, projectName: string) => {
+      // Find the project to get quotation count
+      const project = projects.find(p => p.id === projectId);
+      const quotationCount = project?.quotationCount || 0;
+
       setDeleteConfirm({
         isOpen: true,
         projectId,
         projectName,
+        quotationCount,
       });
     },
-    []
+    [projects]
   );
 
   // Confirm delete
   const confirmDelete = async () => {
     if (deleteConfirm.projectId) {
       try {
-        await deleteProject(deleteConfirm.projectId);
-        toast.success('הפרויקט נמחק בהצלחה');
+        const result = await deleteProject(deleteConfirm.projectId);
+        const deletedQuotations = result?.quotationCount || 0;
+
+        if (deletedQuotations > 0) {
+          toast.success(
+            `הפרויקט ו-${deletedQuotations} הצעות מחיר נמחקו בהצלחה`
+          );
+        } else {
+          toast.success('הפרויקט נמחק בהצלחה');
+        }
       } catch (error) {
         logger.error('Failed to delete project:', error);
         toast.error('שגיאה במחיקת הפרויקט');
       }
-      setDeleteConfirm({ isOpen: false, projectId: null, projectName: '' });
+      setDeleteConfirm({
+        isOpen: false,
+        projectId: null,
+        projectName: '',
+        quotationCount: 0,
+      });
     }
   };
 
   const cancelDelete = () => {
-    setDeleteConfirm({ isOpen: false, projectId: null, projectName: '' });
+    setDeleteConfirm({
+      isOpen: false,
+      projectId: null,
+      projectName: '',
+      quotationCount: 0,
+    });
   };
 
   // Handle row double-click to view project
@@ -558,12 +613,19 @@ export function ProjectList({ onViewProject }: ProjectListProps = {}) {
       <ConfirmDialog
         isOpen={deleteConfirm.isOpen}
         title="מחיקת פרויקט"
-        message={`האם אתה בטוח שברצונך למחוק את הפרויקט "${deleteConfirm.projectName}"? פעולה זו אינה הפיכה.`}
+        message={
+          deleteConfirm.quotationCount > 0
+            ? `האם אתה בטוח שברצונך למחוק את הפרויקט "${deleteConfirm.projectName}"?\n\n⚠️ הפרויקט מכיל ${deleteConfirm.quotationCount} הצעות מחיר שיימחקו גם כן.\n\nפעולה זו אינה הפיכה ותמחק את כל הנתונים הקשורים.`
+            : `האם אתה בטוח שברצונך למחוק את הפרויקט "${deleteConfirm.projectName}"?\n\nפעולה זו אינה הפיכה.`
+        }
         confirmText="מחק"
         cancelText="ביטול"
         onConfirm={confirmDelete}
         onCancel={cancelDelete}
         type="danger"
+        requireConfirmation={deleteConfirm.quotationCount > 0}
+        confirmationText={deleteConfirm.projectName}
+        confirmationPlaceholder="הקלד את שם הפרויקט"
       />
     </div>
   );

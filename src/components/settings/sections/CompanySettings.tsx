@@ -6,10 +6,13 @@ import {
   CardTitle,
 } from '../../ui/card';
 import { Input } from '../../ui/input';
+import { cn } from '../../../lib/utils';
 
-export function CompanySettings() {
+export function CompanySettings({ isAdmin = true }: { isAdmin?: boolean }) {
   return (
-    <div className="space-y-6">
+    <div
+      className={cn('space-y-6', !isAdmin && 'opacity-60 pointer-events-none')}
+    >
       <Card>
         <CardHeader>
           <CardTitle>פרטי חברה</CardTitle>

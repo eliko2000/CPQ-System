@@ -19,6 +19,7 @@ import {
   MatchResult,
 } from '../services/componentMatcher';
 import { logger } from '../lib/logger';
+import { useTeam } from '../contexts/TeamContext';
 
 // ============================================
 // Transform Functions
@@ -92,6 +93,7 @@ function dbToComponentQuoteHistory(
 // ============================================
 
 export function useSupplierQuotes() {
+  const { currentTeam } = useTeam();
   const [quotes, setQuotes] = useState<SupplierQuote[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -100,6 +102,12 @@ export function useSupplierQuotes() {
   // Fetch All Quotes
   // ============================================
   const fetchQuotes = useCallback(async () => {
+    if (!currentTeam) {
+      setQuotes([]);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
@@ -107,6 +115,7 @@ export function useSupplierQuotes() {
       const { data, error } = await supabase
         .from('supplier_quotes')
         .select('*')
+        .eq('team_id', currentTeam.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -120,18 +129,21 @@ export function useSupplierQuotes() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [currentTeam]);
 
   // ============================================
   // Get Single Quote
   // ============================================
   const getQuote = useCallback(
     async (id: string): Promise<SupplierQuote | null> => {
+      if (!currentTeam) return null;
+
       try {
         const { data, error } = await supabase
           .from('supplier_quotes')
           .select('*')
           .eq('id', id)
+          .eq('team_id', currentTeam.id)
           .single();
 
         if (error) throw error;
@@ -143,43 +155,49 @@ export function useSupplierQuotes() {
         return null;
       }
     },
-    []
+    [currentTeam]
   );
 
   // ============================================
   // Get Quote with Component History
   // ============================================
-  const getQuoteWithComponents = useCallback(async (id: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('supplier_quotes')
-        .select(
-          `
+  const getQuoteWithComponents = useCallback(
+    async (id: string) => {
+      if (!currentTeam) return null;
+
+      try {
+        const { data, error } = await supabase
+          .from('supplier_quotes')
+          .select(
+            `
           *,
           component_quote_history (
             *,
             component:components (*)
           )
         `
-        )
-        .eq('id', id)
-        .single();
+          )
+          .eq('id', id)
+          .eq('team_id', currentTeam.id)
+          .single();
 
-      if (error) throw error;
-      if (!data) return null;
+        if (error) throw error;
+        if (!data) return null;
 
-      return {
-        quote: dbToSupplierQuote(data),
-        components: (data.component_quote_history || []).map((h: any) => ({
-          history: dbToComponentQuoteHistory(h),
-          component: h.component,
-        })),
-      };
-    } catch (err) {
-      logger.error('Error fetching quote with components:', err);
-      return null;
-    }
-  }, []);
+        return {
+          quote: dbToSupplierQuote(data),
+          components: (data.component_quote_history || []).map((h: any) => ({
+            history: dbToComponentQuoteHistory(h),
+            component: h.component,
+          })),
+        };
+      } catch (err) {
+        logger.error('Error fetching quote with components:', err);
+        return null;
+      }
+    },
+    [currentTeam]
+  );
 
   // ============================================
   // Create Quote
@@ -191,14 +209,25 @@ export function useSupplierQuotes() {
         'id' | 'createdAt' | 'updatedAt' | 'uploadDate'
       >
     ): Promise<SupplierQuote | null> => {
+      if (!currentTeam) {
+        setError('No active team');
+        return null;
+      }
+
       try {
         setError(null);
 
         const dbQuote = supplierQuoteToDb(quote);
 
+        // Add team_id
+        const quoteWithTeam = {
+          ...dbQuote,
+          team_id: currentTeam.id,
+        };
+
         const { data, error } = await supabase
           .from('supplier_quotes')
-          .insert([dbQuote])
+          .insert([quoteWithTeam])
           .select()
           .single();
 
@@ -219,7 +248,7 @@ export function useSupplierQuotes() {
         return null;
       }
     },
-    []
+    [currentTeam]
   );
 
   // ============================================
@@ -230,6 +259,11 @@ export function useSupplierQuotes() {
       id: string,
       updates: Partial<SupplierQuote>
     ): Promise<SupplierQuote | null> => {
+      if (!currentTeam) {
+        setError('No active team');
+        return null;
+      }
+
       try {
         setError(null);
 
@@ -239,6 +273,7 @@ export function useSupplierQuotes() {
           .from('supplier_quotes')
           .update(dbUpdates)
           .eq('id', id)
+          .eq('team_id', currentTeam.id)
           .select()
           .single();
 
@@ -259,35 +294,44 @@ export function useSupplierQuotes() {
         return null;
       }
     },
-    []
+    [currentTeam]
   );
 
   // ============================================
   // Delete Quote
   // ============================================
-  const deleteQuote = useCallback(async (id: string): Promise<boolean> => {
-    try {
-      setError(null);
+  const deleteQuote = useCallback(
+    async (id: string): Promise<boolean> => {
+      if (!currentTeam) {
+        setError('No active team');
+        return false;
+      }
 
-      const { error } = await supabase
-        .from('supplier_quotes')
-        .delete()
-        .eq('id', id);
+      try {
+        setError(null);
 
-      if (error) throw error;
+        const { error } = await supabase
+          .from('supplier_quotes')
+          .delete()
+          .eq('id', id)
+          .eq('team_id', currentTeam.id);
 
-      // Update local state
-      setQuotes(prev => prev.filter(q => q.id !== id));
+        if (error) throw error;
 
-      return true;
-    } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : 'Failed to delete quote';
-      setError(errorMessage);
-      logger.error('Error deleting quote:', err);
-      return false;
-    }
-  }, []);
+        // Update local state
+        setQuotes(prev => prev.filter(q => q.id !== id));
+
+        return true;
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : 'Failed to delete quote';
+        setError(errorMessage);
+        logger.error('Error deleting quote:', err);
+        return false;
+      }
+    },
+    [currentTeam]
+  );
 
   // ============================================
   // Add Component to Quote History
@@ -307,6 +351,8 @@ export function useSupplierQuotes() {
         isCurrentPrice?: boolean;
       }
     ): Promise<ComponentQuoteHistory | null> => {
+      if (!currentTeam) return null;
+
       try {
         // Check if this combination already exists
         const { data: existing } = await supabase
@@ -314,6 +360,7 @@ export function useSupplierQuotes() {
           .select('id')
           .eq('component_id', componentId)
           .eq('quote_id', quoteId)
+          .eq('team_id', currentTeam.id)
           .single();
 
         if (existing) {
@@ -335,6 +382,7 @@ export function useSupplierQuotes() {
               supplier_name: historyData.supplierName,
               confidence_score: historyData.confidenceScore,
               is_current_price: historyData.isCurrentPrice || false,
+              team_id: currentTeam.id,
             },
           ])
           .select()
@@ -349,7 +397,7 @@ export function useSupplierQuotes() {
         return null;
       }
     },
-    []
+    [currentTeam]
   );
 
   // ============================================
@@ -357,11 +405,14 @@ export function useSupplierQuotes() {
   // ============================================
   const getComponentHistory = useCallback(
     async (componentId: string): Promise<ComponentQuoteHistory[]> => {
+      if (!currentTeam) return [];
+
       try {
         const { data, error } = await supabase
           .from('component_quote_history')
           .select('*')
           .eq('component_id', componentId)
+          .eq('team_id', currentTeam.id)
           .order('quote_date', { ascending: false });
 
         if (error) throw error;
@@ -372,7 +423,7 @@ export function useSupplierQuotes() {
         return [];
       }
     },
-    []
+    [currentTeam]
   );
 
   // ============================================
@@ -380,6 +431,8 @@ export function useSupplierQuotes() {
   // ============================================
   const searchQuotes = useCallback(
     async (query: string): Promise<SupplierQuote[]> => {
+      if (!currentTeam) return [];
+
       try {
         setLoading(true);
         setError(null);
@@ -387,6 +440,7 @@ export function useSupplierQuotes() {
         const { data, error } = await supabase
           .from('supplier_quotes')
           .select('*')
+          .eq('team_id', currentTeam.id)
           .or(
             `file_name.ilike.%${query}%,supplier_name.ilike.%${query}%,quote_number.ilike.%${query}%`
           )
@@ -405,7 +459,7 @@ export function useSupplierQuotes() {
         setLoading(false);
       }
     },
-    []
+    [currentTeam]
   );
 
   // ============================================
@@ -418,11 +472,16 @@ export function useSupplierQuotes() {
       dateTo?: string;
       status?: string;
     }): Promise<SupplierQuote[]> => {
+      if (!currentTeam) return [];
+
       try {
         setLoading(true);
         setError(null);
 
-        let query = supabase.from('supplier_quotes').select('*');
+        let query = supabase
+          .from('supplier_quotes')
+          .select('*')
+          .eq('team_id', currentTeam.id);
 
         if (filters.supplier) {
           query = query.eq('supplier_name', filters.supplier);
@@ -457,7 +516,7 @@ export function useSupplierQuotes() {
         setLoading(false);
       }
     },
-    []
+    [currentTeam]
   );
 
   // ============================================

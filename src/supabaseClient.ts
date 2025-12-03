@@ -5,5 +5,12 @@ import { config } from './lib/config';
 // This ensures we never initialize Supabase with invalid credentials
 export const supabase = createClient(
   config.supabase.url,
-  config.supabase.anonKey
+  config.supabase.anonKey,
+  {
+    auth: {
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: true,
+    },
+  }
 );

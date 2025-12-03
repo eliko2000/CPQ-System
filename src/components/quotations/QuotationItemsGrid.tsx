@@ -129,10 +129,24 @@ export function QuotationItemsGrid({
       ordered.map(c => c.field)
     );
 
+    // Apply saved column widths to prevent flash of default widths
+    const withSavedWidths = ordered.map(col => {
+      const savedWidth = config.columnWidths[col.field!];
+      if (savedWidth) {
+        return { ...col, width: savedWidth };
+      }
+      return col;
+    });
+
     // AG Grid with enableRtl={true} does NOT reverse the array - just the visual layout
     // So we use the column order as-is
-    return ordered.length > 0 ? ordered : visible;
-  }, [columnDefs, config.visibleColumns, config.columnOrder]);
+    return withSavedWidths.length > 0 ? withSavedWidths : visible;
+  }, [
+    columnDefs,
+    config.visibleColumns,
+    config.columnOrder,
+    config.columnWidths,
+  ]);
 
   // Toggle column visibility
   const toggleColumn = useCallback(

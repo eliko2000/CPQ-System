@@ -706,9 +706,23 @@ export function EnhancedComponentGrid({
       .filter(fieldId => visible.some(col => col.field === fieldId))
       .map(fieldId => visible.find(col => col.field === fieldId)!);
 
+    // Apply saved column widths to prevent flash of default widths
+    const withSavedWidths = ordered.map(col => {
+      const savedWidth = config.columnWidths[col.field!];
+      if (savedWidth) {
+        return { ...col, width: savedWidth };
+      }
+      return col;
+    });
+
     // Reverse the order because AG Grid with RTL will reverse it again
-    return ordered.reverse();
-  }, [columnDefs, config.visibleColumns, config.columnOrder]);
+    return withSavedWidths.reverse();
+  }, [
+    columnDefs,
+    config.visibleColumns,
+    config.columnOrder,
+    config.columnWidths,
+  ]);
 
   const defaultColDef = useMemo(
     () => ({
@@ -720,7 +734,6 @@ export function EnhancedComponentGrid({
       editable: false, // Disable inline editing - use the form modal instead
       headerClass: 'ag-header-cell-label-right',
       cellClass: 'ag-rtl',
-      flex: 1, // Allow columns to flex and auto-size
       minWidth: 100,
     }),
     []
@@ -749,43 +762,60 @@ export function EnhancedComponentGrid({
 
   const onGridReady = useCallback(
     (params: any) => {
-      // Apply saved column widths
-      if (Object.keys(config.columnWidths).length > 0 && params.api) {
-        const columns = params.api.getAllDisplayedColumns();
-        columns?.forEach((col: any) => {
-          const fieldId = col.getColId();
-          if (config.columnWidths[fieldId]) {
-            params.api.setColumnWidth(fieldId, config.columnWidths[fieldId]);
-          }
-        });
-      }
+      // Widths are already applied via columnDefs in visibleColumnDefs
+      // No need to re-apply them here as it causes a flash
+      console.log(
+        '[EnhancedComponentGrid] onGridReady - widths already in columnDefs'
+      );
 
       // Apply saved filter state
       if (Object.keys(config.filterState).length > 0 && params.api) {
         params.api.setFilterModel(config.filterState);
       }
-
-      if (params.api) {
-        params.api.sizeColumnsToFit();
-      }
     },
-    [config.columnWidths, config.filterState]
+    [config.filterState]
   );
 
   const onFirstDataRendered = useCallback((params: any) => {
-    params.api.sizeColumnsToFit();
+    // DON'T call sizeColumnsToFit - let AG Grid use the default column widths
+    console.log(
+      '[EnhancedComponentGrid] onFirstDataRendered - using default/saved column widths'
+    );
   }, []);
 
   // Handle column resize
   const onColumnResized = useCallback(
     (params: any) => {
-      if (params.finished && params.api) {
+      console.log(
+        '[EnhancedComponentGrid] onColumnResized - source:',
+        params.source,
+        'finished:',
+        params.finished
+      );
+
+      // ONLY save if this was a user drag - ignore all automatic resizes
+      // User drags have source: 'uiColumnDragged' or 'uiColumnResized'
+      const isUserResize =
+        params.source === 'uiColumnResized' ||
+        params.source === 'uiColumnDragged';
+
+      if (params.finished && params.api && isUserResize) {
         const widths: Record<string, number> = {};
         const columns = params.api.getAllDisplayedColumns();
         columns?.forEach((col: any) => {
           widths[col.getColId()] = col.getActualWidth();
         });
+
+        console.log(
+          '[EnhancedComponentGrid] User resized column, saving widths:',
+          widths
+        );
         saveConfig({ columnWidths: widths });
+      } else {
+        console.log(
+          '[EnhancedComponentGrid] Ignoring automatic resize, source:',
+          params.source
+        );
       }
     },
     [saveConfig]
@@ -844,7 +874,10 @@ export function EnhancedComponentGrid({
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setShowColumnManager(!showColumnManager)}
+            onClick={e => {
+              e.stopPropagation();
+              setShowColumnManager(!showColumnManager);
+            }}
             className="flex items-center gap-2"
           >
             <Settings className="h-4 w-4" />
@@ -880,7 +913,8 @@ export function EnhancedComponentGrid({
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() =>
+                  onClick={e => {
+                    e.stopPropagation();
                     saveConfig({
                       visibleColumns: [
                         'actions',
@@ -910,28 +944,30 @@ export function EnhancedComponentGrid({
                         'manufacturerPN',
                         'actions',
                       ],
-                    })
-                  }
+                    });
+                  }}
                 >
                   אפס להגדרות ברירת מחדל
                 </Button>
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() =>
+                  onClick={e => {
+                    e.stopPropagation();
                     saveConfig({
                       visibleColumns: allColumns.map(col => col.field),
-                    })
-                  }
+                    });
+                  }}
                 >
                   הצג הכל
                 </Button>
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() =>
-                    saveConfig({ visibleColumns: ['name', 'actions'] })
-                  }
+                  onClick={e => {
+                    e.stopPropagation();
+                    saveConfig({ visibleColumns: ['name', 'actions'] });
+                  }}
                 >
                   מינימלי
                 </Button>

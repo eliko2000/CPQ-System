@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 import { DbComponent, Component } from '../types';
 import { logger } from '../lib/logger';
+import { useTeam } from '../contexts/TeamContext';
 
 // Transform UI Component to DB format
 // Only includes fields that are actually present in the input (for partial updates)
@@ -37,123 +38,31 @@ function componentToDb(component: Partial<Component>): Partial<DbComponent> {
   return result;
 }
 
-// Transform DB format to UI Component (kept for reference, unused)
-// @ts-expect-error - Kept for reference but currently unused
-function __dbToComponent(dbComp: DbComponent): Component {
-  logger.debug('📥 dbToComponent converting:', {
-    id: dbComp.id,
-    name: dbComp.name,
-    component_type: dbComp.component_type,
-    labor_subtype: dbComp.labor_subtype, // Added for debugging
-  });
-
-  // CRITICAL: Properly detect original currency
-  // If original_cost and currency are set in DB, use them
-  // Otherwise, detect which price field has the highest value (likely the original)
-  let detectedCurrency: 'NIS' | 'USD' | 'EUR' = dbComp.currency || 'NIS';
-  let detectedOriginalCost: number = dbComp.original_cost || 0;
-
-  // If no original_cost in DB, detect from price fields
-  if (!dbComp.original_cost || dbComp.original_cost === 0) {
-    const ils = dbComp.unit_cost_ils || 0;
-    const usd = dbComp.unit_cost_usd || 0;
-    const eur = dbComp.unit_cost_eur || 0;
-
-    // Find which price is non-zero and likely the original
-    // Heuristic: If USD or EUR price exists and is significantly different from ILS/rate,
-    // it's likely the original
-    if (usd > 0 && ils > 0) {
-      // Check if ILS looks like a conversion from USD (ILS ≈ USD × 3-5)
-      const ratio = ils / usd;
-      if (ratio >= 3 && ratio <= 5) {
-        // ILS is likely converted from USD, so USD is original
-        detectedCurrency = 'USD';
-        detectedOriginalCost = usd;
-      } else {
-        // ILS doesn't match USD conversion, so ILS is likely original
-        detectedCurrency = 'NIS';
-        detectedOriginalCost = ils;
-      }
-    } else if (eur > 0 && ils > 0) {
-      // Check if ILS looks like a conversion from EUR (ILS ≈ EUR × 3.5-5)
-      const ratio = ils / eur;
-      if (ratio >= 3.5 && ratio <= 5) {
-        // ILS is likely converted from EUR, so EUR is original
-        detectedCurrency = 'EUR';
-        detectedOriginalCost = eur;
-      } else {
-        // ILS doesn't match EUR conversion, so ILS is likely original
-        detectedCurrency = 'NIS';
-        detectedOriginalCost = ils;
-      }
-    } else if (usd > 0) {
-      detectedCurrency = 'USD';
-      detectedOriginalCost = usd;
-    } else if (eur > 0) {
-      detectedCurrency = 'EUR';
-      detectedOriginalCost = eur;
-    } else {
-      detectedCurrency = 'NIS';
-      detectedOriginalCost = ils;
-    }
-  }
-
-  const result = {
-    id: dbComp.id,
-    name: dbComp.name,
-    manufacturer: dbComp.manufacturer || '',
-    manufacturerPN: dbComp.manufacturer_part_number || '',
-    category: dbComp.category || 'אחר',
-    componentType: dbComp.component_type || 'hardware',
-    laborSubtype: dbComp.labor_subtype || undefined, // Explicitly convert null to undefined
-    description: dbComp.description || '',
-    unitCostNIS: dbComp.unit_cost_ils || 0,
-    unitCostUSD: dbComp.unit_cost_usd || 0,
-    unitCostEUR: dbComp.unit_cost_eur || 0,
-    supplier: dbComp.supplier || '',
-    currency: detectedCurrency,
-    originalCost: detectedOriginalCost,
-    quoteDate: new Date().toISOString().split('T')[0],
-    quoteFileUrl: '',
-    notes: dbComp.notes || '',
-    createdAt: dbComp.created_at,
-    updatedAt: dbComp.updated_at,
-  };
-
-  logger.debug('📥 dbToComponent result:', {
-    id: result.id,
-    name: result.name,
-    componentType: result.componentType,
-    laborSubtype: result.laborSubtype, // Added for debugging
-    currency: result.currency,
-    originalCost: result.originalCost,
-    unitCostILS: result.unitCostNIS,
-    unitCostUSD: result.unitCostUSD,
-    unitCostEUR: result.unitCostEUR,
-  });
-  return result;
-}
-
 export function useComponents() {
+  const { currentTeam } = useTeam();
   const [components, setComponents] = useState<DbComponent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Fetch all components with optimized query
-  const fetchComponents = async (options?: {
-    limit?: number;
-    offset?: number;
-  }) => {
-    try {
-      setLoading(true);
-      setError(null);
+  const fetchComponents = useCallback(
+    async (options?: { limit?: number; offset?: number }) => {
+      if (!currentTeam) {
+        setComponents([]);
+        setLoading(false);
+        return;
+      }
 
-      // OPTIMIZATION: Select only essential fields for list view
-      // Full details loaded on-demand when viewing/editing
-      let query = supabase
-        .from('components')
-        .select(
-          `
+      try {
+        setLoading(true);
+        setError(null);
+
+        // OPTIMIZATION: Select only essential fields for list view
+        // Full details loaded on-demand when viewing/editing
+        let query = supabase
+          .from('components')
+          .select(
+            `
           id,
           name,
           manufacturer,
@@ -170,44 +79,55 @@ export function useComponents() {
           created_at,
           updated_at
         `
-        )
-        .order('name');
+          )
+          .eq('team_id', currentTeam.id)
+          .order('name');
 
-      // OPTIMIZATION: Support pagination for large datasets
-      if (options?.limit) {
-        query = query.range(
-          options.offset || 0,
-          (options.offset || 0) + options.limit - 1
+        // OPTIMIZATION: Support pagination for large datasets
+        if (options?.limit) {
+          query = query.range(
+            options.offset || 0,
+            (options.offset || 0) + options.limit - 1
+          );
+        }
+
+        const { data, error } = await query;
+
+        if (error) throw error;
+
+        setComponents(data || []);
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : 'Failed to fetch components'
         );
+      } finally {
+        setLoading(false);
       }
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-
-      setComponents(data || []);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'Failed to fetch components'
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+    [currentTeam]
+  );
 
   // Add a new component
   const addComponent = async (
     component: Omit<Component, 'id' | 'createdAt' | 'updatedAt'>
   ) => {
+    if (!currentTeam) throw new Error('No active team');
+
     try {
       setError(null);
 
       // Transform to DB format
       const dbComponent = componentToDb(component);
 
+      // Add team_id
+      const componentWithTeam = {
+        ...dbComponent,
+        team_id: currentTeam.id,
+      };
+
       const { data, error } = await supabase
         .from('components')
-        .insert([dbComponent])
+        .insert([componentWithTeam])
         .select()
         .single();
 
@@ -228,6 +148,8 @@ export function useComponents() {
 
   // Update an existing component
   const updateComponent = async (id: string, updates: Partial<Component>) => {
+    if (!currentTeam) throw new Error('No active team');
+
     try {
       setError(null);
 
@@ -242,6 +164,7 @@ export function useComponents() {
         .from('components')
         .update(dbUpdates)
         .eq('id', id)
+        .eq('team_id', currentTeam.id)
         .select()
         .single();
 
@@ -265,10 +188,16 @@ export function useComponents() {
 
   // Delete a component
   const deleteComponent = async (id: string) => {
+    if (!currentTeam) throw new Error('No active team');
+
     try {
       setError(null);
 
-      const { error } = await supabase.from('components').delete().eq('id', id);
+      const { error } = await supabase
+        .from('components')
+        .delete()
+        .eq('id', id)
+        .eq('team_id', currentTeam.id);
 
       if (error) throw error;
 
@@ -283,6 +212,8 @@ export function useComponents() {
 
   // Search components
   const searchComponents = async (query: string) => {
+    if (!currentTeam) return [];
+
     try {
       setLoading(true);
       setError(null);
@@ -290,6 +221,7 @@ export function useComponents() {
       const { data, error } = await supabase
         .from('components')
         .select('*')
+        .eq('team_id', currentTeam.id)
         .or(
           `name.ilike.%${query}%,manufacturer.ilike.%${query}%,category.ilike.%${query}%`
         )
@@ -310,6 +242,8 @@ export function useComponents() {
 
   // Get components by category
   const getComponentsByCategory = async (category: string) => {
+    if (!currentTeam) return [];
+
     try {
       setLoading(true);
       setError(null);
@@ -317,6 +251,7 @@ export function useComponents() {
       const { data, error } = await supabase
         .from('components')
         .select('*')
+        .eq('team_id', currentTeam.id)
         .eq('category', category)
         .order('name');
 
@@ -335,10 +270,10 @@ export function useComponents() {
     }
   };
 
-  // Load components on mount
+  // Load components on mount and when team changes
   useEffect(() => {
     fetchComponents();
-  }, []);
+  }, [fetchComponents]);
 
   return {
     components,

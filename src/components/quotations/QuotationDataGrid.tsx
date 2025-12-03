@@ -25,6 +25,8 @@ import { ProjectPicker } from './ProjectPicker';
 import { supabase } from '../../supabaseClient';
 import { logger } from '@/lib/logger';
 import { createQuotationColumnDefs } from './quotationGridColumns';
+import { generateQuotationNumber } from '../../services/numberingService';
+import { useTeam } from '../../contexts/TeamContext';
 
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
@@ -51,6 +53,7 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
     fetchQuotations,
   } = useQuotations();
   const { setCurrentQuotation } = useCPQ();
+  const { currentTeam } = useTeam();
 
   const gridRef = useRef<AgGridReact>(null);
   const [selectedQuotations, setSelectedQuotations] = useState<string[]>([]);
@@ -271,14 +274,28 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
       .filter(fieldId => visible.some(col => col.field === fieldId))
       .map(fieldId => visible.find(col => col.field === fieldId)!);
 
+    // Apply saved column widths to prevent flash of default widths
+    const withSavedWidths = ordered.map(col => {
+      const savedWidth = config.columnWidths[col.field!];
+      if (savedWidth) {
+        return { ...col, width: savedWidth };
+      }
+      return col;
+    });
+
     logger.debug(
       'QuotationDataGrid - ordered:',
-      ordered.map(c => c?.field)
+      withSavedWidths.map(c => c?.field)
     );
 
     // Don't reverse! columnDefs is already reversed and AG Grid RTL will handle it
-    return ordered.length > 0 ? ordered : visible;
-  }, [columnDefs, config.visibleColumns, config.columnOrder]);
+    return withSavedWidths.length > 0 ? withSavedWidths : visible;
+  }, [
+    columnDefs,
+    config.visibleColumns,
+    config.columnOrder,
+    config.columnWidths,
+  ]);
 
   // Toggle column visibility - Note: This updates settings, not table config
   const toggleColumn = useCallback(
@@ -391,49 +408,46 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
   // Grid ready handler
   const onGridReady = useCallback(
     (params: any) => {
-      // Apply saved column widths
-      if (Object.keys(config.columnWidths).length > 0 && params.api) {
-        const columns = params.api.getAllDisplayedColumns();
-        columns?.forEach((col: any) => {
-          const fieldId = col.getColId();
-          if (config.columnWidths[fieldId]) {
-            params.api.setColumnWidth(fieldId, config.columnWidths[fieldId]);
-          }
-        });
-      }
+      // Widths are already applied via columnDefs in visibleColumnDefs
+      // No need to re-apply them here as it causes a flash
 
       // Apply saved filter state
       if (Object.keys(config.filterState).length > 0 && params.api) {
         params.api.setFilterModel(config.filterState);
       }
 
-      if (params.api) {
-        params.api.sizeColumnsToFit();
-      }
+      // DON'T call sizeColumnsToFit - it interferes with saved widths
 
       // Mark initial mount as complete after a short delay
       setTimeout(() => {
         isInitialMount.current = false;
       }, 500);
     },
-    [config.columnWidths, config.filterState]
+    [config.filterState]
   );
 
   const onFirstDataRendered = useCallback((params: any) => {
-    params.api.sizeColumnsToFit();
+    // DON'T call sizeColumnsToFit - let AG Grid use the saved column widths from columnDefs
   }, []);
 
   // Handle column resize
   const onColumnResized = useCallback(
     (params: any) => {
-      if (params.finished && !isInitialMount.current && params.api) {
+      // ONLY save if this was a user drag - ignore all automatic resizes
+      const isUserResize =
+        params.source === 'uiColumnResized' ||
+        params.source === 'uiColumnDragged';
+
+      if (params.finished && isUserResize && params.api) {
         const widths: Record<string, number> = {};
         const columns = params.api.getAllDisplayedColumns();
         columns?.forEach((col: any) => {
           widths[col.getColId()] = col.getActualWidth();
         });
-        logger.debug('Column resized, saving widths:', widths);
+        logger.debug('User resized column, saving widths:', widths);
         saveConfig({ columnWidths: widths });
+      } else if (params.finished) {
+        logger.debug('Ignoring automatic resize, source:', params.source);
       }
     },
     [saveConfig]
@@ -442,7 +456,12 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
   // Handle column move
   const onColumnMoved = useCallback(
     (params: any) => {
-      if (params.finished && !isInitialMount.current && params.api) {
+      // ONLY save if this was a user drag - ignore automatic column reordering
+      const isUserMove =
+        params.source === 'uiColumnMoved' ||
+        params.source === 'uiColumnDragged';
+
+      if (params.finished && isUserMove && params.api) {
         const displayedOrder =
           params.api
             .getAllDisplayedColumns()
@@ -450,12 +469,14 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
         // Reverse because AG Grid gives us reversed order in RTL
         const actualOrder = [...displayedOrder].reverse();
         logger.debug(
-          'Column moved - displayed:',
+          'User moved column - displayed:',
           displayedOrder,
           'saving:',
           actualOrder
         );
         saveConfig({ columnOrder: actualOrder });
+      } else if (params.finished) {
+        logger.debug('Ignoring automatic column move, source:', params.source);
       }
     },
     [saveConfig]
@@ -499,8 +520,35 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
         );
         const defaultParams = await loadDefaultQuotationParameters();
 
+        // Generate quotation number (optional feature)
+        if (!currentTeam) throw new Error('No active team');
+
+        let quotationNumber = `Q-${Date.now()}`; // Fallback number
+
+        // Try to generate smart quotation number if project has number
+        if (project.project_number) {
+          try {
+            quotationNumber = await generateQuotationNumber(
+              currentTeam.id,
+              project.project_number
+            );
+            logger.debug('Generated quotation number:', quotationNumber);
+          } catch (numberError) {
+            logger.warn(
+              'Could not generate quotation number, using fallback:',
+              numberError
+            );
+            // Use fallback number already set above
+          }
+        } else {
+          logger.debug(
+            'Project has no project_number, using timestamp-based quotation number'
+          );
+        }
+
         const newQuotation = await addQuotation({
-          quotation_number: `Q-${Date.now()}`,
+          quotation_number: quotationNumber,
+          version: 1,
           customer_name: project.company_name,
           project_name: project.project_name,
           project_id: projectId,

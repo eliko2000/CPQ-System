@@ -71,13 +71,20 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
-      <Card className="w-full max-w-md">
+      <Card className="w-full max-w-md shadow-lg">
         <CardHeader className="space-y-1">
+          <div className="flex justify-center mb-4">
+            <div className="h-12 w-12 bg-primary rounded-lg flex items-center justify-center">
+              <span className="text-primary-foreground font-bold text-xl">
+                CPQ
+              </span>
+            </div>
+          </div>
           <CardTitle className="text-2xl font-bold text-center">
-            Sign in
+            Welcome back
           </CardTitle>
           <CardDescription className="text-center">
-            Enter your email and password to access your account
+            Enter your credentials to access your account
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -91,7 +98,7 @@ export default function LoginPage() {
           <div className="space-y-2">
             <Button
               variant="outline"
-              className="w-full"
+              className="w-full h-11 relative"
               onClick={handleAzureLogin}
               disabled={loading}
             >
@@ -99,7 +106,7 @@ export default function LoginPage() {
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
                 <svg
-                  className="mr-2 h-4 w-4"
+                  className="mr-2 h-5 w-5 absolute left-4"
                   viewBox="0 0 23 23"
                   xmlns="http://www.w3.org/2000/svg"
                 >
@@ -119,7 +126,7 @@ export default function LoginPage() {
             </div>
             <div className="relative flex justify-center text-xs uppercase">
               <span className="bg-background px-2 text-muted-foreground">
-                Or continue with
+                Or continue with email
               </span>
             </div>
           </div>
@@ -130,11 +137,12 @@ export default function LoginPage() {
               <Input
                 id="email"
                 type="email"
-                placeholder="m@example.com"
+                placeholder="name@company.com"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 required
                 disabled={loading}
+                className="h-10"
               />
             </div>
             <div className="space-y-2">
@@ -154,9 +162,10 @@ export default function LoginPage() {
                 onChange={e => setPassword(e.target.value)}
                 required
                 disabled={loading}
+                className="h-10"
               />
             </div>
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button type="submit" className="w-full h-10" disabled={loading}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Sign in
             </Button>

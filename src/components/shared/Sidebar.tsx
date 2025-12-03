@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useCPQ } from '../../contexts/CPQContext';
 import { loadSetting } from '../../services/settingsService';
 import {
@@ -8,15 +8,12 @@ import {
   Package,
   FolderOpen,
   BarChart3,
-  Settings,
   Menu,
   X,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Button } from '../ui/button';
 import { logger } from '@/lib/logger';
-import { UserMenu } from './UserMenu';
-import { TeamSwitcher } from '../teams/TeamSwitcher';
 
 export function Sidebar() {
   const {
@@ -60,11 +57,6 @@ export function Sidebar() {
       name: 'ניתוחים',
       icon: BarChart3,
       view: 'analytics' as const,
-    },
-    {
-      name: 'הגדרות',
-      icon: Settings,
-      view: 'settings' as const,
     },
   ];
 
@@ -124,15 +116,15 @@ export function Sidebar() {
     <>
       <div
         className={cn(
-          'flex flex-col bg-card border-l border-border transition-all duration-300',
+          'flex flex-col bg-card transition-all duration-300',
           uiState.sidebarCollapsed ? 'w-16' : 'w-64'
         )}
       >
-        {/* Header - Blue Background with White Text */}
-        <div className="bg-primary p-4">
-          <div className="flex items-center justify-between mb-4">
+        {/* Header - Blue Background with White Text - matches top bar height */}
+        <div className="bg-primary h-16 flex items-center px-4 border-l border-primary">
+          <div className="flex items-center justify-between w-full">
             {!uiState.sidebarCollapsed && (
-              <h1 className="text-lg font-bold text-primary-foreground w-full text-center">
+              <h1 className="text-lg font-bold text-primary-foreground flex-1 text-center">
                 RadiaQ AI
               </h1>
             )}
@@ -147,55 +139,39 @@ export function Sidebar() {
               )}
             </button>
           </div>
-
-          {/* Team Switcher */}
-          <div className="w-full">
-            <TeamSwitcher collapsed={uiState.sidebarCollapsed} />
-          </div>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 p-4 space-y-2">
-          {navigation.map((item, _index) => {
+        <nav className="flex-1 p-4 space-y-2 border-l border-border">
+          {navigation.map(item => {
             const Icon = item.icon;
             const isActive = uiState.activeView === item.view;
-            const isSettings = item.view === 'settings';
 
             return (
-              <React.Fragment key={item.name}>
-                {/* Add spacing and border before Settings */}
-                {isSettings && !uiState.sidebarCollapsed && (
-                  <div className="pt-4 mt-2 border-t border-border" />
+              <button
+                key={item.name}
+                onClick={() => handleNavigation(item.view)}
+                className={cn(
+                  'w-full flex items-center space-x-reverse space-x-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
+                  isActive
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:bg-accent hover:text-foreground'
                 )}
-
-                <button
-                  onClick={() => handleNavigation(item.view)}
-                  className={cn(
-                    'w-full flex items-center space-x-reverse space-x-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
-                    isActive
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-muted-foreground hover:bg-accent hover:text-foreground'
-                  )}
-                  title={uiState.sidebarCollapsed ? item.name : undefined}
-                >
-                  <Icon className="h-5 w-5 flex-shrink-0" />
-                  {!uiState.sidebarCollapsed && (
-                    <span className="truncate">{item.name}</span>
-                  )}
-                </button>
-              </React.Fragment>
+                title={uiState.sidebarCollapsed ? item.name : undefined}
+              >
+                <Icon className="h-5 w-5 flex-shrink-0" />
+                {!uiState.sidebarCollapsed && (
+                  <span className="truncate">{item.name}</span>
+                )}
+              </button>
             );
           })}
         </nav>
 
-        {/* Footer - User Menu & Company Logo */}
-        <div className="border-t border-border">
-          <div className="p-4 flex justify-center">
-            <UserMenu />
-          </div>
-
+        {/* Footer - Company Logo */}
+        <div className="border-t border-l border-border">
           {!uiState.sidebarCollapsed && logoUrl && (
-            <div className="px-6 pb-6">
+            <div className="px-6 py-6">
               <div className="w-full flex items-center justify-center">
                 <img
                   src={logoUrl}

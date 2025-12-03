@@ -9,6 +9,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type { Assembly, AssemblyComponent, DbAssembly } from '../types';
 import { supabase } from '../supabaseClient';
 import { logger } from '../lib/logger';
+import { useTeam } from '../contexts/TeamContext';
 
 interface UseAssembliesReturn {
   assemblies: Assembly[];
@@ -38,6 +39,7 @@ interface UseAssembliesReturn {
 }
 
 export function useAssemblies(): UseAssembliesReturn {
+  const { currentTeam } = useTeam();
   const [assemblies, setAssemblies] = useState<Assembly[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -46,6 +48,12 @@ export function useAssemblies(): UseAssembliesReturn {
    * Fetch all assemblies with their components
    */
   const fetchAssemblies = useCallback(async () => {
+    if (!currentTeam) {
+      setAssemblies([]);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
@@ -54,6 +62,7 @@ export function useAssemblies(): UseAssembliesReturn {
       const { data: assembliesData, error: assembliesError } = await supabase
         .from('assemblies')
         .select('*')
+        .eq('team_id', currentTeam.id)
         .order('created_at', { ascending: false });
 
       if (assembliesError) throw assembliesError;
@@ -150,7 +159,7 @@ export function useAssemblies(): UseAssembliesReturn {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [currentTeam]);
 
   /**
    * Add a new assembly
@@ -162,6 +171,8 @@ export function useAssemblies(): UseAssembliesReturn {
       description?: string,
       notes?: string
     ) => {
+      if (!currentTeam) throw new Error('No active team');
+
       try {
         setError(null);
 
@@ -184,6 +195,7 @@ export function useAssemblies(): UseAssembliesReturn {
             description,
             notes,
             is_complete: true,
+            team_id: currentTeam.id,
           })
           .select()
           .single();
@@ -203,6 +215,7 @@ export function useAssemblies(): UseAssembliesReturn {
             component_part_number: componentDetail?.manufacturer_part_number,
             quantity: comp.quantity,
             sort_order: index,
+            team_id: currentTeam.id,
           };
         });
 
@@ -220,7 +233,7 @@ export function useAssemblies(): UseAssembliesReturn {
         throw err;
       }
     },
-    [fetchAssemblies]
+    [fetchAssemblies, currentTeam]
   );
 
   /**
@@ -236,6 +249,8 @@ export function useAssemblies(): UseAssembliesReturn {
         components?: Array<{ componentId: string; quantity: number }>;
       }
     ) => {
+      if (!currentTeam) throw new Error('No active team');
+
       try {
         setError(null);
 
@@ -250,7 +265,8 @@ export function useAssemblies(): UseAssembliesReturn {
           const { error: updateError } = await supabase
             .from('assemblies')
             .update(assemblyUpdates)
-            .eq('id', id);
+            .eq('id', id)
+            .eq('team_id', currentTeam.id);
 
           if (updateError) throw updateError;
         }
@@ -289,6 +305,7 @@ export function useAssemblies(): UseAssembliesReturn {
               component_part_number: componentDetail?.manufacturer_part_number,
               quantity: comp.quantity,
               sort_order: index,
+              team_id: currentTeam.id,
             };
           });
 
@@ -306,7 +323,8 @@ export function useAssemblies(): UseAssembliesReturn {
           await supabase
             .from('assemblies')
             .update({ is_complete: isComplete })
-            .eq('id', id);
+            .eq('id', id)
+            .eq('team_id', currentTeam.id);
         }
 
         // Refresh assemblies
@@ -317,7 +335,7 @@ export function useAssemblies(): UseAssembliesReturn {
         throw err;
       }
     },
-    [fetchAssemblies]
+    [fetchAssemblies, currentTeam]
   );
 
   /**
@@ -325,13 +343,16 @@ export function useAssemblies(): UseAssembliesReturn {
    */
   const deleteAssembly = useCallback(
     async (id: string) => {
+      if (!currentTeam) throw new Error('No active team');
+
       try {
         setError(null);
 
         const { error: deleteError } = await supabase
           .from('assemblies')
           .delete()
-          .eq('id', id);
+          .eq('id', id)
+          .eq('team_id', currentTeam.id);
 
         if (deleteError) throw deleteError;
 
@@ -343,40 +364,46 @@ export function useAssemblies(): UseAssembliesReturn {
         throw err;
       }
     },
-    [fetchAssemblies]
+    [fetchAssemblies, currentTeam]
   );
 
   /**
    * Check if a component is used in any assemblies
    */
-  const checkComponentUsage = useCallback(async (componentId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('assembly_components')
-        .select(
-          `
+  const checkComponentUsage = useCallback(
+    async (componentId: string) => {
+      if (!currentTeam) return { isUsed: false, assemblies: [] };
+
+      try {
+        const { data, error } = await supabase
+          .from('assembly_components')
+          .select(
+            `
           assembly_id,
-          assembly:assemblies(id, name)
+          assembly:assemblies(id, name, team_id)
         `
-        )
-        .eq('component_id', componentId);
+          )
+          .eq('component_id', componentId);
 
-      if (error) throw error;
+        if (error) throw error;
 
-      const assemblies = (data || [])
-        .map((item: any) => item.assembly)
-        .filter((a: any) => a !== null)
-        .map((a: any) => ({ id: a.id, name: a.name }));
+        // Filter by team_id
+        const assemblies = (data || [])
+          .map((item: any) => item.assembly)
+          .filter((a: any) => a !== null && a.team_id === currentTeam.id)
+          .map((a: any) => ({ id: a.id, name: a.name }));
 
-      return {
-        isUsed: assemblies.length > 0,
-        assemblies,
-      };
-    } catch (err: any) {
-      logger.error('Error checking component usage:', err);
-      return { isUsed: false, assemblies: [] };
-    }
-  }, []);
+        return {
+          isUsed: assemblies.length > 0,
+          assemblies,
+        };
+      } catch (err: any) {
+        logger.error('Error checking component usage:', err);
+        return { isUsed: false, assemblies: [] };
+      }
+    },
+    [currentTeam]
+  );
 
   /**
    * Refresh assemblies manually
@@ -385,7 +412,7 @@ export function useAssemblies(): UseAssembliesReturn {
     await fetchAssemblies();
   }, [fetchAssemblies]);
 
-  // Fetch assemblies on mount
+  // Fetch assemblies on mount and when team changes
   useEffect(() => {
     fetchAssemblies();
   }, [fetchAssemblies]);

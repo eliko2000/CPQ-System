@@ -1,23 +1,16 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, useRef } from 'react';
 import { AgGridReact } from 'ag-grid-react';
 import { ColDef } from 'ag-grid-community';
 import { Button } from '../ui/button';
 import { Settings, ChevronDown } from 'lucide-react';
 import { useClickOutside } from '../../hooks/useClickOutside';
 import { useTableConfig } from '../../hooks/useTableConfig';
-import { logger } from '@/lib/logger';
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
 
 interface QuotationItemsGridProps {
   gridData: any[];
   columnDefs: ColDef[];
-  autoGroupColumnDef: any;
-  gridOptions: any;
-  onGridReady: (params: any) => void;
-  onColumnResized: (params: any) => void;
-  onColumnMoved: (params: any) => void;
-  onFilterChanged: (params: any) => void;
   onCellValueChanged: (params: any) => void;
   onCellDoubleClicked: (params: any) => void;
   onSelectionChanged: (params: any) => void;
@@ -27,18 +20,13 @@ interface QuotationItemsGridProps {
 export function QuotationItemsGrid({
   gridData,
   columnDefs,
-  autoGroupColumnDef,
-  gridOptions,
-  onGridReady,
-  onColumnResized,
-  onColumnMoved,
-  onFilterChanged,
   onCellValueChanged,
   onCellDoubleClicked,
   onSelectionChanged,
   onAddSystem,
 }: QuotationItemsGridProps) {
   const [showColumnManager, setShowColumnManager] = useState(false);
+  const gridRef = useRef<AgGridReact>(null);
 
   // Use table configuration hook
   const { config, saveConfig, loading } = useTableConfig('quotation_editor', {
@@ -70,7 +58,8 @@ export function QuotationItemsGrid({
     filterState: {},
   });
 
-  logger.debug('🔍 QuotationItemsGrid config loaded:', config);
+  // Removed debug logging to reduce re-renders
+  // logger.debug('🔍 QuotationItemsGrid config loaded:', config);
 
   // Close column manager when clicking outside
   const columnManagerRef = useClickOutside<HTMLDivElement>(() => {
@@ -91,8 +80,9 @@ export function QuotationItemsGrid({
       'customerPriceILS',
     ];
 
-    logger.debug('🔍 config.visibleColumns:', config.visibleColumns);
-    logger.debug('🔍 config.columnOrder:', config.columnOrder);
+    // Removed debug logging to reduce re-renders
+    // logger.debug('🔍 config.visibleColumns:', config.visibleColumns);
+    // logger.debug('🔍 config.columnOrder:', config.columnOrder);
 
     // Use saved order if exists and not empty, otherwise use default
     const effectiveOrder =
@@ -108,7 +98,8 @@ export function QuotationItemsGrid({
           : ['actions', ...config.visibleColumns]
         : defaultOrder;
 
-    logger.debug('🔍 ensuredVisibleColumns:', ensuredVisibleColumns);
+    // Removed debug logging to reduce re-renders
+    // logger.debug('🔍 ensuredVisibleColumns:', ensuredVisibleColumns);
 
     const visible = columnDefs.filter(col =>
       ensuredVisibleColumns.includes(col.field!)
@@ -123,11 +114,12 @@ export function QuotationItemsGrid({
       .filter(fieldId => visible.some(col => col.field === fieldId))
       .map(fieldId => visible.find(col => col.field === fieldId)!);
 
-    logger.debug('🔍 effectiveOrder was:', effectiveOrder);
-    logger.debug(
-      '🔍 Final ordered columns:',
-      ordered.map(c => c.field)
-    );
+    // Removed debug logging to reduce re-renders
+    // logger.debug('🔍 effectiveOrder was:', effectiveOrder);
+    // logger.debug(
+    //   '🔍 Final ordered columns:',
+    //   ordered.map(c => c.field)
+    // );
 
     // Apply saved column widths to prevent flash of default widths
     const withSavedWidths = ordered.map(col => {
@@ -169,6 +161,76 @@ export function QuotationItemsGrid({
     }));
   }, [columnDefs, config.visibleColumns]);
 
+  // Memoized defaultColDef to ensure stable reference and proper AG Grid behavior
+  const defaultColDef = useMemo(
+    () => ({
+      resizable: true,
+      sortable: true,
+      filter: true,
+      cellClass: 'text-right',
+      minWidth: 80,
+    }),
+    []
+  );
+
+  // Internal grid event handlers - all table config is managed HERE, not in parent
+  const handleGridReady = useCallback(
+    (params: any) => {
+      if (!params.api) return;
+
+      // Apply saved filter state
+      if (config.filterState && Object.keys(config.filterState).length > 0) {
+        params.api.setFilterModel(config.filterState);
+      }
+    },
+    [config.filterState]
+  );
+
+  const handleColumnResized = useCallback(
+    (params: any) => {
+      // ONLY save if this was a user drag - ignore all automatic resizes
+      const isUserResize =
+        params.source === 'uiColumnResized' ||
+        params.source === 'uiColumnDragged';
+
+      if (params.finished && isUserResize && params.api) {
+        const widths: Record<string, number> = {};
+        params.api.getAllDisplayedColumns()?.forEach((col: any) => {
+          widths[col.getColId()] = col.getActualWidth();
+        });
+        saveConfig({ columnWidths: widths });
+      }
+    },
+    [saveConfig]
+  );
+
+  const handleColumnMoved = useCallback(
+    (params: any) => {
+      // ONLY save if this was a user drag - ignore automatic column reordering
+      const isUserMove =
+        params.source === 'uiColumnMoved' ||
+        params.source === 'uiColumnDragged';
+
+      if (params.finished && isUserMove && params.api) {
+        const displayedOrder =
+          params.api
+            .getAllDisplayedColumns()
+            ?.map((col: any) => col.getColId()) || [];
+        saveConfig({ columnOrder: displayedOrder });
+      }
+    },
+    [saveConfig]
+  );
+
+  const handleFilterChanged = useCallback(
+    (params: any) => {
+      saveConfig({ filterState: params.api.getFilterModel() });
+    },
+    [saveConfig]
+  );
+
+  // Only wait for config to load - don't block on columnWidths
+  // This allows the grid to render immediately and users can resize columns
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -262,22 +324,26 @@ export function QuotationItemsGrid({
         </div>
       </div>
 
-      <div className="h-96">
+      <div
+        className="ag-theme-alpine"
+        style={{ height: '400px', width: '100%' }}
+      >
         <AgGridReact
+          ref={gridRef}
           rowData={gridData}
           columnDefs={visibleColumnDefs}
-          autoGroupColumnDef={autoGroupColumnDef}
-          gridOptions={gridOptions}
+          defaultColDef={defaultColDef}
           enableRtl={true}
-          onGridReady={onGridReady}
-          onColumnResized={onColumnResized}
-          onColumnMoved={onColumnMoved}
-          onFilterChanged={onFilterChanged}
+          onGridReady={handleGridReady}
+          onColumnResized={handleColumnResized}
+          onColumnMoved={handleColumnMoved}
+          onFilterChanged={handleFilterChanged}
           onCellValueChanged={onCellValueChanged}
           onCellDoubleClicked={onCellDoubleClicked}
           onSelectionChanged={onSelectionChanged}
-          groupDefaultExpanded={1}
-          className="ag-theme-alpine"
+          rowSelection="single"
+          animateRows={true}
+          enableCellTextSelection={true}
         />
       </div>
     </div>

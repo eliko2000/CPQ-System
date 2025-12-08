@@ -33,9 +33,10 @@ export function useTableConfig(tableName: string, defaultConfig: TableConfig) {
   // Listen for settings updates and reload visible columns
   useEffect(() => {
     const handleSettingsUpdate = () => {
-      logger.debug(
-        `[useTableConfig] Settings updated, reloading visible columns for ${tableName}`
-      );
+      // Removed excessive logging to reduce re-renders
+      // logger.debug(
+      //   `[useTableConfig] Settings updated, reloading visible columns for ${tableName}`
+      // );
       const newVisibleColumns = getTableColumnSettings(tableName as TableType);
       setConfig(prev => ({ ...prev, visibleColumns: newVisibleColumns }));
     };
@@ -63,10 +64,11 @@ export function useTableConfig(tableName: string, defaultConfig: TableConfig) {
       const visibleColumnsFromSettings = getTableColumnSettings(
         tableName as TableType
       );
-      logger.debug(
-        `[useTableConfig] Loaded visible columns from settings for ${tableName}:`,
-        visibleColumnsFromSettings
-      );
+      // Removed excessive logging to reduce re-renders
+      // logger.debug(
+      //   `[useTableConfig] Loaded visible columns from settings for ${tableName}:`,
+      //   visibleColumnsFromSettings
+      // );
 
       const { data, error } = await supabase
         .from('user_table_configs')
@@ -85,14 +87,15 @@ export function useTableConfig(tableName: string, defaultConfig: TableConfig) {
       }
 
       if (data?.config) {
-        logger.debug(
-          `[useTableConfig] Loaded saved config for ${tableName}:`,
-          data.config
-        );
-        logger.debug(
-          `[useTableConfig] Raw columnWidths from DB:`,
-          data.config.columnWidths
-        );
+        // Removed excessive logging to reduce re-renders
+        // logger.debug(
+        //   `[useTableConfig] Loaded saved config for ${tableName}:`,
+        //   data.config
+        // );
+        // logger.debug(
+        //   `[useTableConfig] Raw columnWidths from DB:`,
+        //   data.config.columnWidths
+        // );
 
         const savedConfig = data.config as SavedTableConfig;
 
@@ -112,15 +115,17 @@ export function useTableConfig(tableName: string, defaultConfig: TableConfig) {
           filterState: savedConfig.filterState || {},
         };
 
-        logger.debug(
-          `[useTableConfig] Merged config for ${tableName}:`,
-          mergedConfig
-        );
+        // Removed excessive logging to reduce re-renders
+        // logger.debug(
+        //   `[useTableConfig] Merged config for ${tableName}:`,
+        //   mergedConfig
+        // );
         setConfig(mergedConfig);
       } else {
-        logger.debug(
-          `[useTableConfig] No saved config for ${tableName}, using defaults with settings visible columns`
-        );
+        // Removed excessive logging to reduce re-renders
+        // logger.debug(
+        //   `[useTableConfig] No saved config for ${tableName}, using defaults with settings visible columns`
+        // );
         setConfig({
           ...defaultConfig,
           visibleColumns: visibleColumnsFromSettings, // Use settings for first load
@@ -143,7 +148,8 @@ export function useTableConfig(tableName: string, defaultConfig: TableConfig) {
 
   const saveConfig = useCallback(
     async (newConfig: Partial<TableConfig>) => {
-      console.trace('[useTableConfig] saveConfig called with:', newConfig);
+      // Removed excessive logging to reduce re-renders
+      // console.trace('[useTableConfig] saveConfig called with:', newConfig);
       if (!currentTeam || !profile) return;
 
       const updatedConfig = { ...config, ...newConfig };
@@ -158,14 +164,15 @@ export function useTableConfig(tableName: string, defaultConfig: TableConfig) {
           visibleColumns: updatedConfig.visibleColumns, // Now saved to persist user choices
         };
 
-        logger.debug(
-          `[useTableConfig] Saving config for ${tableName}:`,
-          configToSave
-        );
-        logger.debug(
-          `[useTableConfig] columnWidths details:`,
-          JSON.stringify(configToSave.columnWidths)
-        );
+        // Reduced logging - only log on errors or important events
+        // logger.debug(
+        //   `[useTableConfig] Saving config for ${tableName}:`,
+        //   configToSave
+        // );
+        // logger.debug(
+        //   `[useTableConfig] columnWidths details:`,
+        //   JSON.stringify(configToSave.columnWidths)
+        // );
 
         const { error } = await supabase.from('user_table_configs').upsert(
           {
@@ -182,11 +189,13 @@ export function useTableConfig(tableName: string, defaultConfig: TableConfig) {
 
         if (error) {
           logger.error(`[useTableConfig] Error saving config:`, error);
-        } else {
-          logger.debug(
-            `[useTableConfig] Successfully saved config for ${tableName}`
-          );
         }
+        // Removed success log to reduce noise
+        // else {
+        //   logger.debug(
+        //     `[useTableConfig] Successfully saved config for ${tableName}`
+        //   );
+        // }
       } catch (err) {
         logger.error(
           `[useTableConfig] Failed to save config for ${tableName}:`,

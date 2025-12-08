@@ -8,7 +8,7 @@ import { useQuotationState } from '../../hooks/quotation/useQuotationState';
 import { useQuotationActions } from '../../hooks/quotation/useQuotationActions';
 import { useQuotationCalculations } from '../../hooks/quotation/useQuotationCalculations';
 import { useQuotations } from '../../hooks/useQuotations';
-import { useTableConfig } from '../../hooks/useTableConfig';
+// NOTE: useTableConfig is handled ONLY in QuotationItemsGrid to avoid duplicate hook race conditions
 import { QuotationHeader } from './QuotationHeader';
 import { QuotationItemsGrid } from './QuotationItemsGrid';
 import { QuotationSummary } from './QuotationSummary';
@@ -31,37 +31,8 @@ export function QuotationEditor() {
   // Use quotations hook for Supabase persistence
   const quotationsHook = useQuotations();
 
-  // Use table configuration hook
-  const { config, saveConfig, loading } = useTableConfig('quotation_editor', {
-    columnOrder: [
-      'actions',
-      'displayNumber',
-      'componentName',
-      'itemType',
-      'laborSubtype',
-      'quantity',
-      'unitPriceILS',
-      'totalPriceUSD',
-      'totalPriceILS',
-      'customerPriceILS',
-    ],
-    columnWidths: {},
-    visibleColumns: [
-      'actions',
-      'displayNumber',
-      'componentName',
-      'itemType',
-      'laborSubtype',
-      'quantity',
-      'unitPriceILS',
-      'totalPriceUSD',
-      'totalPriceILS',
-      'customerPriceILS',
-    ],
-    filterState: {},
-  });
-
-  logger.debug('🔍 QuotationEditor config loaded:', config);
+  // NOTE: Table configuration (useTableConfig) is handled ONLY in QuotationItemsGrid
+  // to avoid duplicate hook calls causing race conditions and resize issues
 
   // Make components available globally for the LibrarySearchEditor
   useEffect(() => {
@@ -257,10 +228,6 @@ export function QuotationEditor() {
     ]
   );
 
-  // Grid options
-  const gridOptions: any = {};
-  const autoGroupColumnDef: any = {};
-
   // Filter components for popup
   const filteredComponents = useMemo(() => {
     if (!state.componentSearchText) return components;
@@ -292,78 +259,8 @@ export function QuotationEditor() {
     );
   }, [assemblies, state.componentSearchText]);
 
-  // Handle grid ready with config restoration
-  const onGridReady = useCallback(
-    (params: any) => {
-      if (!params.api) return;
-
-      // Widths are already applied via columnDefs in QuotationItemsGrid's visibleColumnDefs
-      // No need to re-apply them here as it causes a flash
-
-      // Apply saved filter state
-      if (Object.keys(config.filterState).length > 0) {
-        params.api.setFilterModel(config.filterState);
-      }
-
-      // DON'T call sizeColumnsToFit - it interferes with saved widths
-    },
-    [config.filterState]
-  );
-
-  // Handle column resize
-  const onColumnResized = useCallback(
-    (params: any) => {
-      // ONLY save if this was a user drag - ignore all automatic resizes
-      const isUserResize =
-        params.source === 'uiColumnResized' ||
-        params.source === 'uiColumnDragged';
-
-      if (params.finished && isUserResize && params.api) {
-        const widths: Record<string, number> = {};
-        params.api.getAllDisplayedColumns()?.forEach((col: any) => {
-          widths[col.getColId()] = col.getActualWidth();
-        });
-        logger.debug('User resized column, saving widths:', widths);
-        saveConfig({ columnWidths: widths });
-      } else if (params.finished) {
-        logger.debug('Ignoring automatic resize, source:', params.source);
-      }
-    },
-    [saveConfig]
-  );
-
-  // Handle column move
-  const onColumnMoved = useCallback(
-    (params: any) => {
-      // ONLY save if this was a user drag - ignore automatic column reordering
-      const isUserMove =
-        params.source === 'uiColumnMoved' ||
-        params.source === 'uiColumnDragged';
-
-      if (params.finished && isUserMove && params.api) {
-        const displayedOrder =
-          params.api
-            .getAllDisplayedColumns()
-            ?.map((col: any) => col.getColId()) || [];
-
-        // In RTL mode with AG Grid, we don't need to reverse the order
-        // AG Grid gives us the logical order, which matches how we store it
-        logger.debug('User moved column, saving order:', displayedOrder);
-        saveConfig({ columnOrder: displayedOrder });
-      } else if (params.finished) {
-        logger.debug('Ignoring automatic column move, source:', params.source);
-      }
-    },
-    [saveConfig]
-  );
-
-  // Handle filter change
-  const onFilterChanged = useCallback(
-    (params: any) => {
-      saveConfig({ filterState: params.api.getFilterModel() });
-    },
-    [saveConfig]
-  );
+  // NOTE: Grid event handlers (onGridReady, onColumnResized, onColumnMoved, onFilterChanged)
+  // are now handled internally by QuotationItemsGrid to avoid duplicate useTableConfig hook calls
 
   // Handle cell value changes
   const onCellValueChanged = useCallback(
@@ -439,13 +336,7 @@ export function QuotationEditor() {
     [components, setModal]
   );
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        Loading table configuration...
-      </div>
-    );
-  }
+  // NOTE: Loading state for table config is now handled by QuotationItemsGrid
 
   if (!currentQuotation) {
     return (
@@ -492,12 +383,6 @@ export function QuotationEditor() {
           <QuotationItemsGrid
             gridData={gridData}
             columnDefs={columnDefs}
-            autoGroupColumnDef={autoGroupColumnDef}
-            gridOptions={gridOptions}
-            onGridReady={onGridReady}
-            onColumnResized={onColumnResized}
-            onColumnMoved={onColumnMoved}
-            onFilterChanged={onFilterChanged}
             onCellValueChanged={onCellValueChanged}
             onCellDoubleClicked={onCellDoubleClicked}
             onSelectionChanged={e =>

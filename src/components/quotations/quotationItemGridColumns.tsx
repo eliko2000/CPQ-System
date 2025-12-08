@@ -15,7 +15,7 @@ import { logger } from '@/lib/logger';
 export const SystemHeaderRenderer = memo((props: ICellRendererParams) => {
   if (props.data?.isSystemGroup) {
     return (
-      <div className="font-bold text-blue-700 bg-blue-50 px-2 py-1 rounded">
+      <div className="font-bold text-blue-700 bg-blue-50 px-2 py-1 rounded text-right">
         {props.value}
       </div>
     );
@@ -201,10 +201,13 @@ export const createQuotationItemColumnDefs = (
     {
       headerName: 'מחיר ללקוח',
       field: 'customerPriceILS',
-      width: 120,
+      width: 140,
+      resizable: true,
       cellRenderer: CurrencyRenderer,
       cellClass: cellParams =>
-        cellParams.data?.isSystemGroup ? 'ag-cell-bold' : 'ag-cell-right',
+        cellParams.data?.isSystemGroup
+          ? 'ag-cell-bold text-right'
+          : 'text-right',
       valueGetter: (valueParams: ValueGetterParams) => {
         if (valueParams.data.isSystemGroup) {
           const system = currentQuotation?.systems.find(
@@ -248,10 +251,13 @@ export const createQuotationItemColumnDefs = (
     {
       headerName: 'מחיר נטו שקלים',
       field: 'totalPriceILS',
-      width: 120,
+      width: 140,
+      resizable: true,
       cellRenderer: CurrencyRenderer,
       cellClass: cellParams =>
-        cellParams.data?.isSystemGroup ? 'ag-cell-bold' : 'ag-cell-right',
+        cellParams.data?.isSystemGroup
+          ? 'ag-cell-bold text-right'
+          : 'text-right',
       valueGetter: (valueParams: ValueGetterParams) => {
         if (valueParams.data.isSystemGroup) {
           const system = currentQuotation?.systems.find(
@@ -287,10 +293,13 @@ export const createQuotationItemColumnDefs = (
     {
       headerName: 'מחיר נטו דולר',
       field: 'totalPriceUSD',
-      width: 120,
+      width: 140,
+      resizable: true,
       cellRenderer: USDCurrencyRenderer,
       cellClass: cellParams =>
-        cellParams.data?.isSystemGroup ? 'ag-cell-bold' : 'ag-cell-right',
+        cellParams.data?.isSystemGroup
+          ? 'ag-cell-bold text-right'
+          : 'text-right',
       valueGetter: (valueParams: ValueGetterParams) => {
         if (valueParams.data.isSystemGroup) {
           const system = currentQuotation?.systems.find(
@@ -326,7 +335,8 @@ export const createQuotationItemColumnDefs = (
     {
       headerName: 'מחיר יחידה',
       field: 'unitPriceILS',
-      width: 100,
+      width: 120,
+      resizable: true,
       editable: (editParams: any) =>
         editParams.data?.isCustomItem && !editParams.data?.isSystemGroup, // ✅ Only custom items editable
       cellEditor: 'agNumberCellEditor',
@@ -336,7 +346,9 @@ export const createQuotationItemColumnDefs = (
       },
       cellRenderer: CurrencyRenderer,
       cellClass: cellParams =>
-        cellParams.data?.isSystemGroup ? 'ag-cell-bold' : 'ag-cell-right',
+        cellParams.data?.isSystemGroup
+          ? 'ag-cell-bold text-right'
+          : 'text-right',
       valueGetter: (valueParams: ValueGetterParams) => {
         if (valueParams.data.isSystemGroup) {
           const systemItems = gridData.filter(
@@ -367,6 +379,7 @@ export const createQuotationItemColumnDefs = (
       headerName: 'כמות',
       field: 'quantity',
       width: 80,
+      resizable: true,
       editable: true,
       cellEditor: 'agNumberCellEditor',
       cellEditorParams: {
@@ -374,7 +387,9 @@ export const createQuotationItemColumnDefs = (
         precision: 0,
       },
       cellClass: cellParams =>
-        cellParams.data?.isSystemGroup ? 'ag-cell-bold' : 'ag-cell-right',
+        cellParams.data?.isSystemGroup
+          ? 'ag-cell-bold text-right'
+          : 'text-right',
       valueGetter: (valueParams: ValueGetterParams) => {
         if (valueParams.data.isSystemGroup)
           return valueParams.data.quantity || 1;
@@ -396,12 +411,15 @@ export const createQuotationItemColumnDefs = (
     {
       headerName: 'שם פריט',
       field: 'componentName',
-      width: 200,
+      width: 300,
+      resizable: true,
       editable: (editParams: any) =>
         editParams.data?.isSystemGroup || editParams.data?.isCustomItem, // ✅ Systems and custom items editable
       cellEditor: SystemNameEditor, // ✅ Direct class assignment
       cellClass: cellParams =>
-        cellParams.data?.isSystemGroup ? 'ag-cell-bold' : '',
+        cellParams.data?.isSystemGroup
+          ? 'ag-cell-bold text-right'
+          : 'text-right',
       cellStyle: { textAlign: 'right', direction: 'rtl' },
       cellRenderer: (cellParams: ICellRendererParams) => {
         if (cellParams.data?.isSystemGroup) {
@@ -483,6 +501,7 @@ export const createQuotationItemColumnDefs = (
       headerName: 'סוג',
       field: 'itemType',
       width: 100,
+      resizable: true,
       editable: (editParams: any) => !editParams.data?.isSystemGroup,
       cellEditor: 'agSelectCellEditor',
       cellEditorParams: {
@@ -500,7 +519,7 @@ export const createQuotationItemColumnDefs = (
               : '';
       },
       cellClass: cellParams =>
-        cellParams.data?.isSystemGroup ? '' : 'ag-cell-right',
+        cellParams.data?.isSystemGroup ? 'text-right' : 'text-right',
       cellStyle: cellParams => {
         if (cellParams.data?.isSystemGroup) {
           return { textAlign: 'right' } as any;
@@ -533,6 +552,7 @@ export const createQuotationItemColumnDefs = (
       headerName: 'תת-סוג עבודה',
       field: 'laborSubtype',
       width: 120,
+      resizable: true,
       editable: (editParams: any) =>
         !editParams.data?.isSystemGroup &&
         editParams.data?.itemType === 'labor',
@@ -592,6 +612,7 @@ export const createQuotationItemColumnDefs = (
       headerName: 'מס"ד',
       field: 'displayNumber',
       width: 80,
+      resizable: true,
       cellRenderer: (cellParams: ICellRendererParams) => {
         if (cellParams.data?.isSystemGroup) {
           return (
@@ -607,7 +628,9 @@ export const createQuotationItemColumnDefs = (
         );
       },
       cellClass: cellParams =>
-        cellParams.data?.isSystemGroup ? 'ag-cell-bold' : 'ag-cell-right',
+        cellParams.data?.isSystemGroup
+          ? 'ag-cell-bold text-right'
+          : 'text-right',
       sortable: false,
       headerComponent: CustomHeader,
       headerComponentParams: (headerParams: any) => ({
@@ -624,14 +647,20 @@ export const createQuotationItemColumnDefs = (
       headerName: 'פעולות',
       field: 'actions',
       width: 150,
+      resizable: true,
       sortable: false,
       filter: false,
       cellClass: cellParams =>
-        cellParams.data?.isSystemGroup ? 'ag-cell-bold' : 'ag-cell-center',
+        cellParams.data?.isSystemGroup
+          ? 'ag-cell-bold text-right'
+          : 'text-right',
       cellRenderer: (cellParams: ICellRendererParams) => {
         if (cellParams.data?.isSystemGroup) {
           return (
-            <div className="flex gap-1 items-center justify-center">
+            <div
+              className="flex gap-1 items-center justify-end"
+              style={{ direction: 'ltr' }}
+            >
               <Button
                 variant="outline"
                 size="sm"
@@ -726,7 +755,10 @@ export const createQuotationItemColumnDefs = (
         }
 
         return (
-          <div className="flex gap-1 items-center justify-center">
+          <div
+            className="flex gap-1 items-center justify-end"
+            style={{ direction: 'ltr' }}
+          >
             <Button
               variant="outline"
               size="sm"

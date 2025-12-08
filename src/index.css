@@ -62,22 +62,22 @@
     direction: rtl;
     text-align: right;
   }
-  
+
   /* RTL support for flex layouts */
   .flex {
     direction: rtl;
   }
-  
+
   /* RTL support for AG Grid */
   .ag-theme-alpine {
     direction: rtl; /* Make AG Grid RTL for proper Hebrew display */
   }
-  
+
   /* RTL spacing utilities */
   .space-x-reverse > :not([hidden]) ~ :not([hidden]) {
     --tw-space-x-reverse: 1;
   }
-  
+
   .space-x-reverse > :not([hidden]) ~ :not([hidden]) {
     margin-right: calc(0.5rem * var(--tw-space-x-reverse));
     margin-left: 0;
@@ -112,6 +112,9 @@
   font-size: 0.875rem; /* Slightly smaller text */
   display: flex;
   align-items: center; /* Vertical center alignment */
+  justify-content: flex-start; /* Use flex-start with direction: rtl for right align */
+  text-align: right; /* Right align text */
+  direction: rtl; /* Ensure RTL direction for proper alignment */
   white-space: nowrap; /* Prevent text wrapping */
   overflow: hidden; /* Hide overflow */
   text-overflow: ellipsis; /* Show ellipsis for truncated text */
@@ -167,24 +170,59 @@
 .ag-cell-bold {
   font-weight: bold !important;
   text-align: right !important;
-  justify-content: flex-end !important;
+  justify-content: flex-start !important;
+  direction: rtl !important;
+}
+
+/* Ensure all child elements in cells inherit RTL direction */
+.ag-theme-alpine .ag-cell > * {
+  direction: rtl;
+  width: 100%;
 }
 
 /* RTL Support for AG Grid */
-[dir="rtl"] .ag-theme-alpine {
+[dir='rtl'] .ag-theme-alpine {
   direction: rtl;
 }
 
-[dir="rtl"] .ag-header-cell-label {
+[dir='rtl'] .ag-header-cell-label {
   text-align: right;
 }
 
-[dir="rtl"] .ag-pinned-right-cols-container {
+[dir='rtl'] .ag-pinned-right-cols-container {
   left: 0;
   right: auto;
 }
 
-[dir="rtl"] .ag-pinned-left-cols-container {
+[dir='rtl'] .ag-pinned-left-cols-container {
   right: 0;
   left: auto;
+}
+
+/* AG Grid Column Resize Handle Styles - Ensure resize handles are visible and interactive */
+.ag-theme-alpine .ag-header-cell-resize {
+  position: absolute;
+  z-index: 10;
+  width: 8px;
+  height: 100%;
+  cursor: col-resize !important;
+  top: 0;
+}
+
+/* For RTL grids, resize handle is on the left side of each column */
+.ag-theme-alpine.ag-rtl .ag-header-cell-resize,
+.ag-theme-alpine[dir='rtl'] .ag-header-cell-resize {
+  left: 0;
+  right: auto;
+}
+
+/* Hover effect for resize handle */
+.ag-theme-alpine .ag-header-cell-resize:hover {
+  background-color: rgba(0, 114, 188, 0.3);
+}
+
+/* Active/dragging state */
+.ag-theme-alpine .ag-header-cell-resize:active,
+.ag-theme-alpine .ag-header-cell-resize.ag-column-resizing {
+  background-color: rgba(0, 114, 188, 0.5);
 }

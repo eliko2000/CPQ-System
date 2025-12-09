@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useCPQ } from '../../contexts/CPQContext';
 import { loadSetting } from '../../services/settingsService';
 import {
@@ -16,6 +17,8 @@ import { Button } from '../ui/button';
 import { logger } from '@/lib/logger';
 
 export function Sidebar() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const {
     uiState,
     setActiveView,
@@ -62,12 +65,27 @@ export function Sidebar() {
 
   // Handle navigation with quotation check
   const handleNavigation = (view: string) => {
-    if (currentQuotation) {
-      // Show confirmation dialog
-      setPendingView(view);
-      setShowNavigationConfirm(true);
+    // If we're on a router-based page (settings, profile, admin), navigate back to main app first
+    if (location.pathname !== '/') {
+      navigate('/');
+      // Wait a tick for navigation to complete, then set the view
+      setTimeout(() => {
+        if (currentQuotation) {
+          setPendingView(view);
+          setShowNavigationConfirm(true);
+        } else {
+          setActiveView(view as any);
+        }
+      }, 0);
     } else {
-      setActiveView(view as any);
+      // Already on main app route
+      if (currentQuotation) {
+        // Show confirmation dialog
+        setPendingView(view);
+        setShowNavigationConfirm(true);
+      } else {
+        setActiveView(view as any);
+      }
     }
   };
 

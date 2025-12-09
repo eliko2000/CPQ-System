@@ -62,6 +62,9 @@ export function UserAvatarUpload({
 
       onUploadComplete(publicUrl);
       toast.success('Avatar updated successfully');
+
+      // Force page reload to refresh avatar in all components
+      window.location.reload();
     } catch (error: any) {
       console.error('Error uploading avatar:', error);
       toast.error('Error uploading avatar: ' + error.message);
@@ -70,6 +73,48 @@ export function UserAvatarUpload({
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
+    }
+  };
+
+  const handleRemoveAvatar = async () => {
+    try {
+      setUploading(true);
+
+      // 1. Delete from storage if avatar exists
+      if (avatarUrl) {
+        const fileName = avatarUrl.split('/').pop();
+        if (fileName) {
+          const { error: deleteError } = await supabase.storage
+            .from('avatars')
+            .remove([fileName]);
+
+          if (deleteError) {
+            console.warn('Error deleting avatar file:', deleteError);
+            // Continue anyway to clear the avatar_url from profile
+          }
+        }
+      }
+
+      // 2. Update user profile to remove avatar_url
+      const { error: updateError } = await supabase
+        .from('user_profiles')
+        .update({ avatar_url: null })
+        .eq('id', user?.id);
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      onUploadComplete('');
+      toast.success('Avatar removed successfully');
+
+      // Force page reload to refresh avatar in all components
+      window.location.reload();
+    } catch (error: any) {
+      console.error('Error removing avatar:', error);
+      toast.error('Error removing avatar: ' + error.message);
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -126,6 +171,18 @@ export function UserAvatarUpload({
         >
           {uploading ? 'Uploading...' : 'Change Avatar'}
         </Button>
+        {avatarUrl && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRemoveAvatar}
+            disabled={uploading}
+            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+          >
+            <X className="h-4 w-4 mr-1" />
+            Remove
+          </Button>
+        )}
       </div>
 
       <p className="text-xs text-muted-foreground">

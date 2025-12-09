@@ -1,16 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 import { logger } from '../lib/logger';
-
-export interface FeatureFlag {
-  id: string;
-  flag_key: string;
-  flag_name: string;
-  description: string | null;
-  is_enabled: boolean;
-  created_at: string;
-  updated_at: string;
-}
+import type { FeatureFlag } from '../types/feature-flags.types';
 
 export function useAdminFeatureFlags() {
   const [flags, setFlags] = useState<FeatureFlag[]>([]);

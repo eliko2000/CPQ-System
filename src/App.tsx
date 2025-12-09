@@ -3,6 +3,7 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { ToastProvider } from './contexts/ToastContext';
 import { AuthProvider } from './contexts/AuthContext';
 import { TeamProvider } from './contexts/TeamContext';
+import { FeatureFlagProvider } from './contexts/FeatureFlagContext';
 import { AppRoutes } from './components/shared/AppRoutes';
 import { ErrorBoundary } from './components/error/ErrorBoundary';
 import { Toaster } from 'sonner';
@@ -14,9 +15,11 @@ function App() {
         <ToastProvider>
           <AuthProvider>
             <TeamProvider>
-              <CPQProvider>
-                <AppRoutes />
-              </CPQProvider>
+              <FeatureFlagProvider>
+                <CPQProvider>
+                  <AppRoutes />
+                </CPQProvider>
+              </FeatureFlagProvider>
             </TeamProvider>
           </AuthProvider>
         </ToastProvider>

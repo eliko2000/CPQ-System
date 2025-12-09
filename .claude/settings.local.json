@@ -31,7 +31,8 @@
       "WebSearch",
       "Bash(ls:*)",
       "Bash(export SUPABASE_ACCESS_TOKEN=sbp_c483c99039ba59415eb1eadf89bcb6d2a87d8d4d)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []

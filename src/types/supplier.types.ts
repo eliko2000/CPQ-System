@@ -148,6 +148,12 @@ export interface ExtractedItem {
   manufacturerPN?: string;
   quantity?: number;
   unitPrice?: number;
+  componentType?: 'hardware' | 'software' | 'labor';
+  laborSubtype?:
+    | 'engineering'
+    | 'commissioning'
+    | 'installation'
+    | 'programming';
   confidence: number;
 }
 

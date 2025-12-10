@@ -82,6 +82,12 @@ export interface AIExtractedComponent extends ExtractedItem {
   unitPriceUSD?: number;
   unitPriceEUR?: number;
   currency?: 'NIS' | 'USD' | 'EUR';
+  componentType?: 'hardware' | 'software' | 'labor';
+  laborSubtype?:
+    | 'engineering'
+    | 'commissioning'
+    | 'installation'
+    | 'programming';
   quoteDate?: string;
   notes?: string;
 }
@@ -239,15 +245,24 @@ Extract the following information for each component:
 4. **category** - Component category - MUST be one of these EXACT Hebrew values:
 ${categoryList}
    Use the most appropriate category, or use "${categories[categories.length - 1]}" if none fit
-5. **supplier** - Supplier/vendor name (if mentioned)
-6. **quantity** - Quantity (if specified)
-7. **unitPriceNIS** - Unit price in Israeli Shekels (₪, NIS, ILS, שקלים)
-8. **unitPriceUSD** - Unit price in US Dollars ($, USD)
-9. **unitPriceEUR** - Unit price in Euros (€, EUR)
-10. **currency** - Primary currency (NIS, USD, or EUR)
-11. **quoteDate** - Date of quotation (if visible)
-12. **notes** - Any important notes, specifications, or remarks (keep technical specs here, NOT in name)
-13. **confidence** - Your confidence level (0.0 to 1.0) in the extraction accuracy for this item
+5. **componentType** - MUST be one of: "hardware", "software", or "labor"
+   - "hardware": Physical components (PLCs, sensors, motors, robots, etc.)
+   - "software": Software licenses, applications, configuration tools
+   - "labor": Services like engineering, installation, commissioning, programming
+6. **laborSubtype** - (ONLY if componentType is "labor") MUST be one of:
+   - "engineering": Engineering design, system design (הנדסה, תכנון)
+   - "commissioning": System commissioning, testing, startup (הפעלה, בדיקות)
+   - "installation": Physical installation work (התקנה)
+   - "programming": PLC programming, robot programming (תכנות)
+7. **supplier** - Supplier/vendor name (if mentioned)
+8. **quantity** - Quantity (if specified)
+9. **unitPriceNIS** - Unit price in Israeli Shekels (₪, NIS, ILS, שקלים)
+10. **unitPriceUSD** - Unit price in US Dollars ($, USD)
+11. **unitPriceEUR** - Unit price in Euros (€, EUR)
+12. **currency** - Primary currency (NIS, USD, or EUR)
+13. **quoteDate** - Date of quotation (if visible)
+14. **notes** - Any important notes, specifications, or remarks (keep technical specs here, NOT in name)
+15. **confidence** - Your confidence level (0.0 to 1.0) in the extraction accuracy for this item
 
 **Important guidelines:**
 - **NAME MUST BE SHORT & DESCRIPTIVE IN HEBREW**: Translate product type + model number only
@@ -279,6 +294,8 @@ Return a valid JSON object with this exact structure:
       "manufacturer": "Manufacturer name or null",
       "manufacturerPN": "Part number or null",
       "category": "Category or null",
+      "componentType": "hardware" | "software" | "labor",
+      "laborSubtype": "engineering" | "commissioning" | "installation" | "programming" | null,
       "supplier": "Supplier name or null",
       "quantity": number or null,
       "unitPriceNIS": number or null,
@@ -679,6 +696,8 @@ export function aiComponentToComponent(
     name: aiComponent.name,
     description: aiComponent.description,
     category: aiComponent.category || 'אחר',
+    componentType: aiComponent.componentType || 'hardware',
+    laborSubtype: aiComponent.laborSubtype,
     manufacturer: aiComponent.manufacturer || '',
     manufacturerPN: aiComponent.manufacturerPN || '',
     supplier: aiComponent.supplier || defaultSupplier || '',

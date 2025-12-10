@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext';
 import { Team, TeamMember } from '../types/auth.types';
@@ -17,6 +18,7 @@ const TeamContext = createContext<TeamContextType | undefined>(undefined);
 
 export function TeamProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [teams, setTeams] = useState<Team[]>([]);
   const [currentTeam, setCurrentTeam] = useState<Team | null>(null);
   const [loading, setLoading] = useState(true);
@@ -160,7 +162,34 @@ export function TeamProvider({ children }: { children: React.ReactNode }) {
   const switchTeam = (teamId: string) => {
     const team = teams.find(t => t.id === teamId);
     if (team) {
+      const oldTeamName = currentTeam?.name;
+
+      // Clear old team's cache from localStorage (don't be too aggressive)
+      if (currentTeam && currentTeam.id !== teamId) {
+        const oldCacheKey = `cpq-settings-cache-${currentTeam.id}`;
+        localStorage.removeItem(oldCacheKey);
+      }
+
       setCurrentTeam(team);
+
+      // Notify components that team switched
+      window.dispatchEvent(
+        new CustomEvent('team-switched', {
+          detail: { teamId: team.id, fromTeam: currentTeam?.id },
+        })
+      );
+
+      // Show feedback toast
+      if (oldTeamName) {
+        toast.success(`Switched to ${team.name}`, {
+          description: `You are now viewing ${team.name}'s data and settings`,
+        });
+      }
+
+      // Navigate to home page on team switch (better UX)
+      setTimeout(() => {
+        navigate('/');
+      }, 300);
     }
   };
 

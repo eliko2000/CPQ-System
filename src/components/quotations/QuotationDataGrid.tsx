@@ -20,6 +20,7 @@ import {
 import { Plus, Settings, ChevronDown } from 'lucide-react';
 import { useClickOutside } from '../../hooks/useClickOutside';
 import { useTableConfig } from '../../hooks/useTableConfig';
+import { useAppearancePreferences } from '../../hooks/useAppearancePreferences';
 import { getTableColumnSettings } from '../../constants/settings';
 import { ProjectPicker } from './ProjectPicker';
 import { supabase } from '../../supabaseClient';
@@ -54,6 +55,7 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
   } = useQuotations();
   const { setCurrentQuotation } = useCPQ();
   const { currentTeam } = useTeam();
+  const { preferences } = useAppearancePreferences();
 
   const gridRef = useRef<AgGridReact>(null);
   const [selectedQuotations, setSelectedQuotations] = useState<string[]>([]);
@@ -821,8 +823,8 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
               stopEditingWhenCellsLoseFocus={true}
               singleClickEdit={true}
               pagination={true}
-              paginationPageSize={50}
-              paginationPageSizeSelector={[25, 50, 100, 200]}
+              paginationPageSize={preferences.itemsPerPage}
+              paginationPageSizeSelector={[25, 50, 100]}
             />
           </div>
         </CardContent>

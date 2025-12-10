@@ -14,9 +14,11 @@ import {
   saveSetting,
   migrateLocalStorageToSupabase,
 } from '@/services/settingsService';
+import { useTeam } from '@/contexts/TeamContext';
 import { logger } from '@/lib/logger';
 
 export function PricingSettings() {
+  const { currentTeam } = useTeam();
   const [isLoading, setIsLoading] = useState(true);
   const [pricingSettings, setPricingSettings] = useState({
     usdToIlsRate: 3.7,
@@ -37,8 +39,11 @@ export function PricingSettings() {
         // First, migrate any old localStorage settings
         await migrateLocalStorageToSupabase();
 
-        // Load from Supabase
-        const result = await loadSetting<typeof pricingSettings>('pricing');
+        // Load from Supabase with team scope
+        const result = await loadSetting<typeof pricingSettings>(
+          'pricing',
+          currentTeam?.id
+        );
         if (result.success && result.data) {
           setPricingSettings(result.data);
         }
@@ -49,14 +54,14 @@ export function PricingSettings() {
       }
     }
     loadPricingSettings();
-  }, []);
+  }, [currentTeam?.id]);
 
   // Auto-save to Supabase whenever settings change
   const savePricingSettings = async (
     updatedSettings: typeof pricingSettings
   ) => {
     try {
-      await saveSetting('pricing', updatedSettings);
+      await saveSetting('pricing', updatedSettings, currentTeam?.id);
       // Dispatch event to notify other components
       window.dispatchEvent(new CustomEvent('cpq-settings-updated'));
     } catch (error) {

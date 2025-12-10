@@ -9,6 +9,8 @@ import { Edit, Trash2, Eye, Settings, ChevronDown, Copy } from 'lucide-react';
 import { Component } from '../../types';
 import { useClickOutside } from '../../hooks/useClickOutside';
 import { useTableConfig } from '../../hooks/useTableConfig';
+import { useTeam } from '../../contexts/TeamContext';
+import { useAppearancePreferences } from '../../hooks/useAppearancePreferences';
 import { CustomHeader } from '../grid/CustomHeader';
 import {
   getComponentCategories,
@@ -34,18 +36,31 @@ export function EnhancedComponentGrid({
   onView,
   onComponentUpdate,
 }: EnhancedComponentGridProps) {
+  const { currentTeam } = useTeam();
+  const { preferences } = useAppearancePreferences();
   const gridRef = useRef<AgGridReact>(null);
   const [showColumnManager, setShowColumnManager] = useState(false);
   const [categories, setCategories] = useState<string[]>(() =>
-    getComponentCategories()
+    getComponentCategories(currentTeam?.id)
   );
+
+  // Reload categories when team changes
+  useEffect(() => {
+    if (currentTeam?.id) {
+      setCategories(getComponentCategories(currentTeam.id));
+      // Force grid to refresh column definitions
+      if (gridRef.current && gridRef.current.api) {
+        gridRef.current.api.refreshCells({ force: true });
+      }
+    }
+  }, [currentTeam?.id]);
 
   // Listen for category updates from settings
   useEffect(() => {
     const handleCategoriesUpdate = () => {
-      setCategories(getComponentCategories());
+      setCategories(getComponentCategories(currentTeam?.id));
       // Force grid to refresh column definitions
-      if (gridRef.current) {
+      if (gridRef.current && gridRef.current.api) {
         gridRef.current.api.refreshCells({ force: true });
       }
     };
@@ -57,7 +72,7 @@ export function EnhancedComponentGrid({
         handleCategoriesUpdate
       );
     };
-  }, []);
+  }, [currentTeam?.id]);
 
   // Use table configuration hook - RTL order (reversed because AG Grid reverses it back)
   const { config, saveConfig, loading } = useTableConfig('component_library', {
@@ -997,7 +1012,8 @@ export function EnhancedComponentGrid({
           rowSelection="single"
           animateRows={true}
           pagination={true}
-          paginationPageSize={20}
+          paginationPageSize={preferences.itemsPerPage}
+          paginationPageSizeSelector={[25, 50, 100]}
           enableCellTextSelection={true}
           localeText={{
             page: 'עמוד',

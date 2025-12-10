@@ -3,6 +3,7 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { useCPQ } from '../../contexts/CPQContext';
+import { useTeam } from '../../contexts/TeamContext';
 import {
   Component,
   ComponentFormData,
@@ -35,9 +36,10 @@ export function ComponentForm({
   onClose,
 }: ComponentFormProps) {
   const { addComponent, updateComponent } = useCPQ();
+  const { currentTeam } = useTeam();
   const { handleError, handleWarning, handleSuccess } = useErrorHandler();
   const [categories, setCategories] = useState<string[]>(() =>
-    getComponentCategories()
+    getComponentCategories(currentTeam?.id)
   );
   const [formData, setFormData] = useState<
     ComponentFormData & {
@@ -68,10 +70,17 @@ export function ComponentForm({
   );
   const modalRef = useClickOutside<HTMLDivElement>(() => handleClose());
 
+  // Reload categories when team changes
+  useEffect(() => {
+    if (currentTeam?.id) {
+      setCategories(getComponentCategories(currentTeam.id));
+    }
+  }, [currentTeam?.id]);
+
   // Listen for category updates from settings
   useEffect(() => {
     const handleCategoriesUpdate = () => {
-      setCategories(getComponentCategories());
+      setCategories(getComponentCategories(currentTeam?.id));
     };
 
     window.addEventListener(CATEGORIES_UPDATED_EVENT, handleCategoriesUpdate);
@@ -81,7 +90,7 @@ export function ComponentForm({
         handleCategoriesUpdate
       );
     };
-  }, []);
+  }, [currentTeam?.id]);
 
   // Initialize form data when component changes
   useEffect(() => {

@@ -15,6 +15,7 @@ import {
 } from '@/constants/settings';
 import { CategoryMigrationDialog } from '../../ui/CategoryMigrationDialog';
 import { useCPQ } from '@/contexts/CPQContext';
+import { useTeam } from '@/contexts/TeamContext';
 import {
   loadSetting,
   saveSetting,
@@ -24,6 +25,7 @@ import { logger } from '@/lib/logger';
 
 export function ComponentCategoriesSettings() {
   const { components, updateComponent } = useCPQ();
+  const { currentTeam } = useTeam();
   const [categories, setCategories] = useState<string[]>([
     ...DEFAULT_COMPONENT_CATEGORIES,
   ]);
@@ -53,9 +55,10 @@ export function ComponentCategoriesSettings() {
         // First, migrate any old localStorage settings
         await migrateLocalStorageToSupabase();
 
-        // Load from Supabase
+        // Load from Supabase with team scope
         const result = await loadSetting<{ categories: string[] }>(
-          'componentCategories'
+          'componentCategories',
+          currentTeam?.id
         );
         if (result.success && result.data?.categories) {
           setCategories(result.data.categories);
@@ -71,14 +74,18 @@ export function ComponentCategoriesSettings() {
       }
     }
     loadCategories();
-  }, []);
+  }, [currentTeam?.id]);
 
   const updateCategoriesInStorage = async (updatedCategories: string[]) => {
     try {
-      // Save to Supabase (also caches in localStorage)
-      await saveSetting('componentCategories', {
-        categories: updatedCategories,
-      });
+      // Save to Supabase (also caches in localStorage) with team scope
+      await saveSetting(
+        'componentCategories',
+        {
+          categories: updatedCategories,
+        },
+        currentTeam?.id
+      );
       notifyCategoriesUpdated();
     } catch (error) {
       logger.error('Error saving categories:', error);

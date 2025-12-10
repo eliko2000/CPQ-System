@@ -10,9 +10,11 @@ import { Input } from '../../ui/input';
 import { Button } from '../../ui/button';
 import { Eye, EyeOff, Loader2, Check, X, AlertCircle } from 'lucide-react';
 import { loadSetting, saveSetting } from '@/services/settingsService';
+import { useTeam } from '@/contexts/TeamContext';
 import { logger } from '@/lib/logger';
 
 export function GeneralSettings() {
+  const { currentTeam } = useTeam();
   // State for API key management
   const [apiKey, setApiKey] = useState<string>('');
   const [showApiKey, setShowApiKey] = useState(false);
@@ -29,11 +31,14 @@ export function GeneralSettings() {
   // Load API key on mount
   useEffect(() => {
     loadApiKey();
-  }, []);
+  }, [currentTeam?.id]);
 
   const loadApiKey = async () => {
     try {
-      const result = await loadSetting<{ apiKey: string }>('anthropicApiKey');
+      const result = await loadSetting<{ apiKey: string }>(
+        'anthropicApiKey',
+        currentTeam?.id
+      );
       if (result.success && result.data?.apiKey) {
         setApiKey(result.data.apiKey);
       }
@@ -62,9 +67,13 @@ export function GeneralSettings() {
     setIsSaving(true);
 
     try {
-      const result = await saveSetting('anthropicApiKey', {
-        apiKey: apiKey.trim(),
-      });
+      const result = await saveSetting(
+        'anthropicApiKey',
+        {
+          apiKey: apiKey.trim(),
+        },
+        currentTeam?.id
+      );
 
       if (result.success) {
         setSaveStatus({ message: 'מפתח API נשמר בהצלחה', type: 'success' });

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   CheckCircle,
   Edit2,
@@ -26,6 +26,10 @@ import type {
 } from '../../services/claudeAI';
 import type { Component, ComponentMatchDecision } from '../../types';
 import { normalizeComponentPrices } from '../../utils/currencyConversion';
+import {
+  getComponentCategories,
+  CATEGORIES_UPDATED_EVENT,
+} from '../../constants/settings';
 
 // Type guards for metadata
 interface ExcelMetadata {
@@ -74,18 +78,18 @@ interface PreviewComponent extends AIExtractedComponent {
   matchDecision?: ComponentMatchDecision;
 }
 
-const CATEGORIES = [
-  'בקרים',
-  'חיישנים',
-  'אקטואטורים',
-  'מנועים',
-  'ספקי כוח',
-  'תקשורת',
-  'בטיחות',
-  'מכני',
-  'כבלים ומחברים',
-  'אחר',
-];
+const COMPONENT_TYPES = [
+  { value: 'hardware', label: 'חומרה' },
+  { value: 'software', label: 'תוכנה' },
+  { value: 'labor', label: 'עבודה' },
+] as const;
+
+const LABOR_SUBTYPES = [
+  { value: 'engineering', label: 'הנדסה' },
+  { value: 'commissioning', label: 'הפעלה' },
+  { value: 'installation', label: 'התקנה' },
+  { value: 'programming', label: 'תכנות' },
+] as const;
 
 export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
   extractionResult,
@@ -93,6 +97,11 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
   onConfirm,
   onCancel,
 }) => {
+  // Load team-specific categories dynamically
+  const [categories, setCategories] = useState<string[]>(() =>
+    getComponentCategories()
+  );
+
   const [components, setComponents] = useState<PreviewComponent[]>(
     extractionResult.components.map((c, idx) => ({
       ...c,
@@ -102,6 +111,21 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
       matchDecision: matchDecisions.find(d => d.componentIndex === idx),
     }))
   );
+
+  // Listen for category updates
+  useEffect(() => {
+    const handleCategoriesUpdated = () => {
+      setCategories(getComponentCategories());
+    };
+
+    window.addEventListener(CATEGORIES_UPDATED_EVENT, handleCategoriesUpdated);
+    return () => {
+      window.removeEventListener(
+        CATEGORIES_UPDATED_EVENT,
+        handleCategoriesUpdated
+      );
+    };
+  }, []);
 
   const [localMatchDecisions, setLocalMatchDecisions] =
     useState<ComponentMatchDecision[]>(matchDecisions);
@@ -731,10 +755,10 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
                     }
                   >
                     <SelectTrigger>
-                      <SelectValue />
+                      <SelectValue placeholder="בחר קטגוריה" />
                     </SelectTrigger>
                     <SelectContent>
-                      {CATEGORIES.map(cat => (
+                      {categories.map(cat => (
                         <SelectItem key={cat} value={cat}>
                           {cat}
                         </SelectItem>
@@ -744,25 +768,93 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
                 </div>
                 <div>
                   <label className="text-xs text-muted-foreground">
-                    מחיר (₪)
+                    סוג רכיב
+                  </label>
+                  <Select
+                    value={component.componentType || 'hardware'}
+                    onValueChange={(value: 'hardware' | 'software' | 'labor') =>
+                      handleFieldChange(component.id, 'componentType', value)
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="בחר סוג" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {COMPONENT_TYPES.map(type => (
+                        <SelectItem key={type.value} value={type.value}>
+                          {type.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {component.componentType === 'labor' && (
+                  <div>
+                    <label className="text-xs text-muted-foreground">
+                      סוג עבודה
+                    </label>
+                    <Select
+                      value={component.laborSubtype || undefined}
+                      onValueChange={(
+                        value:
+                          | 'engineering'
+                          | 'commissioning'
+                          | 'installation'
+                          | 'programming'
+                      ) =>
+                        handleFieldChange(component.id, 'laborSubtype', value)
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="בחר סוג עבודה" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {LABOR_SUBTYPES.map(subtype => (
+                          <SelectItem key={subtype.value} value={subtype.value}>
+                            {subtype.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                <div>
+                  <label className="text-xs text-muted-foreground">
+                    מחיר (
+                    {component.currency === 'USD'
+                      ? '$'
+                      : component.currency === 'EUR'
+                        ? '€'
+                        : '₪'}
+                    )
                   </label>
                   <Input
                     type="number"
-                    value={component.unitPriceNIS || ''}
-                    onChange={e =>
-                      handleFieldChange(
-                        component.id,
-                        'unitPriceNIS',
-                        parseFloat(e.target.value)
-                      )
+                    step="0.01"
+                    value={
+                      component.currency === 'USD'
+                        ? component.unitPriceUSD || ''
+                        : component.currency === 'EUR'
+                          ? component.unitPriceEUR || ''
+                          : component.unitPriceNIS || ''
                     }
+                    onChange={e => {
+                      const value = parseFloat(e.target.value) || 0;
+                      if (component.currency === 'USD') {
+                        handleFieldChange(component.id, 'unitPriceUSD', value);
+                      } else if (component.currency === 'EUR') {
+                        handleFieldChange(component.id, 'unitPriceEUR', value);
+                      } else {
+                        handleFieldChange(component.id, 'unitPriceNIS', value);
+                      }
+                    }}
                     placeholder="0.00"
                   />
                 </div>
               </div>
             )}
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-sm">
               <div>
                 <span className="text-muted-foreground">יצרן:</span>
                 <p className="font-medium truncate">
@@ -780,8 +872,33 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
                 <p className="font-medium">{component.category || '—'}</p>
               </div>
               <div>
+                <span className="text-muted-foreground">סוג:</span>
+                <p className="font-medium">
+                  {component.componentType === 'hardware'
+                    ? 'חומרה'
+                    : component.componentType === 'software'
+                      ? 'תוכנה'
+                      : component.componentType === 'labor'
+                        ? 'עבודה'
+                        : '—'}
+                  {component.componentType === 'labor' &&
+                    component.laborSubtype &&
+                    ` (${
+                      component.laborSubtype === 'engineering'
+                        ? 'הנדסה'
+                        : component.laborSubtype === 'commissioning'
+                          ? 'הפעלה'
+                          : component.laborSubtype === 'installation'
+                            ? 'התקנה'
+                            : component.laborSubtype === 'programming'
+                              ? 'תכנות'
+                              : ''
+                    })`}
+                </p>
+              </div>
+              <div>
                 <span className="text-muted-foreground">מחירים:</span>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   {component.unitPriceNIS && (
                     <p
                       className={`font-medium ${component.currency === 'NIS' ? 'text-green-600' : ''}`}

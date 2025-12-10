@@ -11,9 +11,11 @@ import { Input } from '../../ui/input';
 import { Badge } from '../../ui/badge';
 import { Upload, Loader2, Trash2 } from 'lucide-react';
 import { loadSetting, saveSetting } from '@/services/settingsService';
+import { useTeam } from '@/contexts/TeamContext';
 import { logger } from '@/lib/logger';
 
 export function QuotationSettings() {
+  const { currentTeam } = useTeam();
   const [isUploading, setIsUploading] = useState(false);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -24,7 +26,10 @@ export function QuotationSettings() {
     async function loadLogo() {
       setIsLoading(true);
       try {
-        const result = await loadSetting<{ logoUrl: string }>('companyLogo');
+        const result = await loadSetting<{ logoUrl: string }>(
+          'companyLogo',
+          currentTeam?.id
+        );
         if (result.success && result.data?.logoUrl) {
           setLogoUrl(result.data.logoUrl);
         }
@@ -35,7 +40,7 @@ export function QuotationSettings() {
       }
     }
     loadLogo();
-  }, []);
+  }, [currentTeam?.id]);
 
   const handleLogoUpload = async (
     event: React.ChangeEvent<HTMLInputElement>
@@ -64,8 +69,12 @@ export function QuotationSettings() {
 
       if (result.success && result.url) {
         setLogoUrl(result.url);
-        // Save to settings
-        await saveSetting('companyLogo', { logoUrl: result.url });
+        // Save to settings with team scope
+        await saveSetting(
+          'companyLogo',
+          { logoUrl: result.url },
+          currentTeam?.id
+        );
         // Dispatch event to notify other components
         window.dispatchEvent(
           new CustomEvent('cpq-logo-updated', {
@@ -96,8 +105,8 @@ export function QuotationSettings() {
 
       await deleteFile('company-logo', 'company-assets');
       setLogoUrl(null);
-      // Clear from settings
-      await saveSetting('companyLogo', { logoUrl: null });
+      // Clear from settings with team scope
+      await saveSetting('companyLogo', { logoUrl: null }, currentTeam?.id);
       // Dispatch event to notify other components
       window.dispatchEvent(
         new CustomEvent('cpq-logo-updated', { detail: { logoUrl: null } })

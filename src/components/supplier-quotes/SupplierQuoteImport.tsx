@@ -60,8 +60,9 @@ export const SupplierQuoteImport: React.FC<SupplierQuoteImportProps> = ({
 
   /**
    * Upload file to Supabase Storage
+   * Returns URL if successful, or a placeholder if storage is unavailable
    */
-  const uploadFileToStorage = async (file: File): Promise<string | null> => {
+  const uploadFileToStorage = async (file: File): Promise<string> => {
     try {
       // Generate unique file path
       const timestamp = new Date();
@@ -82,8 +83,17 @@ export const SupplierQuoteImport: React.FC<SupplierQuoteImportProps> = ({
         });
 
       if (error) {
-        logger.error('Storage upload error:', error);
-        throw error;
+        logger.warn(
+          'Storage upload failed, continuing without file URL:',
+          error
+        );
+        logger.warn(
+          '💡 TIP: Check Supabase Dashboard → Storage → Create "supplier-quotes" bucket if missing'
+        );
+
+        // Return a placeholder URL instead of null
+        // This allows the import to continue even if storage fails
+        return `placeholder://file-not-stored/${sanitizedName}`;
       }
 
       logger.debug('✅ File uploaded successfully:', data.path);
@@ -95,9 +105,18 @@ export const SupplierQuoteImport: React.FC<SupplierQuoteImportProps> = ({
 
       return urlData.publicUrl;
     } catch (error) {
-      logger.error('Error uploading file:', error);
-      toast.error('שגיאה בהעלאת הקובץ');
-      return null;
+      logger.warn('Error uploading file, continuing without storage:', error);
+      logger.warn(
+        '💡 TIP: To fix this, create "supplier-quotes" bucket in Supabase Dashboard'
+      );
+
+      // Show warning toast but don't block the import
+      toast.warning('הקובץ לא נשמר באחסון, אך הייבוא ימשיך', {
+        description: 'בדוק את הגדרות Supabase Storage',
+      });
+
+      // Return placeholder instead of null
+      return `placeholder://storage-unavailable/${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
     }
   };
 

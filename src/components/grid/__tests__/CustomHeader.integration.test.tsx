@@ -15,6 +15,18 @@ vi.mock('@/lib/logger', () => ({
   },
 }));
 
+// Mock Team context
+vi.mock('@/contexts/TeamContext', () => ({
+  useTeam: () => ({
+    currentTeam: { id: 'test-team-1', name: 'Test Team' },
+    teams: [],
+    loading: false,
+    createTeam: vi.fn(),
+    switchTeam: vi.fn(),
+    refreshTeams: vi.fn(),
+  }),
+}));
+
 // Mock lucide-react icons
 vi.mock('lucide-react', () => ({
   MoreVertical: () => <div>More</div>,

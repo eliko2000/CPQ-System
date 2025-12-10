@@ -15,9 +15,11 @@ import {
   getDefaultVisibleColumns,
 } from '@/constants/settings';
 import { loadSetting, saveSetting } from '@/services/settingsService';
+import { useTeam } from '@/contexts/TeamContext';
 import { logger } from '@/lib/logger';
 
 export function TableColumnsSettings() {
+  const { currentTeam } = useTeam();
   const [activeTable, setActiveTable] = useState<
     'component_library' | 'bom_grid' | 'quotation_data_grid'
   >('component_library');
@@ -37,7 +39,7 @@ export function TableColumnsSettings() {
           component_library: string[];
           bom_grid: string[];
           quotation_data_grid: string[];
-        }>('tableColumns');
+        }>('tableColumns', currentTeam?.id);
 
         if (result.success && result.data) {
           setTableSettings(result.data);
@@ -58,7 +60,7 @@ export function TableColumnsSettings() {
       }
     }
     loadTableSettings();
-  }, []);
+  }, [currentTeam?.id]);
 
   const tableNames = {
     component_library: 'ספריית רכיבים',
@@ -82,9 +84,9 @@ export function TableColumnsSettings() {
 
     setTableSettings(updatedSettings);
 
-    // Save to Supabase
+    // Save to Supabase with team scope
     try {
-      await saveSetting('tableColumns', updatedSettings);
+      await saveSetting('tableColumns', updatedSettings, currentTeam?.id);
       // Notify grids that table column settings have changed
       window.dispatchEvent(new CustomEvent('cpq-settings-updated'));
     } catch (error) {
@@ -101,9 +103,9 @@ export function TableColumnsSettings() {
 
     setTableSettings(updatedSettings);
 
-    // Save to Supabase
+    // Save to Supabase with team scope
     try {
-      await saveSetting('tableColumns', updatedSettings);
+      await saveSetting('tableColumns', updatedSettings, currentTeam?.id);
       // Notify grids that table column settings have changed
       window.dispatchEvent(new CustomEvent('cpq-settings-updated'));
     } catch (error) {

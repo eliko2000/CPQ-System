@@ -70,6 +70,11 @@ export interface QuotationItem {
   originalCurrency?: Currency;
   originalCost?: number; // Price in original currency
 
+  // MSRP pricing (for distributed components)
+  msrpPrice?: number; // MSRP list price
+  msrpCurrency?: Currency; // Currency of MSRP price
+  useMsrpPricing?: boolean; // Toggle: true = use MSRP, false = use cost + margin
+
   // Markup
   itemMarkupPercent: number; // Default from project, can override
 
@@ -91,6 +96,7 @@ export interface QuotationParameters {
   markupPercent: number; // Default markup for all items
   dayWorkCost: number; // Cost per day for labor
   profitPercent: number; // Target profit percentage
+  useMsrpPricing?: boolean; // Global toggle to use MSRP pricing for items that have it
 
   // Risk
   riskPercent: number; // Applied to total project cost
@@ -153,6 +159,7 @@ export interface DbQuotation {
   eur_to_ils_rate?: number;
   margin_percentage: number;
   risk_percentage?: number;
+  use_msrp_pricing?: boolean; // Global toggle for MSRP pricing
   status: 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired';
   valid_until_date?: string;
   terms?: string;
@@ -212,6 +219,10 @@ export interface DbQuotationItem {
   // Currency tracking for proper exchange rate handling
   original_currency?: Currency;
   original_cost?: number;
+  // MSRP pricing (for distributed components)
+  msrp_price?: number;
+  msrp_currency?: Currency;
+  partner_discount_percent?: number;
   created_at: string;
   updated_at: string;
 

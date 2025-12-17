@@ -24,13 +24,40 @@ export function calculateItemTotals(
   const totalPriceUSD = item.quantity * item.unitPriceUSD;
   const totalPriceILS = item.quantity * item.unitPriceILS;
 
-  // Apply profit coefficient to customer price (divide by coefficient)
-  // IMPORTANT: Labor items are sold at cost (no markup)
-  const profitCoefficient = parameters.markupPercent ?? 0.75;
-  const customerPriceILS =
-    item.itemType === 'labor'
-      ? totalPriceILS // Labor sold at cost
-      : totalPriceILS / profitCoefficient; // Hardware/Software get markup
+  // Calculate customer price based on MSRP toggle
+  let customerPriceILS: number;
+
+  // Check if MSRP pricing is enabled GLOBALLY for this quotation
+  // If enabled and item has MSRP data, use MSRP pricing
+  const useMsrpGlobally = parameters.useMsrpPricing || false;
+
+  if (useMsrpGlobally && item.msrpPrice && item.msrpCurrency) {
+    // Use MSRP as customer price (convert to ILS if needed)
+    let msrpInILS: number;
+
+    switch (item.msrpCurrency) {
+      case 'USD':
+        msrpInILS = item.msrpPrice * parameters.usdToIlsRate;
+        break;
+      case 'EUR':
+        msrpInILS = item.msrpPrice * parameters.eurToIlsRate;
+        break;
+      case 'NIS':
+      default:
+        msrpInILS = item.msrpPrice;
+        break;
+    }
+
+    customerPriceILS = msrpInILS * item.quantity;
+  } else {
+    // Standard pricing: Apply profit coefficient to customer price (divide by coefficient)
+    // IMPORTANT: Labor items are sold at cost (no markup)
+    const profitCoefficient = parameters.markupPercent ?? 0.75;
+    customerPriceILS =
+      item.itemType === 'labor'
+        ? totalPriceILS // Labor sold at cost
+        : totalPriceILS / profitCoefficient; // Hardware/Software get markup
+  }
 
   return {
     ...item,

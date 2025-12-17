@@ -28,12 +28,14 @@ interface ComponentFormProps {
   component?: Component | null;
   isOpen: boolean;
   onClose: () => void;
+  onSave?: (component: Component) => void; // Optional callback after successful save
 }
 
 export function ComponentForm({
   component,
   isOpen,
   onClose,
+  onSave,
 }: ComponentFormProps) {
   const { addComponent, updateComponent } = useCPQ();
   const { currentTeam } = useTeam();
@@ -45,6 +47,9 @@ export function ComponentForm({
     ComponentFormData & {
       componentType: ComponentType;
       laborSubtype?: LaborSubtype;
+      msrpPrice?: number;
+      msrpCurrency?: Currency;
+      partnerDiscountPercent?: number;
     }
   >({
     name: '',
@@ -61,6 +66,9 @@ export function ComponentForm({
     unitCostEUR: 0,
     currency: 'NIS',
     originalCost: 0,
+    msrpPrice: undefined,
+    msrpCurrency: undefined,
+    partnerDiscountPercent: undefined,
     quoteDate: new Date().toISOString().split('T')[0],
     notes: '',
   });
@@ -104,7 +112,7 @@ export function ComponentForm({
           description: component.description || '',
           category: component.category,
           componentType: component.componentType || 'hardware',
-          laborSubtype: component.laborSubtype, // ← FIXED: Include laborSubtype
+          laborSubtype: component.laborSubtype,
           productType: component.productType || '',
           manufacturer: component.manufacturer,
           manufacturerPN: component.manufacturerPN,
@@ -114,6 +122,9 @@ export function ComponentForm({
           unitCostEUR: component.unitCostEUR || 0,
           currency: componentCurrency,
           originalCost: component.originalCost || component.unitCostNIS,
+          msrpPrice: component.msrpPrice,
+          msrpCurrency: component.msrpCurrency,
+          partnerDiscountPercent: component.partnerDiscountPercent,
           quoteDate:
             component.quoteDate || new Date().toISOString().split('T')[0],
           notes: component.notes || '',
@@ -135,7 +146,8 @@ export function ComponentForm({
         name: '',
         description: '',
         category: 'אחר',
-        componentType: 'hardware', // ← ADDED THIS
+        componentType: 'hardware',
+        laborSubtype: undefined,
         productType: '',
         manufacturer: '',
         manufacturerPN: '',
@@ -145,6 +157,9 @@ export function ComponentForm({
         unitCostEUR: 0,
         currency: 'NIS',
         originalCost: 0,
+        msrpPrice: undefined,
+        msrpCurrency: undefined,
+        partnerDiscountPercent: undefined,
         quoteDate: new Date().toISOString().split('T')[0],
         notes: '',
       });
@@ -153,7 +168,13 @@ export function ComponentForm({
   }, [component]);
 
   const handleInputChange = (
-    field: keyof ComponentFormData | 'componentType' | 'laborSubtype',
+    field:
+      | keyof ComponentFormData
+      | 'componentType'
+      | 'laborSubtype'
+      | 'msrpPrice'
+      | 'msrpCurrency'
+      | 'partnerDiscountPercent',
     value: string | number
   ) => {
     setFormData(prev => ({
@@ -204,8 +225,11 @@ export function ComponentForm({
       // Convert ComponentFormData to Component by adding required fields
       const componentData = {
         ...formData,
-        quoteDate: new Date().toISOString().split('T')[0], // Today's date
-        quoteFileUrl: '', // Empty for manual entry
+        msrpPrice: formData.msrpPrice,
+        msrpCurrency: formData.msrpCurrency,
+        partnerDiscountPercent: formData.partnerDiscountPercent,
+        quoteDate: new Date().toISOString().split('T')[0],
+        quoteFileUrl: '',
       };
 
       // FIXED: Check if component has an 'id' property to distinguish between editing and adding
@@ -213,6 +237,11 @@ export function ComponentForm({
         // Editing existing component - has an id
         await updateComponent(component.id, componentData);
         handleSuccess('הרכיב עודכן בהצלחה');
+
+        // Call onSave callback with updated component data
+        if (onSave) {
+          onSave({ ...component, ...componentData } as Component);
+        }
       } else {
         // Adding new component (including duplicates) - no id
         await addComponent(componentData);
@@ -502,7 +531,9 @@ export function ComponentForm({
             {/* Pricing Information */}
             <div className="space-y-3">
               <div className="border-b pb-2">
-                <h3 className="text-lg font-semibold text-blue-600">מחירון</h3>
+                <h3 className="text-lg font-semibold text-blue-600">
+                  מחירון - מחיר עלות
+                </h3>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -603,6 +634,94 @@ export function ComponentForm({
                     className="w-full px-3 py-2 border border-input bg-gray-100 rounded-md text-sm"
                   />
                 </div>
+              </div>
+            </div>
+
+            {/* MSRP Pricing Information (for distributed components) */}
+            <div className="space-y-3">
+              <div className="border-b pb-2">
+                <h3 className="text-lg font-semibold text-purple-600">
+                  מחירון מפיץ (MSRP) - אופציונלי
+                </h3>
+                <p className="text-xs text-gray-600 mt-1">
+                  למוצרים מופצים: הזן מחיר MSRP להצגה ללקוח. אחוז ההנחה יחושב
+                  אוטומטית מההפרש בין MSRP למחיר העלות.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    מחיר MSRP
+                  </label>
+                  <Input
+                    type="number"
+                    step="1"
+                    min="0"
+                    value={formData.msrpPrice || ''}
+                    onChange={e => {
+                      const msrpPrice = parseInt(e.target.value) || undefined;
+                      handleInputChange('msrpPrice', msrpPrice as any);
+
+                      // Auto-calculate discount % if both prices exist
+                      if (msrpPrice && formData.unitCostNIS > 0) {
+                        const discount =
+                          ((msrpPrice - formData.unitCostNIS) / msrpPrice) *
+                          100;
+                        handleInputChange(
+                          'partnerDiscountPercent',
+                          Math.round(discount * 100) / 100
+                        );
+                      }
+                    }}
+                    placeholder="0"
+                    className="bg-purple-50 border-purple-300"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    מטבע MSRP
+                  </label>
+                  <select
+                    value={formData.msrpCurrency || 'USD'}
+                    onChange={e =>
+                      handleInputChange(
+                        'msrpCurrency',
+                        e.target.value as Currency
+                      )
+                    }
+                    className="w-full px-3 py-2 border border-purple-300 bg-purple-50 rounded-md text-sm"
+                  >
+                    <option value="NIS">שקלים (₪)</option>
+                    <option value="USD">דולר ($)</option>
+                    <option value="EUR">אירו (€)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    אחוז הנחת שותף (%)
+                  </label>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    value={formData.partnerDiscountPercent || ''}
+                    readOnly
+                    placeholder="מחושב אוטומטית"
+                    className="bg-gray-100 border-gray-300 text-gray-700"
+                    title="מחושב אוטומטית: (MSRP - עלות) / MSRP × 100"
+                  />
+                </div>
+              </div>
+
+              <div className="bg-purple-100 border border-purple-300 rounded p-2">
+                <p className="text-xs text-purple-800">
+                  💡 <strong>שימוש:</strong> עבור רכיבים מופצים (למשל Dobot,
+                  ABB), הזן את מחיר המחירון (MSRP) שהיצרן מפרסם. המערכת תחשב
+                  אוטומטית את אחוז ההנחה שאתה מקבל כשותף. בהצעות מחיר תוכל לבחור
+                  להציג ללקוח את מחיר ה-MSRP או מחיר עלות+מרווח.
+                </p>
               </div>
             </div>
 

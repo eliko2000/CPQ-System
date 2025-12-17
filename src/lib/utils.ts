@@ -125,6 +125,9 @@ export function convertDbQuotationToQuotationProject(
         // CRITICAL: Preserve original currency and cost for exchange rate recalculation
         originalCurrency: originalCurrency,
         originalCost: originalCost,
+        // MSRP fields - loaded from quotation item (copied from component when added)
+        msrpPrice: dbItem.msrp_price,
+        msrpCurrency: dbItem.msrp_currency,
         createdAt: dbItem.created_at,
         updatedAt: dbItem.updated_at,
       });
@@ -163,6 +166,7 @@ export function convertDbQuotationToQuotationProject(
       dayWorkCost: defaultParams.dayWorkCost,
       profitPercent: defaultParams.profitPercent,
       riskPercent: dbQuotation.risk_percentage || defaultParams.riskPercent,
+      useMsrpPricing: dbQuotation.use_msrp_pricing || false, // Load MSRP toggle state
       includeVAT: defaultParams.includeVAT,
       vatRate: defaultParams.vatRate,
       paymentTerms: dbQuotation.terms || defaultParams.paymentTerms,

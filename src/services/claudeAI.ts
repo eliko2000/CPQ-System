@@ -74,6 +74,13 @@ export function getAnthropicClient(): Anthropic | null {
   return anthropic;
 }
 
+// Price column data from extraction
+export interface PriceColumn {
+  columnName: string; // Original column header name
+  value: number | undefined; // Price value
+  currency: 'NIS' | 'USD' | 'EUR'; // Currency detected
+}
+
 // Response type from Claude
 export interface AIExtractedComponent extends ExtractedItem {
   category?: string;
@@ -82,6 +89,9 @@ export interface AIExtractedComponent extends ExtractedItem {
   unitPriceUSD?: number;
   unitPriceEUR?: number;
   currency?: 'NIS' | 'USD' | 'EUR';
+  msrpPrice?: number; // MSRP list price (for distributed components)
+  msrpCurrency?: 'NIS' | 'USD' | 'EUR'; // Currency of MSRP price
+  partnerDiscountPercent?: number; // Partner discount % (for historical tracking)
   componentType?: 'hardware' | 'software' | 'labor';
   laborSubtype?:
     | 'engineering'
@@ -90,6 +100,8 @@ export interface AIExtractedComponent extends ExtractedItem {
     | 'programming';
   quoteDate?: string;
   notes?: string;
+  // Multi-column price extraction (for user column selection)
+  allPriceColumns?: PriceColumn[]; // All price columns found in the row
 }
 
 export interface AIExtractionResult {
@@ -220,13 +232,110 @@ async function excelToText(file: File): Promise<string> {
 }
 
 /**
+ * Column header extraction options
+ */
+export interface ColumnExtractionOptions {
+  partnerPriceColumn?: string; // Selected partner price column
+  msrpColumn?: string; // Selected MSRP column
+}
+
+/**
+ * Column header extraction result
+ */
+export interface ColumnHeadersResult {
+  success: boolean;
+  columnHeaders: string[];
+  documentType?: 'quotation' | 'price_list' | 'invoice' | 'catalog' | 'unknown';
+  metadata?: {
+    supplier?: string;
+    quoteDate?: string;
+    currency?: string;
+  };
+  error?: string;
+}
+
+/**
+ * Create a lightweight prompt for extracting just column headers
+ */
+function createHeaderExtractionPrompt(): string {
+  return `You are analyzing a price list or quotation document. Extract ONLY the column headers.
+
+Your task:
+1. Identify ALL column headers from the table(s) in this document
+2. **CRITICAL**: Extract ALL price column variations (e.g., "Unit Price Camera+SDK", "Unit Price Camera+Vision", "MSRP Camera+SDK", etc.)
+3. Return the exact column header text as it appears in the document
+4. Preserve the exact wording, including model variations, package names, and configuration options
+5. Include metadata about the document
+
+**Response format:**
+Return a valid JSON object with this exact structure:
+
+{
+  "documentType": "quotation" | "price_list" | "invoice" | "catalog" | "unknown",
+  "metadata": {
+    "supplier": "supplier name if found",
+    "quoteDate": "date if found (YYYY-MM-DD format)",
+    "currency": "primary currency in document"
+  },
+  "columnHeaders": [
+    "Product Name",
+    "Part Number",
+    "Unit Price (USD) Camera+SDK",
+    "Unit Price (USD) Camera+Vision+Viz",
+    "MSRP (USD) Camera+SDK",
+    "MSRP (USD) Camera+Vision+Viz",
+    "Quantity"
+  ]
+}
+
+**Important:**
+- Extract EVERY column header you find, especially all price column variations
+- Use the exact text from the headers
+- If headers are in Hebrew, keep them in Hebrew
+- If headers are in English, keep them in English
+- Include ALL price columns, even if there are 5+ columns
+
+Respond ONLY with valid JSON. No markdown, no explanations, just the JSON object.`;
+}
+
+/**
  * Create the extraction prompt for Claude
  */
-function createExtractionPrompt(): string {
+function createExtractionPrompt(
+  columnOptions?: ColumnExtractionOptions
+): string {
   const categories = getComponentCategories();
   const categoryList = categories.map(cat => `   - "${cat}"`).join('\n');
 
-  return `You are an expert at extracting structured component data from supplier quotations, price lists, and technical documents.
+  // Build column-specific instructions if options are provided
+  let columnInstructions = '';
+  if (columnOptions?.partnerPriceColumn || columnOptions?.msrpColumn) {
+    columnInstructions = `
+
+**CRITICAL - Column Selection:**
+The user has specified which price columns to extract:`;
+
+    if (columnOptions.partnerPriceColumn) {
+      columnInstructions += `
+- **Partner Price Column:** Extract prices from the column named "${columnOptions.partnerPriceColumn}"
+  - Use this column for unitPriceUSD/NIS/EUR fields
+  - This is the partner/distributor cost price`;
+    }
+
+    if (columnOptions.msrpColumn) {
+      columnInstructions += `
+- **MSRP Column:** Extract prices from the column named "${columnOptions.msrpColumn}"
+  - Use this column for msrpPrice field
+  - This is the manufacturer's suggested retail price`;
+    }
+
+    columnInstructions += `
+
+**DO NOT extract from other price columns** - only use the columns specified above.
+`;
+  }
+
+  return `You are an expert at extracting structured component data from supplier quotations, price lists, and technical documents.${columnInstructions}
 
 Analyze this document and extract ALL component/product information. The document may be in English, Hebrew (עברית), or mixed languages.
 
@@ -256,19 +365,39 @@ ${categoryList}
    - "programming": PLC programming, robot programming (תכנות)
 7. **supplier** - Supplier/vendor name (if mentioned)
 8. **quantity** - Quantity (if specified)
-9. **unitPriceNIS** - Unit price in Israeli Shekels (₪, NIS, ILS, שקלים)
-10. **unitPriceUSD** - Unit price in US Dollars ($, USD)
-11. **unitPriceEUR** - Unit price in Euros (€, EUR)
+9. **unitPriceNIS** - Unit price in Israeli Shekels (₪, NIS, ILS, שקלים) - PARTNER/YOUR COST (auto-select first price column if available)
+10. **unitPriceUSD** - Unit price in US Dollars ($, USD) - PARTNER/YOUR COST (auto-select first price column if available)
+11. **unitPriceEUR** - Unit price in Euros (€, EUR) - PARTNER/YOUR COST (auto-select first price column if available)
 12. **currency** - Primary currency (NIS, USD, or EUR)
-13. **quoteDate** - Date of quotation (if visible)
-14. **notes** - Any important notes, specifications, or remarks (keep technical specs here, NOT in name)
-15. **confidence** - Your confidence level (0.0 to 1.0) in the extraction accuracy for this item
+13. **msrpPrice** - MSRP/List price if there's a SEPARATE column for it (auto-select second price column if available)
+   - Look for column headers like: "MSRP", "List Price", "Retail", "מחיר מחירון", "מחיר קטלוגי"
+   - Only populate if there are TWO+ price columns (partner price + MSRP)
+   - If only ONE price column exists, leave this null
+14. **msrpCurrency** - Currency of MSRP price (NIS, USD, or EUR) - only if msrpPrice is present
+15. **allPriceColumns** - **CRITICAL**: Extract ALL price columns found in this row (for user column selection UI)
+   - Array of objects with: { columnName: string, value: number, currency: 'NIS'|'USD'|'EUR' }
+   - Example: [
+       { columnName: "Unit Price (USD) Camera+SDK", value: 4400, currency: "USD" },
+       { columnName: "Unit Price (USD) Camera+Vision+Viz", value: 5200, currency: "USD" },
+       { columnName: "MSRP (USD) Camera+SDK", value: 6670, currency: "USD" },
+       { columnName: "MSRP (USD) Camera+Vision+Viz", value: 7890, currency: "USD" }
+     ]
+   - Extract EVERY price column, even if there are 5+ columns
+   - This allows user to select which columns to use for partner price and MSRP
+16. **quoteDate** - Date of quotation (if visible)
+17. **notes** - Any important notes, specifications, or remarks (keep technical specs here, NOT in name)
+18. **confidence** - Your confidence level (0.0 to 1.0) in the extraction accuracy for this item
 
 **Important guidelines:**
 - **NAME MUST BE SHORT & DESCRIPTIVE IN HEBREW**: Translate product type + model number only
 - Handle merged cells, multi-line descriptions, and complex table layouts
 - Recognize prices in various formats: "$1,234.56", "1234.56 USD", "₪5,000", "5000 ש״ח"
 - Understand Hebrew terms: מחיר (price), יצרן (manufacturer), ספק (supplier), כמות (quantity)
+- **DUAL PRICING**: If document has TWO price columns (e.g., "Partner Price" + "MSRP" or "Your Price" + "List Price"):
+  * Put the LOWER price (partner/distributor price) in unitPriceUSD/NIS/EUR
+  * Put the HIGHER price (MSRP/list price) in msrpPrice + msrpCurrency
+  * Common MSRP column headers: "MSRP", "List Price", "Retail", "RRP", "מחיר מחירון"
+  * Common partner price headers: "Partner", "Your Price", "Net", "Cost", "מחיר שותף"
 - **CRITICAL: category MUST be one of the 10 exact Hebrew values listed above - do NOT invent new categories!**
 - If unsure about category, use "אחר" (Other)
 - If a field is not found, set it as null
@@ -286,7 +415,8 @@ Return a valid JSON object with this exact structure:
     "supplier": "supplier name if found",
     "quoteDate": "date if found (YYYY-MM-DD format)",
     "currency": "primary currency in document",
-    "totalItems": number
+    "totalItems": number,
+    "columnHeaders": ["array of ALL column header names found in the document, especially ALL price column names"]
   },
   "components": [
     {
@@ -302,6 +432,20 @@ Return a valid JSON object with this exact structure:
       "unitPriceUSD": number or null,
       "unitPriceEUR": number or null,
       "currency": "NIS" | "USD" | "EUR" | null,
+      "msrpPrice": number or null,
+      "msrpCurrency": "NIS" | "USD" | "EUR" | null,
+      "allPriceColumns": [
+        {
+          "columnName": "Unit Price (USD) Camera+SDK",
+          "value": 4400,
+          "currency": "USD"
+        },
+        {
+          "columnName": "MSRP (USD) Camera+SDK",
+          "value": 6670,
+          "currency": "USD"
+        }
+      ],
       "quoteDate": "YYYY-MM-DD or null",
       "notes": "any notes or null",
       "confidence": 0.0 to 1.0
@@ -353,6 +497,7 @@ function parseClaudeResponse(responseText: string): AIExtractionResult {
         quoteDate: parsed.metadata?.quoteDate,
         currency: parsed.metadata?.currency,
         totalItems: parsed.components.length,
+        columnHeaders: parsed.metadata?.columnHeaders || [],
       },
       confidence: avgConfidence,
       rawResponse: responseText,
@@ -383,9 +528,143 @@ function parseClaudeResponse(responseText: string): AIExtractionResult {
 }
 
 /**
+ * Extract column headers from document (Step 1 of multi-step extraction)
+ * This is a lightweight call that returns just column headers for user selection
+ */
+export async function extractColumnHeaders(
+  file: File
+): Promise<ColumnHeadersResult> {
+  try {
+    // Check if API key is configured
+    if (!anthropic) {
+      return {
+        success: false,
+        columnHeaders: [],
+        error:
+          'Claude AI is not configured. Please add your API key in Settings.',
+      };
+    }
+
+    let contentBlock: any;
+
+    // Handle Excel files with text extraction
+    if (isExcelFile(file)) {
+      const excelText = await excelToText(file);
+      contentBlock = [
+        {
+          type: 'text',
+          text: `${createHeaderExtractionPrompt()}\n\n=== EXCEL DATA ===\n\n${excelText}`,
+        },
+      ];
+    }
+    // Handle images and PDFs with vision API
+    else {
+      const validTypes = [
+        'image/jpeg',
+        'image/jpg',
+        'image/png',
+        'image/gif',
+        'image/webp',
+        'application/pdf',
+      ];
+
+      if (!validTypes.includes(file.type)) {
+        return {
+          success: false,
+          columnHeaders: [],
+          error: `Unsupported file type: ${file.type}`,
+        };
+      }
+
+      const base64Data = await fileToBase64(file);
+      const mediaType = getMediaType(file);
+      const isPDF = file.type === 'application/pdf';
+
+      contentBlock = [
+        isPDF
+          ? {
+              type: 'document',
+              source: {
+                type: 'base64',
+                media_type: 'application/pdf',
+                data: base64Data,
+              },
+            }
+          : {
+              type: 'image',
+              source: {
+                type: 'base64',
+                media_type: mediaType as
+                  | 'image/jpeg'
+                  | 'image/png'
+                  | 'image/gif'
+                  | 'image/webp',
+                data: base64Data,
+              },
+            },
+        {
+          type: 'text',
+          text: createHeaderExtractionPrompt(),
+        },
+      ];
+    }
+
+    // Call Claude with lightweight header extraction
+    const message = await anthropic.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 1024, // Small limit - we only need column headers
+      messages: [
+        {
+          role: 'user',
+          content: contentBlock,
+        },
+      ],
+    });
+
+    // Extract text from response
+    const responseText = message.content
+      .filter(block => block.type === 'text')
+      .map(block => (block as { type: 'text'; text: string }).text)
+      .join('\n');
+
+    // Parse response
+    let cleanedResponse = responseText.trim();
+    if (cleanedResponse.startsWith('```json')) {
+      cleanedResponse = cleanedResponse
+        .replace(/```json\n?/g, '')
+        .replace(/```\n?$/g, '');
+    } else if (cleanedResponse.startsWith('```')) {
+      cleanedResponse = cleanedResponse.replace(/```\n?/g, '');
+    }
+
+    const parsed = JSON.parse(cleanedResponse);
+
+    return {
+      success: true,
+      columnHeaders: parsed.columnHeaders || [],
+      documentType: parsed.documentType,
+      metadata: parsed.metadata,
+    };
+  } catch (error) {
+    logger.error('Column header extraction error:', error);
+    return {
+      success: false,
+      columnHeaders: [],
+      error:
+        error instanceof Error
+          ? `Failed to extract column headers: ${error.message}`
+          : 'Unknown error during header extraction',
+    };
+  }
+}
+
+/**
  * Extract component data from Excel file using Claude AI text analysis
  */
-async function extractFromExcelFile(file: File): Promise<AIExtractionResult> {
+async function extractFromExcelFile(
+  file: File,
+  columnOptions?: ColumnExtractionOptions
+): Promise<AIExtractionResult> {
   try {
     if (!anthropic) {
       throw new Error('Anthropic client not initialized');
@@ -397,14 +676,14 @@ async function extractFromExcelFile(file: File): Promise<AIExtractionResult> {
     // Call Claude AI with text content
     const message = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 8192,
+      max_tokens: 16384, // Increased for large price lists with multiple columns
       messages: [
         {
           role: 'user',
           content: [
             {
               type: 'text',
-              text: `${createExtractionPrompt()}\n\n=== EXCEL DATA ===\n\n${excelText}`,
+              text: `${createExtractionPrompt(columnOptions)}\n\n=== EXCEL DATA ===\n\n${excelText}`,
             },
           ],
         },
@@ -463,9 +742,13 @@ async function extractFromExcelFile(file: File): Promise<AIExtractionResult> {
  * - Excel files (.xlsx, .xls, .csv) - Text-based extraction
  * - PDF files (.pdf) - Vision API
  * - Image files (JPEG, PNG, GIF, WebP) - Vision API
+ *
+ * @param file - File to extract from
+ * @param columnOptions - Optional column selection (partner price column, MSRP column)
  */
 export async function extractComponentsFromDocument(
-  file: File
+  file: File,
+  columnOptions?: ColumnExtractionOptions
 ): Promise<AIExtractionResult> {
   try {
     // Check if API key is configured
@@ -482,7 +765,7 @@ export async function extractComponentsFromDocument(
 
     // Check if it's an Excel file - handle with text-based extraction
     if (isExcelFile(file)) {
-      return await extractFromExcelFile(file);
+      return await extractFromExcelFile(file, columnOptions);
     }
 
     // Validate file - for vision-based extraction (images and PDFs)
@@ -513,7 +796,7 @@ export async function extractComponentsFromDocument(
     // Call Claude Vision API
     const message = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514', // Using Claude Sonnet 4 (latest stable model)
-      max_tokens: 8192, // Increased for large PDFs
+      max_tokens: 16384, // Increased for large price lists with multiple columns
       messages: [
         {
           role: 'user',
@@ -542,7 +825,7 @@ export async function extractComponentsFromDocument(
                 },
             {
               type: 'text',
-              text: createExtractionPrompt(),
+              text: createExtractionPrompt(columnOptions),
             },
           ],
         },

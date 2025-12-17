@@ -144,6 +144,27 @@ export const QuotationParameters = memo(function QuotationParameters({
               ערך בין 0 ל-20 אחוז (ברירת מחדל 10%)
             </p>
           </div>
+
+          {/* MSRP Pricing Toggle */}
+          <div className="flex items-start pt-2">
+            <input
+              type="checkbox"
+              id="useMsrpPricing"
+              checked={parameters.useMsrpPricing || false}
+              onChange={e => handleChange('useMsrpPricing', e.target.checked)}
+              disabled={disabled}
+              className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded mt-1"
+            />
+            <label
+              htmlFor="useMsrpPricing"
+              className="mr-3 block text-sm font-medium text-gray-700"
+            >
+              <div>השתמש במחירי MSRP</div>
+              <div className="text-xs text-gray-500 font-normal mt-0.5">
+                עבור רכיבים עם MSRP, השתמש במחיר הקטלוגי במקום עלות + מרווח
+              </div>
+            </label>
+          </div>
         </div>
       </div>
     </div>

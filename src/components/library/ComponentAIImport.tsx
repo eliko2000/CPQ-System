@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
-import { IntelligentDocumentUpload } from './IntelligentDocumentUpload';
+import {
+  IntelligentDocumentUpload,
+  type MSRPImportOptions,
+} from './IntelligentDocumentUpload';
 import { AIExtractionPreview } from './AIExtractionPreview';
 import type { AIExtractionResult } from '../../services/claudeAI';
 import type { Component } from '../../types';
-import { logger } from '@/lib/logger'
+import { logger } from '@/lib/logger';
 
 interface ComponentAIImportProps {
   isOpen: boolean;
@@ -20,17 +23,35 @@ export const ComponentAIImport: React.FC<ComponentAIImportProps> = ({
   onImport,
 }) => {
   const [step, setStep] = useState<ImportStep>('upload');
-  const [extractionResult, setExtractionResult] = useState<AIExtractionResult | null>(null);
-  const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
+  const [extractionResult, setExtractionResult] =
+    useState<AIExtractionResult | null>(null);
+  const [msrpOptions, setMsrpOptions] = useState<MSRPImportOptions>({
+    mode: 'none',
+  });
+  const [importProgress, setImportProgress] = useState({
+    current: 0,
+    total: 0,
+  });
 
-  const handleExtractionComplete = (result: AIExtractionResult) => {
+  const handleExtractionComplete = (
+    result: AIExtractionResult,
+    file: File,
+    options: MSRPImportOptions
+  ) => {
     setExtractionResult(result);
+    setMsrpOptions(options);
     setStep('preview');
   };
 
   const handleConfirm = async (components: Partial<Component>[]) => {
     setStep('importing');
     setImportProgress({ current: 0, total: components.length });
+
+    logger.info('[ComponentAIImport] onImport received components', {
+      totalComponents: components.length,
+      componentsWithMSRP: components.filter(c => c.msrpPrice).length,
+      sampleComponent: components[0],
+    });
 
     try {
       // Import components
@@ -77,6 +98,7 @@ export const ComponentAIImport: React.FC<ComponentAIImportProps> = ({
         {step === 'preview' && extractionResult && (
           <AIExtractionPreview
             extractionResult={extractionResult}
+            msrpOptions={msrpOptions}
             onConfirm={handleConfirm}
             onCancel={() => setStep('upload')}
           />
@@ -109,7 +131,9 @@ export const ComponentAIImport: React.FC<ComponentAIImportProps> = ({
                 />
               </svg>
             </div>
-            <p className="text-lg font-medium">Import completed successfully!</p>
+            <p className="text-lg font-medium">
+              Import completed successfully!
+            </p>
             <p className="text-sm text-muted-foreground mt-2">
               {importProgress.total} components added to library
             </p>

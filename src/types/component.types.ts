@@ -19,6 +19,9 @@ export interface Component {
   unitCostEUR?: number;
   currency: Currency; // מטבע המחיר המקורי
   originalCost: number; // המחיר המקורי במטבע המקורי
+  msrpPrice?: number; // MSRP list price (for distributed components)
+  msrpCurrency?: Currency; // Currency of MSRP price
+  partnerDiscountPercent?: number; // Partner discount % (for historical tracking)
   quoteDate: string;
   quoteFileUrl: string;
   notes?: string;
@@ -45,6 +48,9 @@ export interface DbComponent {
   unit_cost_eur?: number;
   currency?: Currency; // Original currency the component was priced in
   original_cost?: number; // Original cost in the original currency
+  msrp_price?: number; // MSRP list price (for distributed components)
+  msrp_currency?: Currency; // Currency of MSRP price
+  partner_discount_percent?: number; // Partner discount % (historical tracking)
   supplier?: string;
   supplier_part_number?: string;
   lead_time_days?: number;

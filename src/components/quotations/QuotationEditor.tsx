@@ -15,6 +15,7 @@ import { QuotationSummary } from './QuotationSummary';
 import { AddItemDialog } from './AddItemDialog';
 import { QuotationModals } from './QuotationModals';
 import { createQuotationItemColumnDefs } from './quotationItemGridColumns';
+import { calculateItemTotals } from '../../utils/quotationCalculations';
 
 export function QuotationEditor() {
   const {
@@ -107,8 +108,6 @@ export function QuotationEditor() {
     if (!currentQuotation) return [];
 
     const data: any[] = [];
-    const profitCoefficient =
-      currentQuotation.parameters?.markupPercent ?? 0.75;
 
     // Defensive: ensure systems and items arrays exist
     const systems = currentQuotation.systems || [];
@@ -118,12 +117,20 @@ export function QuotationEditor() {
     systems.forEach(system => {
       const systemItems = items.filter(item => item.systemId === system.id);
 
-      // Calculate system totals with current profit coefficient
+      // Calculate system totals using calculateItemTotals for consistency
       const systemTotalCost = systemItems.reduce(
         (sum, item) => sum + (item.unitPriceILS || 0) * (item.quantity || 1),
         0
       );
-      const systemCustomerPrice = systemTotalCost / profitCoefficient;
+
+      // Calculate system customer price using the centralized calculation
+      const systemCustomerPrice = systemItems.reduce((sum, item) => {
+        const calculatedItem = calculateItemTotals(
+          item,
+          currentQuotation.parameters
+        );
+        return sum + calculatedItem.customerPriceILS;
+      }, 0);
 
       // Create system node
       const systemNode = {
@@ -152,14 +159,16 @@ export function QuotationEditor() {
 
       // Add existing items with updated customer prices
       systemItems.forEach(item => {
-        const unitPrice = item.unitPriceILS || 0;
-        const quantity = item.quantity || 1;
-        const customerPrice = (unitPrice * quantity) / profitCoefficient;
+        // CRITICAL: Use calculateItemTotals for consistent pricing logic
+        // This ensures MSRP toggle, exchange rates, and profit coefficient are all applied correctly
+        const calculatedItem = calculateItemTotals(
+          item,
+          currentQuotation.parameters
+        );
 
         data.push({
-          ...item,
+          ...calculatedItem,
           systemName: system.name,
-          customerPriceILS: customerPrice,
         });
       });
     });
@@ -440,6 +449,67 @@ export function QuotationEditor() {
       <QuotationModals
         modalState={modalState}
         closeModal={closeModal}
+        onComponentUpdate={updatedComponent => {
+          // When a component is updated from within the quotation editor,
+          // sync ALL pricing data to any quotation items using that component
+          if (currentQuotation) {
+            const updatedItems = currentQuotation.items.map(item => {
+              if (item.componentId === updatedComponent.id) {
+                // Sync all pricing fields from component to quotation item
+                const updatedItem = {
+                  ...item,
+                  // Cost prices
+                  unitPriceUSD: updatedComponent.unitCostUSD || 0,
+                  unitPriceILS: updatedComponent.unitCostNIS || 0,
+                  unitPriceEUR: updatedComponent.unitCostEUR || 0,
+                  // Totals (recalculate based on quantity)
+                  totalPriceUSD:
+                    (updatedComponent.unitCostUSD || 0) * item.quantity,
+                  totalPriceILS:
+                    (updatedComponent.unitCostNIS || 0) * item.quantity,
+                  // Original currency tracking
+                  originalCurrency: updatedComponent.currency,
+                  originalCost: updatedComponent.originalCost,
+                  // MSRP data
+                  msrpPrice: updatedComponent.msrpPrice,
+                  msrpCurrency: updatedComponent.msrpCurrency,
+                };
+
+                return updatedItem;
+              }
+              return item;
+            });
+
+            // Update quotation with new item prices
+            const updatedQuotation = {
+              ...currentQuotation,
+              items: updatedItems,
+            };
+
+            setCurrentQuotation(updatedQuotation);
+
+            // Persist each updated item to database
+            const itemsToUpdate = updatedItems.filter(
+              item => item.componentId === updatedComponent.id
+            );
+            itemsToUpdate.forEach(async item => {
+              try {
+                await quotationsHook.updateQuotationItem(item.id, {
+                  unit_cost: item.unitPriceILS,
+                  total_cost: item.totalPriceILS,
+                  unit_price: item.unitPriceILS,
+                  total_price: item.totalPriceILS,
+                  original_currency: item.originalCurrency,
+                  original_cost: item.originalCost,
+                  msrp_price: item.msrpPrice,
+                  msrp_currency: item.msrpCurrency,
+                });
+              } catch (error) {
+                logger.error('Failed to update quotation item prices:', error);
+              }
+            });
+          }
+        }}
         showProjectPicker={state.showProjectPicker}
         onProjectPickerClose={() => state.setShowProjectPicker(false)}
         onProjectSelect={actions.handleProjectSelect}

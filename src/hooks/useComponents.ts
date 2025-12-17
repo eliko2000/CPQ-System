@@ -7,6 +7,13 @@ import { useTeam } from '../contexts/TeamContext';
 // Transform UI Component to DB format
 // Only includes fields that are actually present in the input (for partial updates)
 function componentToDb(component: Partial<Component>): Partial<DbComponent> {
+  logger.debug('[useComponents] componentToDb INPUT', {
+    name: component.name,
+    msrpPrice: component.msrpPrice,
+    msrpCurrency: component.msrpCurrency,
+    partnerDiscountPercent: component.partnerDiscountPercent,
+  });
+
   const result: Partial<DbComponent> = {};
 
   if (component.name !== undefined) result.name = component.name;
@@ -32,8 +39,22 @@ function componentToDb(component: Partial<Component>): Partial<DbComponent> {
   if (component.currency !== undefined) result.currency = component.currency;
   if (component.originalCost !== undefined)
     result.original_cost = component.originalCost;
+  // MSRP fields
+  if (component.msrpPrice !== undefined)
+    result.msrp_price = component.msrpPrice;
+  if (component.msrpCurrency !== undefined)
+    result.msrp_currency = component.msrpCurrency;
+  if (component.partnerDiscountPercent !== undefined)
+    result.partner_discount_percent = component.partnerDiscountPercent;
   if (component.supplier !== undefined) result.supplier = component.supplier;
   if (component.notes !== undefined) result.notes = component.notes;
+
+  logger.debug('[useComponents] componentToDb OUTPUT', {
+    name: result.name,
+    msrp_price: result.msrp_price,
+    msrp_currency: result.msrp_currency,
+    partner_discount_percent: result.partner_discount_percent,
+  });
 
   return result;
 }
@@ -75,6 +96,9 @@ export function useComponents() {
           unit_cost_eur,
           currency,
           original_cost,
+          msrp_price,
+          msrp_currency,
+          partner_discount_percent,
           supplier,
           created_at,
           updated_at
@@ -132,6 +156,14 @@ export function useComponents() {
         .single();
 
       if (error) throw error;
+
+      logger.info('[useComponents] INSERT successful', {
+        id: data.id,
+        name: data.name,
+        msrp_price: data.msrp_price,
+        msrp_currency: data.msrp_currency,
+        partner_discount_percent: data.partner_discount_percent,
+      });
 
       // Update state immediately with new component
       setComponents(prev => [...prev, data]);

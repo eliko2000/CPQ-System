@@ -218,24 +218,16 @@ export const createQuotationItemColumnDefs = (
             item =>
               item.systemId === valueParams.data.systemId && !item.isSystemGroup
           );
-          // Calculate customer price with profit coefficient for system total
-          const profitCoefficient =
-            currentQuotation?.parameters?.markupPercent ?? 0.75;
+          // CRITICAL: Use already-calculated customerPriceILS from each item
+          // This ensures MSRP pricing, exchange rates, and profit coefficient are applied correctly
           const itemsTotal = systemItems.reduce((sum: number, item: any) => {
-            const unitPrice = item.unitPriceILS || 0;
-            const quantity = item.quantity || 1;
-            const customerPrice = (unitPrice * quantity) / profitCoefficient;
-            return sum + customerPrice;
+            return sum + (item.customerPriceILS || 0);
           }, 0);
           return itemsTotal * systemQuantity;
         }
-        // Calculate customer price with profit coefficient for individual items
-        const unitPrice = valueParams.data.unitPriceILS || 0;
-        const quantity = valueParams.data.quantity || 1;
-        const profitCoefficient =
-          currentQuotation?.parameters?.markupPercent ?? 0.75;
-        const customerPrice = (unitPrice * quantity) / profitCoefficient;
-        return customerPrice;
+        // CRITICAL: Use the already-calculated customerPriceILS from the item data
+        // This value is calculated by calculateItemTotals() which handles MSRP, rates, and profit
+        return valueParams.data.customerPriceILS || 0;
       },
       headerComponent: CustomHeader,
       headerComponentParams: (headerParams: any) => ({
@@ -461,6 +453,10 @@ export const createQuotationItemColumnDefs = (
           );
         }
 
+        // Check if this component has MSRP pricing
+        const hasMSRP =
+          cellParams.data?.msrpPrice && cellParams.data?.msrpCurrency;
+
         // For component items: double-click opens component card
         return (
           <div
@@ -473,11 +469,19 @@ export const createQuotationItemColumnDefs = (
                 setModal({ type: 'edit-component', data: component });
               }
             }}
-            className="cursor-pointer hover:text-blue-600 w-full text-right"
+            className="cursor-pointer hover:text-blue-600 w-full text-right flex items-center gap-2"
             style={{ direction: 'rtl' }}
             title="לחץ פעמיים לפתיחת כרטיס רכיב"
           >
-            {cellParams.value}
+            {hasMSRP && (
+              <span
+                className="inline-flex items-center gap-1 text-purple-600"
+                title="רכיב מופץ - יש מחיר MSRP"
+              >
+                🏷️
+              </span>
+            )}
+            <span>{cellParams.value}</span>
           </div>
         );
       },
@@ -495,6 +499,113 @@ export const createQuotationItemColumnDefs = (
         columnApi: headerParams.columnApi,
         column: headerParams.column,
         uniqueValues: getUniqueValues('componentName'),
+      }),
+    },
+    {
+      headerName: 'תמחור MSRP',
+      field: 'useMsrpPricing',
+      width: 120,
+      resizable: true,
+      sortable: false,
+      hide: false, // Ensure column is visible by default
+      cellClass: 'text-center',
+      cellRenderer: (cellParams: ICellRendererParams) => {
+        // Debug logging for ALL items to understand full data structure
+        logger.debug('[QuotationGrid] MSRP Toggle Cell Renderer called', {
+          itemName: cellParams.data?.componentName,
+          isSystemGroup: cellParams.data?.isSystemGroup,
+          msrpPrice: cellParams.data?.msrpPrice,
+          msrpCurrency: cellParams.data?.msrpCurrency,
+          useMsrpPricing: cellParams.data?.useMsrpPricing,
+          fullItemData: cellParams.data,
+        });
+
+        // Don't show for system groups
+        if (cellParams.data?.isSystemGroup) {
+          logger.debug('[QuotationGrid] Skipping - is system group');
+          return null;
+        }
+
+        // Show toggle for items WITH MSRP data
+        if (cellParams.data?.msrpPrice && cellParams.data?.msrpCurrency) {
+          logger.debug('[QuotationGrid] Showing MSRP toggle button', {
+            itemName: cellParams.data.componentName,
+            msrpPrice: cellParams.data.msrpPrice,
+            msrpCurrency: cellParams.data.msrpCurrency,
+          });
+          const isUsingMsrp = cellParams.data?.useMsrpPricing ?? false;
+
+          return (
+            <div className="flex items-center justify-center h-full">
+              <Button
+                size="sm"
+                variant={isUsingMsrp ? 'default' : 'outline'}
+                onClick={async () => {
+                  // Toggle MSRP pricing for this item
+                  const itemId = cellParams.data.id;
+                  const newValue = !isUsingMsrp;
+
+                  // Update in quotation state
+                  if (currentQuotation) {
+                    try {
+                      const updatedItems = currentQuotation.items.map(item =>
+                        item.id === itemId
+                          ? { ...item, useMsrpPricing: newValue }
+                          : item
+                      );
+
+                      const updatedQuotation = {
+                        ...currentQuotation,
+                        items: updatedItems,
+                      };
+
+                      setCurrentQuotation(updatedQuotation);
+                      updateQuotation(currentQuotation.id, {
+                        items: updatedItems,
+                      });
+
+                      // Update in database
+                      await quotationsHook.updateQuotationItem(itemId, {
+                        use_msrp_pricing: newValue,
+                      });
+
+                      logger.info('MSRP pricing toggled:', {
+                        itemId,
+                        newValue,
+                      });
+                    } catch (error) {
+                      logger.error('Failed to toggle MSRP pricing:', error);
+                      alert('שגיאה בעדכון תמחור MSRP. נסה שוב.');
+                    }
+                  }
+                }}
+                className="gap-1 text-xs whitespace-nowrap"
+                title={
+                  isUsingMsrp
+                    ? 'משתמש במחיר MSRP - לחץ לשנות למחיר עלות+מרווח'
+                    : 'משתמש במחיר עלות+מרווח - לחץ לשנות למחיר MSRP'
+                }
+              >
+                {isUsingMsrp ? <>🏷️ MSRP</> : <>💰 עלות+מרווח</>}
+              </Button>
+            </div>
+          );
+        }
+
+        // Show placeholder for items WITHOUT MSRP (so column doesn't collapse)
+        logger.debug('[QuotationGrid] No MSRP - showing placeholder', {
+          itemName: cellParams.data?.componentName,
+        });
+        return <span className="text-xs text-gray-400">—</span>;
+      },
+      headerComponent: CustomHeader,
+      headerComponentParams: (headerParams: any) => ({
+        displayName: 'תמחור MSRP',
+        onMenuClick: handleColumnMenuClick,
+        onFilterClick: handleFilterClick,
+        api: headerParams.api,
+        columnApi: headerParams.columnApi,
+        column: headerParams.column,
       }),
     },
     {

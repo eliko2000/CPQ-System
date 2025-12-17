@@ -80,6 +80,7 @@ export function EnhancedComponentGrid({
       'description',
       'notes',
       'quoteDate',
+      'msrpPrice', // MSRP column
       'currency',
       'unitCostEUR',
       'unitCostUSD',
@@ -645,6 +646,61 @@ export function EnhancedComponentGrid({
         ),
         filterParams: {
           values: ['NIS', 'USD', 'EUR'],
+        },
+      },
+      {
+        headerName: 'MSRP',
+        field: 'msrpPrice',
+        sortable: true,
+        filter: 'agNumberColumnFilter',
+        resizable: true,
+        width: 150,
+        type: 'numericColumn',
+        hide: false, // Show by default but user can hide via column manager
+        headerComponent: CustomHeader,
+        headerComponentParams: (params: any) => ({
+          displayName: 'MSRP',
+          onMenuClick: handleColumnMenuClick,
+          onFilterClick: handleFilterClick,
+          api: params.api,
+          columnApi: params.columnApi,
+          column: params.column,
+          filterType: 'number',
+        }),
+        cellRenderer: (params: ICellRendererParams) => {
+          const msrpPrice = params.data?.msrpPrice;
+          const msrpCurrency = params.data?.msrpCurrency;
+          const partnerDiscount = params.data?.partnerDiscountPercent;
+
+          if (!msrpPrice || !msrpCurrency) {
+            return <span className="text-xs text-gray-400">—</span>;
+          }
+
+          const formattedPrice =
+            msrpCurrency === 'USD'
+              ? `$${msrpPrice.toFixed(2)}`
+              : msrpCurrency === 'EUR'
+                ? `€${msrpPrice.toFixed(2)}`
+                : `₪${msrpPrice.toFixed(2)}`;
+
+          return (
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-purple-600">
+                {formattedPrice}
+              </span>
+              {partnerDiscount && (
+                <Badge
+                  variant="secondary"
+                  className="text-xs bg-purple-100 text-purple-700"
+                >
+                  -{partnerDiscount.toFixed(1)}%
+                </Badge>
+              )}
+            </div>
+          );
+        },
+        filterParams: {
+          buttons: ['reset'],
         },
       },
       {

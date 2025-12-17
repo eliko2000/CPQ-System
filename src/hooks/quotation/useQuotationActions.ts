@@ -153,6 +153,10 @@ export function useQuotationActions({
           // CRITICAL: Save original currency and cost for proper exchange rate handling
           original_currency: component.currency,
           original_cost: component.originalCost,
+          // MSRP data (for distributed components)
+          msrp_price: component.msrpPrice,
+          msrp_currency: component.msrpCurrency,
+          partner_discount_percent: component.partnerDiscountPercent,
         });
 
         if (!dbItem) {
@@ -180,6 +184,9 @@ export function useQuotationActions({
           // Store original currency to preserve it when exchange rates change
           originalCurrency: component.currency,
           originalCost: component.originalCost,
+          // MSRP data (for distributed components)
+          msrpPrice: component.msrpPrice,
+          msrpCurrency: component.msrpCurrency,
           itemMarkupPercent: dbItem.margin_percentage || 25,
           customerPriceILS: dbItem.total_price || 0,
           notes: dbItem.notes || '',
@@ -508,6 +515,14 @@ export function useQuotationActions({
     (parameters: any) => {
       if (!currentQuotation) return;
 
+      logger.debug('🔄 updateParameters called:', {
+        oldParams: currentQuotation.parameters,
+        newParams: parameters,
+        useMsrpChanged:
+          parameters.useMsrpPricing !==
+          currentQuotation.parameters.useMsrpPricing,
+      });
+
       // Check if exchange rates changed
       const ratesChanged =
         parameters.usdToIlsRate !== currentQuotation.parameters.usdToIlsRate ||
@@ -577,7 +592,22 @@ export function useQuotationActions({
       };
 
       setCurrentQuotation(updatedQuotation);
-      updateQuotation(currentQuotation.id, { parameters, items: updatedItems });
+
+      // Convert parameters to database format
+      const dbUpdates: any = {
+        exchange_rate: parameters.usdToIlsRate,
+        eur_to_ils_rate: parameters.eurToIlsRate,
+        margin_percentage: parameters.markupPercent,
+        risk_percentage: parameters.riskPercent,
+        use_msrp_pricing: parameters.useMsrpPricing || false, // Save MSRP toggle state
+      };
+
+      logger.debug('💾 Saving parameters to database:', {
+        parameters,
+        dbUpdates,
+      });
+
+      updateQuotation(currentQuotation.id, dbUpdates);
     },
     [currentQuotation, setCurrentQuotation, updateQuotation]
   );

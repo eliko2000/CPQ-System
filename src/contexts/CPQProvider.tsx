@@ -160,28 +160,47 @@ function ProductProvider({ children }: { children: React.ReactNode }) {
 
   // Sync components
   useEffect(() => {
-    const mappedComponents = componentsHook.components.map(comp => ({
-      id: comp.id,
-      name: comp.name,
-      description: comp.description || '',
-      category: comp.category || 'Other',
-      componentType: comp.component_type || 'hardware',
-      laborSubtype: comp.labor_subtype,
-      productType: comp.category || 'Other',
-      manufacturer: comp.manufacturer || '',
-      manufacturerPN: comp.manufacturer_part_number || '',
-      supplier: comp.supplier || '',
-      unitCostNIS: comp.unit_cost_ils || 0,
-      unitCostUSD: comp.unit_cost_usd || 0,
-      unitCostEUR: comp.unit_cost_eur || 0,
-      currency: comp.currency || 'NIS',
-      originalCost: comp.original_cost || comp.unit_cost_ils || 0,
-      quoteDate: comp.created_at?.split('T')[0] || '',
-      quoteFileUrl: '',
-      notes: comp.notes,
-      createdAt: comp.created_at,
-      updatedAt: comp.updated_at,
-    }));
+    const mappedComponents = componentsHook.components.map(comp => {
+      const mapped = {
+        id: comp.id,
+        name: comp.name,
+        description: comp.description || '',
+        category: comp.category || 'Other',
+        componentType: comp.component_type || 'hardware',
+        laborSubtype: comp.labor_subtype,
+        productType: comp.category || 'Other',
+        manufacturer: comp.manufacturer || '',
+        manufacturerPN: comp.manufacturer_part_number || '',
+        supplier: comp.supplier || '',
+        unitCostNIS: comp.unit_cost_ils || 0,
+        unitCostUSD: comp.unit_cost_usd || 0,
+        unitCostEUR: comp.unit_cost_eur || 0,
+        currency: comp.currency || 'NIS',
+        originalCost: comp.original_cost || comp.unit_cost_ils || 0,
+        // MSRP fields (for distributed components)
+        msrpPrice: comp.msrp_price,
+        msrpCurrency: comp.msrp_currency,
+        partnerDiscountPercent: comp.partner_discount_percent,
+        quoteDate: comp.created_at?.split('T')[0] || '',
+        quoteFileUrl: '',
+        notes: comp.notes,
+        createdAt: comp.created_at,
+        updatedAt: comp.updated_at,
+      };
+
+      if (comp.msrp_price) {
+        logger.debug('[CPQProvider] Mapping MSRP from DB', {
+          componentName: comp.name,
+          dbMsrpPrice: comp.msrp_price,
+          dbMsrpCurrency: comp.msrp_currency,
+          dbPartnerDiscountPercent: comp.partner_discount_percent,
+          mappedMsrpPrice: mapped.msrpPrice,
+          mappedMsrpCurrency: mapped.msrpCurrency,
+        });
+      }
+
+      return mapped;
+    });
     dispatch({ type: 'SET_COMPONENTS', payload: mappedComponents });
   }, [componentsHook.components]);
 

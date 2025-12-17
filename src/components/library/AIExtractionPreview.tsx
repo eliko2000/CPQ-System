@@ -26,10 +26,12 @@ import type {
 } from '../../services/claudeAI';
 import type { Component, ComponentMatchDecision } from '../../types';
 import { normalizeComponentPrices } from '../../utils/currencyConversion';
+import type { MSRPImportOptions } from './IntelligentDocumentUpload';
 import {
   getComponentCategories,
   CATEGORIES_UPDATED_EVENT,
 } from '../../constants/settings';
+import { logger } from '@/lib/logger';
 
 // Type guards for metadata
 interface ExcelMetadata {
@@ -61,6 +63,7 @@ function hasPDFMetadata(metadata: unknown): metadata is PDFMetadata {
 
 interface AIExtractionPreviewProps {
   extractionResult: AIExtractionResult;
+  msrpOptions?: MSRPImportOptions; // Optional - not all callers provide it
   matchDecisions?: ComponentMatchDecision[];
   onConfirm: (
     components: Partial<Component>[],
@@ -93,6 +96,7 @@ const LABOR_SUBTYPES = [
 
 export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
   extractionResult,
+  msrpOptions,
   matchDecisions = [],
   onConfirm,
   onCancel,
@@ -103,13 +107,94 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
   );
 
   const [components, setComponents] = useState<PreviewComponent[]>(
-    extractionResult.components.map((c, idx) => ({
-      ...c,
-      id: `extracted-${idx}`,
-      status: 'approved' as ComponentStatus,
-      isEditing: false,
-      matchDecision: matchDecisions.find(d => d.componentIndex === idx),
-    }))
+    extractionResult.components.map((c, idx) => {
+      const processedComponent = { ...c };
+
+      // Mode A: File contains dual columns (Partner + MSRP)
+      // Claude AI already extracted both prices, now calculate discount %
+      if (c.msrpPrice && c.msrpCurrency) {
+        logger.debug('[AIExtractionPreview] Mode A detected - dual columns', {
+          componentIndex: idx,
+          componentName: c.name,
+          msrpPrice: c.msrpPrice,
+          msrpCurrency: c.msrpCurrency,
+          unitPriceUSD: c.unitPriceUSD,
+          unitPriceNIS: c.unitPriceNIS,
+          unitPriceEUR: c.unitPriceEUR,
+        });
+
+        // Calculate discount % from extracted prices
+        const partnerPrice =
+          c.msrpCurrency === 'USD'
+            ? c.unitPriceUSD
+            : c.msrpCurrency === 'NIS'
+              ? c.unitPriceNIS
+              : c.msrpCurrency === 'EUR'
+                ? c.unitPriceEUR
+                : 0;
+
+        if (partnerPrice && c.msrpPrice) {
+          // Discount % = (MSRP - Partner) / MSRP × 100
+          const discountPercent =
+            ((c.msrpPrice - partnerPrice) / c.msrpPrice) * 100;
+          processedComponent.partnerDiscountPercent =
+            Math.round(discountPercent * 100) / 100; // Round to 2 decimals
+
+          logger.debug('[AIExtractionPreview] Calculated discount %', {
+            componentIndex: idx,
+            msrpPrice: c.msrpPrice,
+            partnerPrice: partnerPrice,
+            discountPercent: processedComponent.partnerDiscountPercent,
+          });
+        }
+      }
+      // Mode B: Apply user-entered discount % to prices
+      else if (
+        msrpOptions?.mode === 'discount' &&
+        msrpOptions.partnerDiscountPercent
+      ) {
+        logger.debug('[AIExtractionPreview] Mode B detected - discount %', {
+          componentIndex: idx,
+          componentName: c.name,
+          mode: msrpOptions.mode,
+          partnerDiscountPercent: msrpOptions.partnerDiscountPercent,
+          msrpCurrency: msrpOptions.msrpCurrency,
+        });
+        const discount = msrpOptions.partnerDiscountPercent / 100;
+        const msrpCurrency = msrpOptions?.msrpCurrency || 'USD';
+
+        // Prices in file are MSRP, calculate partner price
+        if (msrpCurrency === 'USD' && c.unitPriceUSD) {
+          processedComponent.msrpPrice = c.unitPriceUSD;
+          processedComponent.msrpCurrency = 'USD';
+          processedComponent.partnerDiscountPercent =
+            msrpOptions.partnerDiscountPercent;
+          processedComponent.unitPriceUSD = c.unitPriceUSD * (1 - discount);
+        } else if (msrpCurrency === 'NIS' && c.unitPriceNIS) {
+          processedComponent.msrpPrice = c.unitPriceNIS;
+          processedComponent.msrpCurrency = 'NIS';
+          processedComponent.partnerDiscountPercent =
+            msrpOptions.partnerDiscountPercent;
+          processedComponent.unitPriceNIS = c.unitPriceNIS * (1 - discount);
+        } else if (msrpCurrency === 'EUR' && c.unitPriceEUR) {
+          processedComponent.msrpPrice = c.unitPriceEUR;
+          processedComponent.msrpCurrency = 'EUR';
+          processedComponent.partnerDiscountPercent =
+            msrpOptions.partnerDiscountPercent;
+          processedComponent.unitPriceEUR = c.unitPriceEUR * (1 - discount);
+        }
+      }
+      // Mode C: Regular import (no MSRP)
+      // No processing needed
+
+      return {
+        ...processedComponent,
+        id: `extracted-${idx}`,
+        status: 'approved' as ComponentStatus,
+        isEditing: false,
+        matchDecision: matchDecisions.find(d => d.componentIndex === idx),
+      };
+    })
   );
 
   // Listen for category updates
@@ -209,6 +294,76 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
     );
   };
 
+  /**
+   * Handle column selection changes - swap partner and MSRP prices if needed
+   * This is used when Claude AI may have extracted the columns in the wrong order
+   */
+  const handleSwapPrices = () => {
+    logger.info('[AIExtractionPreview] Swapping partner and MSRP prices');
+
+    setComponents(prev =>
+      prev.map(c => {
+        // Only swap if component has both partner price and MSRP
+        if (!c.msrpPrice || !c.msrpCurrency) {
+          return c;
+        }
+
+        // Determine current partner price based on MSRP currency
+        const currentPartnerPrice =
+          c.msrpCurrency === 'USD'
+            ? c.unitPriceUSD
+            : c.msrpCurrency === 'NIS'
+              ? c.unitPriceNIS
+              : c.msrpCurrency === 'EUR'
+                ? c.unitPriceEUR
+                : 0;
+
+        if (!currentPartnerPrice) {
+          return c;
+        }
+
+        // Swap: partner price becomes MSRP, MSRP becomes partner price
+        const newMsrpPrice = currentPartnerPrice;
+        const newPartnerPrice = c.msrpPrice;
+
+        // Recalculate discount with swapped values
+        // Discount % = (new MSRP - new Partner) / new MSRP × 100
+        const newDiscountPercent =
+          newMsrpPrice > 0
+            ? ((newMsrpPrice - newPartnerPrice) / newMsrpPrice) * 100
+            : 0;
+
+        // Create updated component with swapped prices
+        const updated = {
+          ...c,
+          msrpPrice: newMsrpPrice,
+          partnerDiscountPercent: Math.round(newDiscountPercent * 100) / 100,
+          status: 'modified' as ComponentStatus,
+        };
+
+        // Update the partner price field based on currency
+        if (c.msrpCurrency === 'USD') {
+          updated.unitPriceUSD = newPartnerPrice;
+        } else if (c.msrpCurrency === 'NIS') {
+          updated.unitPriceNIS = newPartnerPrice;
+        } else if (c.msrpCurrency === 'EUR') {
+          updated.unitPriceEUR = newPartnerPrice;
+        }
+
+        logger.debug('[AIExtractionPreview] Swapped prices for component', {
+          componentName: c.name,
+          oldPartner: currentPartnerPrice,
+          oldMSRP: c.msrpPrice,
+          newPartner: newPartnerPrice,
+          newMSRP: newMsrpPrice,
+          newDiscount: updated.partnerDiscountPercent,
+        });
+
+        return updated;
+      })
+    );
+  };
+
   const handleConfirm = () => {
     const approvedComponents = components
       .filter(c => c.status !== 'rejected')
@@ -222,7 +377,7 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
           originalCost: c.unitPriceNIS || c.unitPriceUSD || c.unitPriceEUR || 0,
         });
 
-        return {
+        const component = {
           name: c.name,
           description: c.description,
           category: c.category || 'אחר',
@@ -234,6 +389,10 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
           unitCostEUR: normalizedPrices.unitCostEUR,
           currency: normalizedPrices.currency,
           originalCost: normalizedPrices.originalCost,
+          // MSRP fields
+          msrpPrice: c.msrpPrice,
+          msrpCurrency: c.msrpCurrency,
+          partnerDiscountPercent: c.partnerDiscountPercent,
           quoteDate:
             c.quoteDate ||
             extractionResult.metadata.quoteDate ||
@@ -241,7 +400,23 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
           quoteFileUrl: '', // Will be set when saved
           notes: c.notes,
         };
+
+        logger.debug('[AIExtractionPreview] Passing component to onConfirm', {
+          componentName: c.name,
+          msrpPrice: component.msrpPrice,
+          msrpCurrency: component.msrpCurrency,
+          partnerDiscountPercent: component.partnerDiscountPercent,
+          unitPriceUSD: component.unitCostUSD,
+          unitPriceNIS: component.unitCostNIS,
+        });
+
+        return component;
       });
+
+    logger.info('[AIExtractionPreview] Confirming import', {
+      totalComponents: approvedComponents.length,
+      componentsWithMSRP: approvedComponents.filter(c => c.msrpPrice).length,
+    });
 
     onConfirm(approvedComponents, localMatchDecisions);
   };
@@ -591,7 +766,7 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
                     component.status === 'approved' ? 'default' : 'outline'
                   }
                   onClick={() => handleStatusChange(component.id, 'approved')}
-                  title="Approve"
+                  title="אשר"
                 >
                   <CheckCircle className="w-4 h-4" />
                 </Button>
@@ -599,7 +774,7 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
                   size="sm"
                   variant="outline"
                   onClick={() => handleEdit(component.id)}
-                  title="Edit"
+                  title="ערוך"
                 >
                   <Edit2 className="w-4 h-4" />
                 </Button>
@@ -607,7 +782,7 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
                   size="sm"
                   variant="outline"
                   onClick={() => handleDelete(component.id)}
-                  title="Delete"
+                  title="מחק"
                 >
                   <Trash2 className="w-4 h-4 text-red-500" />
                 </Button>
@@ -897,7 +1072,9 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
                 </p>
               </div>
               <div>
-                <span className="text-muted-foreground">מחירים:</span>
+                <span className="text-muted-foreground">
+                  {component.msrpPrice ? 'מחיר שותף:' : 'מחירים:'}
+                </span>
                 <div className="flex gap-2 flex-wrap">
                   {component.unitPriceNIS && (
                     <p
@@ -926,6 +1103,27 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
                     '—'}
                 </div>
               </div>
+              {/* MSRP Display */}
+              {component.msrpPrice && (
+                <div>
+                  <span className="text-muted-foreground">MSRP:</span>
+                  <div className="flex gap-2 items-center">
+                    <p className="font-medium text-purple-600">
+                      {component.msrpCurrency === 'USD' &&
+                        `$${component.msrpPrice.toFixed(2)}`}
+                      {component.msrpCurrency === 'NIS' &&
+                        `₪${component.msrpPrice.toFixed(2)}`}
+                      {component.msrpCurrency === 'EUR' &&
+                        `€${component.msrpPrice.toFixed(2)}`}
+                    </p>
+                    {component.partnerDiscountPercent && (
+                      <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded">
+                        -{component.partnerDiscountPercent.toFixed(1)}% הנחה
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             {component.notes && (

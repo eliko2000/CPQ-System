@@ -1,8 +1,8 @@
-import React, { useState, useMemo, useCallback } from 'react'
-import { Card, CardContent } from '../ui/card'
-import { Button } from '../ui/button'
-import { Input } from '../ui/input'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
+import React, { useState, useMemo, useCallback } from 'react';
+import { Card, CardContent } from '../ui/card';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import {
   Package,
   Plus,
@@ -11,73 +11,107 @@ import {
   Building,
   Calendar,
   Sparkles,
-  Layers
-} from 'lucide-react'
-import { useCPQ } from '../../contexts/CPQContext'
-import { Component, Assembly } from '../../types'
-import { ComponentForm } from './ComponentForm'
-import { AssemblyForm } from './AssemblyForm'
-import { AssemblyGrid } from './AssemblyGrid'
-import { ConfirmDialog } from '../ui/ConfirmDialog'
-import { EnhancedComponentGrid } from './EnhancedComponentGrid'
-import { SupplierQuoteImport } from '../supplier-quotes/SupplierQuoteImport'
-import { toast } from 'sonner'
-import { logger } from '@/lib/logger'
+  Layers,
+} from 'lucide-react';
+import { useCPQ } from '../../contexts/CPQContext';
+import { Component, Assembly } from '../../types';
+import { ComponentForm } from './ComponentForm';
+import { AssemblyForm } from './AssemblyForm';
+import { AssemblyGrid } from './AssemblyGrid';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
+import { EnhancedComponentGrid } from './EnhancedComponentGrid';
+import { ComponentAIImport } from './ComponentAIImport';
+import { toast } from 'sonner';
+import { logger } from '@/lib/logger';
 
 export function ComponentLibrary() {
-  const { components, assemblies, updateComponent, deleteComponent, deleteAssembly, setModal, modalState, closeModal } = useCPQ()
-  const [activeTab, setActiveTab] = useState<'components' | 'assemblies'>('components')
-  const [searchTerm, setSearchTerm] = useState('')
-  const [isAIImportOpen, setIsAIImportOpen] = useState(false)
-  const [selectedAssembly, setSelectedAssembly] = useState<Assembly | null>(null)
-  const [isAssemblyFormOpen, setIsAssemblyFormOpen] = useState(false)
-  const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; componentId: string | null; componentName: string }>({
+  const {
+    components,
+    assemblies,
+    updateComponent,
+    deleteComponent,
+    deleteAssembly,
+    addComponent,
+    setModal,
+    modalState,
+    closeModal,
+  } = useCPQ();
+  const [activeTab, setActiveTab] = useState<'components' | 'assemblies'>(
+    'components'
+  );
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isAIImportOpen, setIsAIImportOpen] = useState(false);
+  const [selectedAssembly, setSelectedAssembly] = useState<Assembly | null>(
+    null
+  );
+  const [isAssemblyFormOpen, setIsAssemblyFormOpen] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    isOpen: boolean;
+    componentId: string | null;
+    componentName: string;
+  }>({
     isOpen: false,
     componentId: null,
-    componentName: ''
-  })
+    componentName: '',
+  });
 
   // Handle inline component updates
-  const handleComponentUpdate = useCallback(async (componentId: string, field: string, value: any) => {
-    try {
-      logger.debug('🎯 ComponentLibrary.handleComponentUpdate called:', { componentId, field, value })
-      const component = components.find(c => c.id === componentId)
-      if (component) {
-        logger.debug('🎯 Found component:', component)
-        logger.debug('🎯 Creating update object:', { [field]: value })
-        await updateComponent(componentId, { [field]: value })
-        logger.debug('🎯 Update completed successfully')
-      } else {
-        logger.error('❌ Component not found:', componentId)
+  const handleComponentUpdate = useCallback(
+    async (componentId: string, field: string, value: any) => {
+      try {
+        logger.debug('🎯 ComponentLibrary.handleComponentUpdate called:', {
+          componentId,
+          field,
+          value,
+        });
+        const component = components.find(c => c.id === componentId);
+        if (component) {
+          logger.debug('🎯 Found component:', component);
+          logger.debug('🎯 Creating update object:', { [field]: value });
+          await updateComponent(componentId, { [field]: value });
+          logger.debug('🎯 Update completed successfully');
+        } else {
+          logger.error('❌ Component not found:', componentId);
+        }
+      } catch (error) {
+        logger.error('❌ Failed to update component:', error);
       }
-    } catch (error) {
-      logger.error('❌ Failed to update component:', error)
-    }
-  }, [components, updateComponent])
+    },
+    [components, updateComponent]
+  );
 
   // Filter components based on search only
   const filteredComponents = useMemo(() => {
     return components.filter(component => {
-      const matchesSearch = searchTerm === '' || 
+      const matchesSearch =
+        searchTerm === '' ||
         component.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        component.manufacturer.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        component.manufacturerPN.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        component.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        component.manufacturer
+          .toLowerCase()
+          .includes(searchTerm.toLowerCase()) ||
+        component.manufacturerPN
+          .toLowerCase()
+          .includes(searchTerm.toLowerCase()) ||
+        component.description
+          ?.toLowerCase()
+          .includes(searchTerm.toLowerCase()) ||
         component.category?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        component.productType?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        component.supplier?.toLowerCase().includes(searchTerm.toLowerCase())
-      
-      return matchesSearch
-    })
-  }, [components, searchTerm])
+        component.productType
+          ?.toLowerCase()
+          .includes(searchTerm.toLowerCase()) ||
+        component.supplier?.toLowerCase().includes(searchTerm.toLowerCase());
+
+      return matchesSearch;
+    });
+  }, [components, searchTerm]);
 
   const handleAddComponent = () => {
-    setModal({ type: 'add-component', data: null })
-  }
+    setModal({ type: 'add-component', data: null });
+  };
 
   const handleEditComponent = (component: Component) => {
-    setModal({ type: 'edit-component', data: component })
-  }
+    setModal({ type: 'edit-component', data: component });
+  };
 
   const handleDuplicateComponent = (component: Component) => {
     // Create a duplicate without an ID so the form treats it as new
@@ -94,58 +128,104 @@ export function ComponentLibrary() {
       currency: component.currency || 'NIS',
       originalCost: component.originalCost || component.unitCostNIS,
       quoteDate: component.quoteDate || new Date().toISOString().split('T')[0],
-      notes: component.notes || ''
-    }
-    setModal({ type: 'add-component', data: duplicatedComponent })
-  }
+      notes: component.notes || '',
+    };
+    setModal({ type: 'add-component', data: duplicatedComponent });
+  };
 
-  const handleDeleteComponent = (componentId: string, componentName: string) => {
+  const handleDeleteComponent = (
+    componentId: string,
+    componentName: string
+  ) => {
     setDeleteConfirm({
       isOpen: true,
       componentId,
-      componentName
-    })
-  }
+      componentName,
+    });
+  };
 
   const confirmDelete = async () => {
     if (deleteConfirm.componentId) {
-      await deleteComponent(deleteConfirm.componentId)
-      setDeleteConfirm({ isOpen: false, componentId: null, componentName: '' })
+      await deleteComponent(deleteConfirm.componentId);
+      setDeleteConfirm({ isOpen: false, componentId: null, componentName: '' });
     }
-  }
+  };
 
   const cancelDelete = () => {
-    setDeleteConfirm({ isOpen: false, componentId: null, componentName: '' })
-  }
+    setDeleteConfirm({ isOpen: false, componentId: null, componentName: '' });
+  };
 
   // Assembly handlers
   const handleAddAssembly = () => {
-    setSelectedAssembly(null)
-    setIsAssemblyFormOpen(true)
-  }
+    setSelectedAssembly(null);
+    setIsAssemblyFormOpen(true);
+  };
 
   const handleEditAssembly = (assembly: Assembly) => {
-    setSelectedAssembly(assembly)
-    setIsAssemblyFormOpen(true)
-  }
+    setSelectedAssembly(assembly);
+    setIsAssemblyFormOpen(true);
+  };
 
-  const handleDeleteAssembly = async (assemblyId: string, assemblyName: string) => {
-    if (window.confirm(`האם אתה בטוח שברצונך למחוק את ההרכבה "${assemblyName}"?`)) {
+  const handleDeleteAssembly = async (
+    assemblyId: string,
+    assemblyName: string
+  ) => {
+    if (
+      window.confirm(`האם אתה בטוח שברצונך למחוק את ההרכבה "${assemblyName}"?`)
+    ) {
       try {
-        await deleteAssembly(assemblyId)
-        toast.success('ההרכבה נמחקה בהצלחה')
+        await deleteAssembly(assemblyId);
+        toast.success('ההרכבה נמחקה בהצלחה');
       } catch (error) {
-        toast.error('שגיאה במחיקת הרכבה')
+        toast.error('שגיאה במחיקת הרכבה');
       }
     }
-  }
+  };
+
+  // Handle batch component import from AI extraction
+  const handleBatchImport = async (components: Partial<Component>[]) => {
+    logger.debug(
+      '📦 ComponentLibrary.handleBatchImport called with',
+      components.length,
+      'components'
+    );
+
+    try {
+      let successCount = 0;
+      let failCount = 0;
+
+      for (const comp of components) {
+        try {
+          logger.debug('➕ Adding component:', comp.name);
+          await addComponent(
+            comp as Omit<Component, 'id' | 'createdAt' | 'updatedAt'>
+          );
+          successCount++;
+        } catch (error) {
+          logger.error('❌ Failed to add component:', comp.name, error);
+          failCount++;
+        }
+      }
+
+      if (successCount > 0) {
+        toast.success(`${successCount} רכיבים יובאו בהצלחה`);
+      }
+      if (failCount > 0) {
+        toast.error(`${failCount} רכיבים נכשלו`);
+      }
+    } catch (error) {
+      logger.error('❌ Batch import failed:', error);
+      toast.error('שגיאה בייבוא רכיבים');
+      throw error;
+    }
+  };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
-    }).format(amount)
-  }
+    }).format(amount);
+  };
 
   return (
     <div className="space-y-6" dir="rtl">
@@ -154,11 +234,16 @@ export function ComponentLibrary() {
         <div>
           <h1 className="text-3xl font-bold text-foreground">ספריית רכיבים</h1>
           <p className="text-muted-foreground">
-            נהל את הרכיבים והאסמבלים שלך ({components.length} רכיבים, {assemblies.length} הרכבות)
+            נהל את הרכיבים והאסמבלים שלך ({components.length} רכיבים,{' '}
+            {assemblies.length} הרכבות)
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setIsAIImportOpen(true)} className="gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setIsAIImportOpen(true)}
+            className="gap-2"
+          >
             <Sparkles className="h-4 w-4" />
             ייבוא חכם
           </Button>
@@ -177,7 +262,10 @@ export function ComponentLibrary() {
       </div>
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'components' | 'assemblies')}>
+      <Tabs
+        value={activeTab}
+        onValueChange={v => setActiveTab(v as 'components' | 'assemblies')}
+      >
         <TabsList>
           <TabsTrigger value="components" className="gap-2">
             <Package className="h-4 w-4" />
@@ -198,98 +286,116 @@ export function ComponentLibrary() {
               <Input
                 placeholder="חיפוש לפי שם, יצרן, מקט, קטגוריה, סוג מוצר, ספק..."
                 value={searchTerm}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                  setSearchTerm(e.target.value)
+                }
                 className="pr-10"
               />
             </div>
           </div>
 
           {/* Enhanced Grid */}
-      {filteredComponents.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <Package className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">
-              {searchTerm ? 'לא נמצאו רכיבים תואמים' : 'אין רכיבים שנוספו עדיין'}
-            </h3>
-            <p className="text-muted-foreground text-center mb-4">
-              {searchTerm 
-                ? 'נסה לשנות את תנאי החיפוש'
-                : 'התחל בהוספת הרכיב הראשון שלך לספרייה'
-              }
-            </p>
-            {!searchTerm && (
-              <Button onClick={handleAddComponent}>
-                <Plus className="h-4 w-4 ml-2" />
-                הוסף רכיב ראשון
-              </Button>
-            )}
-          </CardContent>
-        </Card>
-      ) : (
-        <EnhancedComponentGrid
-          components={filteredComponents}
-          onEdit={handleEditComponent}
-          onDelete={handleDeleteComponent}
-          onDuplicate={handleDuplicateComponent}
-          onComponentUpdate={handleComponentUpdate}
-        />
-      )}
+          {filteredComponents.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <Package className="h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-semibold mb-2">
+                  {searchTerm
+                    ? 'לא נמצאו רכיבים תואמים'
+                    : 'אין רכיבים שנוספו עדיין'}
+                </h3>
+                <p className="text-muted-foreground text-center mb-4">
+                  {searchTerm
+                    ? 'נסה לשנות את תנאי החיפוש'
+                    : 'התחל בהוספת הרכיב הראשון שלך לספרייה'}
+                </p>
+                {!searchTerm && (
+                  <Button onClick={handleAddComponent}>
+                    <Plus className="h-4 w-4 ml-2" />
+                    הוסף רכיב ראשון
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          ) : (
+            <EnhancedComponentGrid
+              components={filteredComponents}
+              onEdit={handleEditComponent}
+              onDelete={handleDeleteComponent}
+              onDuplicate={handleDuplicateComponent}
+              onComponentUpdate={handleComponentUpdate}
+            />
+          )}
 
-      {/* Summary Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <Package className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium text-muted-foreground">סה"כ רכיבים</span>
-            </div>
-            <p className="text-2xl font-bold">{components.length}</p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <Building className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium text-muted-foreground">ספקים</span>
-            </div>
-            <p className="text-2xl font-bold">
-              {new Set(components.map(c => c.supplier)).size}
-            </p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium text-muted-foreground">ערך ממוצע</span>
-            </div>
-            <p className="text-2xl font-bold">
-              {components.length > 0 
-                ? formatCurrency(components.reduce((sum, c) => sum + c.unitCostNIS, 0) / components.length)
-                : '$0'
-              }
-            </p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium text-muted-foreground">עודכן לאחרונה</span>
-            </div>
-            <p className="text-2xl font-bold">
-              {components.length > 0
-                ? new Date(Math.max(...components.map(c => new Date(c.updatedAt).getTime()))).toLocaleDateString('he-IL')
-                : '-'
-              }
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+          {/* Summary Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-2">
+                  <Package className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium text-muted-foreground">
+                    סה"כ רכיבים
+                  </span>
+                </div>
+                <p className="text-2xl font-bold">{components.length}</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-2">
+                  <Building className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium text-muted-foreground">
+                    ספקים
+                  </span>
+                </div>
+                <p className="text-2xl font-bold">
+                  {new Set(components.map(c => c.supplier)).size}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-2">
+                  <DollarSign className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium text-muted-foreground">
+                    ערך ממוצע
+                  </span>
+                </div>
+                <p className="text-2xl font-bold">
+                  {components.length > 0
+                    ? formatCurrency(
+                        components.reduce((sum, c) => sum + c.unitCostNIS, 0) /
+                          components.length
+                      )
+                    : '$0'}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-2">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium text-muted-foreground">
+                    עודכן לאחרונה
+                  </span>
+                </div>
+                <p className="text-2xl font-bold">
+                  {components.length > 0
+                    ? new Date(
+                        Math.max(
+                          ...components.map(c =>
+                            new Date(c.updatedAt).getTime()
+                          )
+                        )
+                      ).toLocaleDateString('he-IL')
+                    : '-'}
+                </p>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         {/* Assemblies Tab */}
@@ -304,8 +410,16 @@ export function ComponentLibrary() {
 
       {/* Component Form Modal */}
       <ComponentForm
-        component={modalState?.type === 'edit-component' || modalState?.type === 'add-component' ? modalState.data : null}
-        isOpen={modalState?.type === 'add-component' || modalState?.type === 'edit-component'}
+        component={
+          modalState?.type === 'edit-component' ||
+          modalState?.type === 'add-component'
+            ? modalState.data
+            : null
+        }
+        isOpen={
+          modalState?.type === 'add-component' ||
+          modalState?.type === 'edit-component'
+        }
         onClose={closeModal}
       />
 
@@ -314,19 +428,16 @@ export function ComponentLibrary() {
         assembly={selectedAssembly}
         isOpen={isAssemblyFormOpen}
         onClose={() => {
-          setIsAssemblyFormOpen(false)
-          setSelectedAssembly(null)
+          setIsAssemblyFormOpen(false);
+          setSelectedAssembly(null);
         }}
       />
 
-      {/* AI Import Modal - Now uses enhanced SupplierQuoteImport */}
-      <SupplierQuoteImport
+      {/* AI Import Modal */}
+      <ComponentAIImport
         isOpen={isAIImportOpen}
         onClose={() => setIsAIImportOpen(false)}
-        onSuccess={() => {
-          setIsAIImportOpen(false);
-          toast.success('רכיבים יובאו בהצלחה');
-        }}
+        onImport={handleBatchImport}
       />
 
       {/* Delete Confirmation Dialog */}
@@ -341,5 +452,5 @@ export function ComponentLibrary() {
         onCancel={cancelDelete}
       />
     </div>
-  )
+  );
 }

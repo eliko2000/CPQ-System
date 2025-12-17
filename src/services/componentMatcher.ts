@@ -23,9 +23,9 @@ import { logger } from '@/lib/logger';
 
 export interface FuzzyMatchReason {
   manufacturerSimilarity: number; // 0-1
-  partNumberSimilarity: number;   // 0-1
-  nameSimilarity: number;          // 0-1
-  overallScore: number;            // 0-1
+  partNumberSimilarity: number; // 0-1
+  nameSimilarity: number; // 0-1
+  overallScore: number; // 0-1
 }
 
 export interface FuzzyMatchResult {
@@ -61,15 +61,15 @@ export interface MatchResult {
 // ============================================
 
 const FUZZY_MATCH_THRESHOLDS = {
-  HIGH_CONFIDENCE: 0.90,    // 90%+ - Auto-suggest as match
-  MEDIUM_CONFIDENCE: 0.70,  // 70-89% - Use AI to verify
-  MIN_CONFIDENCE: 0.60,     // 60% - Minimum to consider
+  HIGH_CONFIDENCE: 0.9, // 90%+ - Auto-suggest as match
+  MEDIUM_CONFIDENCE: 0.7, // 70-89% - Use AI to verify
+  MIN_CONFIDENCE: 0.6, // 60% - Minimum to consider
 };
 
 const FUZZY_MATCH_WEIGHTS = {
-  partNumber: 0.5,     // Part number is most important
-  manufacturer: 0.3,   // Manufacturer is second
-  name: 0.2,           // Name is least important
+  partNumber: 0.5, // Part number is most important
+  manufacturer: 0.3, // Manufacturer is second
+  name: 0.2, // Name is least important
 };
 
 // ============================================
@@ -85,8 +85,8 @@ function normalize(str: string | undefined): string {
   return str
     .toLowerCase()
     .trim()
-    .replace(/[^a-z0-9]/g, '')  // Remove special chars
-    .replace(/\s+/g, '');        // Remove spaces
+    .replace(/[^a-z0-9]/g, '') // Remove special chars
+    .replace(/\s+/g, ''); // Remove spaces
 }
 
 /**
@@ -111,7 +111,7 @@ function dbToComponent(dbComp: DbComponent): Component {
     quoteFileUrl: '',
     notes: dbComp.notes || '',
     createdAt: dbComp.created_at,
-    updatedAt: dbComp.updated_at
+    updatedAt: dbComp.updated_at,
   };
 }
 
@@ -209,8 +209,8 @@ async function fuzzyMatch(
             manufacturerSimilarity: manufacturerScore,
             partNumberSimilarity: partNumberScore,
             nameSimilarity: nameScore,
-            overallScore
-          }
+            overallScore,
+          },
         });
       }
     }
@@ -247,7 +247,7 @@ async function aiSemanticMatch(
 
     const anthropic = new Anthropic({
       apiKey,
-      dangerouslyAllowBrowser: true // Allow browser usage (API key is from env)
+      dangerouslyAllowBrowser: true, // Allow browser usage (API key is from env)
     });
 
     const prompt = `You are an expert in industrial automation components and robotics parts. Your task is to determine if components are the same physical product, even if described differently.
@@ -259,13 +259,17 @@ NEW COMPONENT from supplier quote:
 - Description: ${newComponent.description || 'None'}
 
 EXISTING COMPONENTS in library (candidates):
-${candidateComponents.map((c, i) => `
+${candidateComponents
+  .map(
+    (c, i) => `
 ${i + 1}. Name: ${c.name}
    Manufacturer: ${c.manufacturer}
    Part Number: ${c.manufacturerPN}
    Category: ${c.category}
    Description: ${c.description || 'None'}
-`).join('\n')}
+`
+  )
+  .join('\n')}
 
 For each existing component, analyze if it is the SAME physical product as the new component.
 
@@ -291,18 +295,19 @@ Return ONLY a JSON array with this EXACT format:
 Do not include any other text, just the JSON array.`;
 
     const message = await anthropic.messages.create({
-      model: 'claude-3-5-sonnet-20241022',
+      model: 'claude-sonnet-4-20250514',
       max_tokens: 2048,
       temperature: 0,
-      messages: [{
-        role: 'user',
-        content: prompt
-      }]
+      messages: [
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ],
     });
 
-    const responseText = message.content[0].type === 'text'
-      ? message.content[0].text
-      : '';
+    const responseText =
+      message.content[0].type === 'text' ? message.content[0].text : '';
 
     // Extract JSON from response
     const jsonMatch = responseText.match(/\[[\s\S]*\]/);
@@ -313,7 +318,6 @@ Do not include any other text, just the JSON array.`;
 
     const results: AIMatchResult[] = JSON.parse(jsonMatch[0]);
     return results;
-
   } catch (error) {
     logger.error('AI semantic match error:', error);
     return [];
@@ -331,7 +335,6 @@ Do not include any other text, just the JSON array.`;
 export async function findComponentMatches(
   newComponent: AIExtractedComponent
 ): Promise<MatchResult> {
-
   // TIER 1: Try exact match first (fastest)
   logger.debug('🔍 Tier 1: Checking for exact match...');
   const exactResult = await exactMatch(
@@ -343,12 +346,14 @@ export async function findComponentMatches(
     logger.debug('✅ Exact match found!');
     return {
       matchType: 'exact',
-      matches: [{
-        component: exactResult,
-        confidence: 1.0,
-        reasoning: 'Exact match on manufacturer and part number'
-      }],
-      newComponent
+      matches: [
+        {
+          component: exactResult,
+          confidence: 1.0,
+          reasoning: 'Exact match on manufacturer and part number',
+        },
+      ],
+      newComponent,
     };
   }
 
@@ -361,12 +366,14 @@ export async function findComponentMatches(
     return {
       matchType: 'none',
       matches: [],
-      newComponent
+      newComponent,
     };
   }
 
   const bestFuzzyMatch = fuzzyResults[0];
-  logger.debug(`📊 Best fuzzy match: ${(bestFuzzyMatch.matchScore * 100).toFixed(0)}% confidence`);
+  logger.debug(
+    `📊 Best fuzzy match: ${(bestFuzzyMatch.matchScore * 100).toFixed(0)}% confidence`
+  );
 
   // High confidence fuzzy match (90%+) - suggest immediately
   if (bestFuzzyMatch.matchScore >= FUZZY_MATCH_THRESHOLDS.HIGH_CONFIDENCE) {
@@ -376,9 +383,9 @@ export async function findComponentMatches(
       matches: fuzzyResults.slice(0, 3).map(r => ({
         component: r.component,
         confidence: r.matchScore,
-        reasoning: `Fuzzy match: Manufacturer ${(r.matchReasons.manufacturerSimilarity * 100).toFixed(0)}%, PN ${(r.matchReasons.partNumberSimilarity * 100).toFixed(0)}%, Name ${(r.matchReasons.nameSimilarity * 100).toFixed(0)}%`
+        reasoning: `Fuzzy match: Manufacturer ${(r.matchReasons.manufacturerSimilarity * 100).toFixed(0)}%, PN ${(r.matchReasons.partNumberSimilarity * 100).toFixed(0)}%, Name ${(r.matchReasons.nameSimilarity * 100).toFixed(0)}%`,
       })),
-      newComponent
+      newComponent,
     };
   }
 
@@ -399,22 +406,26 @@ export async function findComponentMatches(
       const matchedComponent = topCandidates[bestAIMatch.componentIndex - 1];
       return {
         matchType: 'ai',
-        matches: [{
-          component: matchedComponent,
-          confidence: bestAIMatch.confidence,
-          reasoning: `AI verified: ${bestAIMatch.reasoning}`
-        }],
-        newComponent
+        matches: [
+          {
+            component: matchedComponent,
+            confidence: bestAIMatch.confidence,
+            reasoning: `AI verified: ${bestAIMatch.reasoning}`,
+          },
+        ],
+        newComponent,
       };
     }
   }
 
   // No good matches found - it's a new component
-  logger.debug('❌ No confident matches found - this appears to be a new component');
+  logger.debug(
+    '❌ No confident matches found - this appears to be a new component'
+  );
   return {
     matchType: 'none',
     matches: [],
-    newComponent
+    newComponent,
   };
 }
 

@@ -79,6 +79,8 @@ interface PreviewComponent extends AIExtractedComponent {
   status: ComponentStatus;
   isEditing: boolean;
   matchDecision?: ComponentMatchDecision;
+  marginPercent?: number; // Per-item margin override (if different from global)
+  hasMarginOverride?: boolean; // Tracks if this item has custom margin
 }
 
 const COMPONENT_TYPES = [
@@ -104,6 +106,11 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
   // Load team-specific categories dynamically
   const [categories, setCategories] = useState<string[]>(() =>
     getComponentCategories()
+  );
+
+  // Global margin % state (for discount mode)
+  const [globalMarginPercent, setGlobalMarginPercent] = useState<number>(
+    msrpOptions?.partnerDiscountPercent || 25
   );
 
   const [components, setComponents] = useState<PreviewComponent[]>(
@@ -295,74 +302,104 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
   };
 
   /**
-   * Handle column selection changes - swap partner and MSRP prices if needed
-   * This is used when Claude AI may have extracted the columns in the wrong order
+   * Recalculate partner price from MSRP based on margin %
+   * Formula: Partner Price = MSRP × (1 - Margin% / 100)
    */
-  const handleSwapPrices = () => {
-    logger.info('[AIExtractionPreview] Swapping partner and MSRP prices');
+  const recalculatePriceFromMargin = (
+    msrpPrice: number,
+    msrpCurrency: 'USD' | 'NIS' | 'EUR',
+    marginPercent: number
+  ) => {
+    const discountFactor = 1 - marginPercent / 100;
+    const partnerPrice = msrpPrice * discountFactor;
 
+    // Return partner price in all three currencies
+    // Only the MSRP currency is calculated, others remain undefined
+    if (msrpCurrency === 'USD') {
+      return {
+        unitPriceUSD: partnerPrice,
+        unitPriceNIS: undefined,
+        unitPriceEUR: undefined,
+      };
+    } else if (msrpCurrency === 'NIS') {
+      return {
+        unitPriceUSD: undefined,
+        unitPriceNIS: partnerPrice,
+        unitPriceEUR: undefined,
+      };
+    } else {
+      return {
+        unitPriceUSD: undefined,
+        unitPriceNIS: undefined,
+        unitPriceEUR: partnerPrice,
+      };
+    }
+  };
+
+  /**
+   * Handle global margin change - recalculate all components without overrides
+   */
+  const handleGlobalMarginChange = (newMargin: number) => {
+    setGlobalMarginPercent(newMargin);
+
+    // Recalculate all components that don't have margin override
     setComponents(prev =>
       prev.map(c => {
-        // Only swap if component has both partner price and MSRP
-        if (!c.msrpPrice || !c.msrpCurrency) {
+        // Skip if no MSRP or has manual override
+        if (!c.msrpPrice || !c.msrpCurrency || c.hasMarginOverride) {
           return c;
         }
 
-        // Determine current partner price based on MSRP currency
-        const currentPartnerPrice =
-          c.msrpCurrency === 'USD'
-            ? c.unitPriceUSD
-            : c.msrpCurrency === 'NIS'
-              ? c.unitPriceNIS
-              : c.msrpCurrency === 'EUR'
-                ? c.unitPriceEUR
-                : 0;
+        // Recalculate partner price from MSRP
+        const newPrices = recalculatePriceFromMargin(
+          c.msrpPrice,
+          c.msrpCurrency,
+          newMargin
+        );
 
-        if (!currentPartnerPrice) {
-          return c;
-        }
-
-        // Swap: partner price becomes MSRP, MSRP becomes partner price
-        const newMsrpPrice = currentPartnerPrice;
-        const newPartnerPrice = c.msrpPrice;
-
-        // Recalculate discount with swapped values
-        // Discount % = (new MSRP - new Partner) / new MSRP × 100
-        const newDiscountPercent =
-          newMsrpPrice > 0
-            ? ((newMsrpPrice - newPartnerPrice) / newMsrpPrice) * 100
-            : 0;
-
-        // Create updated component with swapped prices
-        const updated = {
+        return {
           ...c,
-          msrpPrice: newMsrpPrice,
-          partnerDiscountPercent: Math.round(newDiscountPercent * 100) / 100,
+          ...newPrices,
+          partnerDiscountPercent: newMargin,
+          marginPercent: newMargin,
           status: 'modified' as ComponentStatus,
         };
-
-        // Update the partner price field based on currency
-        if (c.msrpCurrency === 'USD') {
-          updated.unitPriceUSD = newPartnerPrice;
-        } else if (c.msrpCurrency === 'NIS') {
-          updated.unitPriceNIS = newPartnerPrice;
-        } else if (c.msrpCurrency === 'EUR') {
-          updated.unitPriceEUR = newPartnerPrice;
-        }
-
-        logger.debug('[AIExtractionPreview] Swapped prices for component', {
-          componentName: c.name,
-          oldPartner: currentPartnerPrice,
-          oldMSRP: c.msrpPrice,
-          newPartner: newPartnerPrice,
-          newMSRP: newMsrpPrice,
-          newDiscount: updated.partnerDiscountPercent,
-        });
-
-        return updated;
       })
     );
   };
+
+  /**
+   * Handle per-item margin change - mark as override and recalculate
+   */
+  const handleItemMarginChange = (id: string, newMargin: number) => {
+    setComponents(prev =>
+      prev.map(c => {
+        if (c.id !== id || !c.msrpPrice || !c.msrpCurrency) {
+          return c;
+        }
+
+        // Recalculate partner price from MSRP
+        const newPrices = recalculatePriceFromMargin(
+          c.msrpPrice,
+          c.msrpCurrency,
+          newMargin
+        );
+
+        return {
+          ...c,
+          ...newPrices,
+          partnerDiscountPercent: newMargin,
+          marginPercent: newMargin,
+          hasMarginOverride: true,
+          status: 'modified' as ComponentStatus,
+        };
+      })
+    );
+  };
+
+  // NOTE: handleSwapPrices function removed - was unused in current implementation
+  // It was intended for swapping partner and MSRP columns if Claude AI extracts them in wrong order
+  // Can be re-added if needed for 'column' mode in the future
 
   const handleConfirm = () => {
     const approvedComponents = components
@@ -541,6 +578,57 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
                 </span>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Global Margin Edit Section - Show only in discount mode */}
+        {msrpOptions?.mode === 'discount' && (
+          <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <TrendingUp className="w-5 h-5 text-green-600" />
+              <h3 className="text-sm font-medium text-green-900">
+                שולי רווח גלובליים - החל על כל הרכיבים
+              </h3>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+              <div className="space-y-1">
+                <label className="text-xs text-green-700 font-medium">
+                  אחוז שולי רווח (%)
+                </label>
+                <Input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  value={globalMarginPercent}
+                  onChange={e =>
+                    handleGlobalMarginChange(parseFloat(e.target.value) || 0)
+                  }
+                  className="bg-white"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-green-700 font-medium">
+                  נוסחה
+                </label>
+                <div className="text-xs text-green-600 font-mono bg-white p-2 rounded border">
+                  מחיר שותף = MSRP × (1 - {globalMarginPercent}%)
+                </div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-green-700 font-medium">
+                  דוגמה
+                </label>
+                <div className="text-xs text-green-600 bg-white p-2 rounded border">
+                  MSRP $100 → שותף $
+                  {(100 * (1 - globalMarginPercent / 100)).toFixed(2)}
+                </div>
+              </div>
+            </div>
+            <p className="text-xs text-green-600 mt-2">
+              💡 שינוי שולי הרווח הגלובליים יחושב מחדש את כל הרכיבים (פרט לאלה
+              שעודכנו ידנית)
+            </p>
           </div>
         )}
 
@@ -1071,43 +1159,66 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
                     })`}
                 </p>
               </div>
-              <div>
-                <span className="text-muted-foreground">
-                  {component.msrpPrice ? 'מחיר שותף:' : 'מחירים:'}
-                </span>
-                <div className="flex gap-2 flex-wrap">
-                  {component.unitPriceNIS && (
-                    <p
-                      className={`font-medium ${component.currency === 'NIS' ? 'text-green-600' : ''}`}
-                    >
-                      ₪{component.unitPriceNIS.toFixed(2)}
-                    </p>
-                  )}
-                  {component.unitPriceUSD && (
-                    <p
-                      className={`font-medium ${component.currency === 'USD' ? 'text-green-600' : ''}`}
-                    >
-                      ${component.unitPriceUSD.toFixed(2)}
-                    </p>
-                  )}
-                  {component.unitPriceEUR && (
-                    <p
-                      className={`font-medium ${component.currency === 'EUR' ? 'text-green-600' : ''}`}
-                    >
-                      €{component.unitPriceEUR.toFixed(2)}
-                    </p>
-                  )}
-                  {!component.unitPriceNIS &&
-                    !component.unitPriceUSD &&
-                    !component.unitPriceEUR &&
-                    '—'}
-                </div>
-              </div>
-              {/* MSRP Display */}
-              {component.msrpPrice && (
-                <div>
-                  <span className="text-muted-foreground">MSRP:</span>
-                  <div className="flex gap-2 items-center">
+              {/* Price Display - Different layouts based on MSRP mode */}
+              {component.msrpPrice && msrpOptions?.mode === 'discount' ? (
+                <>
+                  {/* Mode: Discount - Show Partner Price | Margin % | MSRP */}
+                  <div>
+                    <span className="text-muted-foreground">מחיר שותף:</span>
+                    <div className="flex gap-2 flex-wrap">
+                      {component.msrpCurrency === 'USD' &&
+                        component.unitPriceUSD && (
+                          <p className="font-medium text-blue-600">
+                            ${component.unitPriceUSD.toFixed(2)}
+                          </p>
+                        )}
+                      {component.msrpCurrency === 'NIS' &&
+                        component.unitPriceNIS && (
+                          <p className="font-medium text-blue-600">
+                            ₪{component.unitPriceNIS.toFixed(2)}
+                          </p>
+                        )}
+                      {component.msrpCurrency === 'EUR' &&
+                        component.unitPriceEUR && (
+                          <p className="font-medium text-blue-600">
+                            €{component.unitPriceEUR.toFixed(2)}
+                          </p>
+                        )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="text-muted-foreground">שולי רווח:</span>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                        value={
+                          component.marginPercent ||
+                          component.partnerDiscountPercent ||
+                          globalMarginPercent
+                        }
+                        onChange={e =>
+                          handleItemMarginChange(
+                            component.id,
+                            parseFloat(e.target.value) || 0
+                          )
+                        }
+                        className="w-20 h-8 text-sm"
+                      />
+                      <span className="text-sm">%</span>
+                      {component.hasMarginOverride && (
+                        <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded">
+                          ידני
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="text-muted-foreground">MSRP:</span>
                     <p className="font-medium text-purple-600">
                       {component.msrpCurrency === 'USD' &&
                         `$${component.msrpPrice.toFixed(2)}`}
@@ -1116,13 +1227,65 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
                       {component.msrpCurrency === 'EUR' &&
                         `€${component.msrpPrice.toFixed(2)}`}
                     </p>
-                    {component.partnerDiscountPercent && (
-                      <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded">
-                        -{component.partnerDiscountPercent.toFixed(1)}% הנחה
-                      </span>
-                    )}
                   </div>
-                </div>
+                </>
+              ) : (
+                <>
+                  {/* Regular mode - Show prices normally */}
+                  <div>
+                    <span className="text-muted-foreground">
+                      {component.msrpPrice ? 'מחיר שותף:' : 'מחירים:'}
+                    </span>
+                    <div className="flex gap-2 flex-wrap">
+                      {component.unitPriceNIS && (
+                        <p
+                          className={`font-medium ${component.currency === 'NIS' ? 'text-green-600' : ''}`}
+                        >
+                          ₪{component.unitPriceNIS.toFixed(2)}
+                        </p>
+                      )}
+                      {component.unitPriceUSD && (
+                        <p
+                          className={`font-medium ${component.currency === 'USD' ? 'text-green-600' : ''}`}
+                        >
+                          ${component.unitPriceUSD.toFixed(2)}
+                        </p>
+                      )}
+                      {component.unitPriceEUR && (
+                        <p
+                          className={`font-medium ${component.currency === 'EUR' ? 'text-green-600' : ''}`}
+                        >
+                          €{component.unitPriceEUR.toFixed(2)}
+                        </p>
+                      )}
+                      {!component.unitPriceNIS &&
+                        !component.unitPriceUSD &&
+                        !component.unitPriceEUR &&
+                        '—'}
+                    </div>
+                  </div>
+                  {/* MSRP Display */}
+                  {component.msrpPrice && (
+                    <div>
+                      <span className="text-muted-foreground">MSRP:</span>
+                      <div className="flex gap-2 items-center">
+                        <p className="font-medium text-purple-600">
+                          {component.msrpCurrency === 'USD' &&
+                            `$${component.msrpPrice.toFixed(2)}`}
+                          {component.msrpCurrency === 'NIS' &&
+                            `₪${component.msrpPrice.toFixed(2)}`}
+                          {component.msrpCurrency === 'EUR' &&
+                            `€${component.msrpPrice.toFixed(2)}`}
+                        </p>
+                        {component.partnerDiscountPercent && (
+                          <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded">
+                            -{component.partnerDiscountPercent.toFixed(1)}% הנחה
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
 

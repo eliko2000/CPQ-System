@@ -20,7 +20,6 @@ import {
   type ColumnExtractionOptions,
 } from '../../services/claudeAI';
 import {
-  parseDocument,
   getExtractionMethod,
   getExtractionMethodName,
   getEstimatedProcessingTime,
@@ -217,6 +216,62 @@ export const IntelligentDocumentUpload: React.FC<
 
       // Extract components with column selection
       const result = await extractComponentsFromDocument(file, columnOptions);
+
+      clearInterval(progressInterval);
+      setProgress(100);
+
+      if (result.success) {
+        setStatus('completed');
+        setTimeout(() => {
+          // Prepare MSRP options
+          const msrpOptions: MSRPImportOptions = {
+            mode: msrpImportMode,
+            partnerDiscountPercent:
+              msrpImportMode === 'discount'
+                ? parseFloat(partnerDiscountPercent)
+                : undefined,
+            msrpCurrency: msrpImportMode !== 'none' ? msrpCurrency : undefined,
+          };
+          onExtractionComplete(result, file, msrpOptions);
+        }, 500);
+      } else {
+        setStatus('error');
+        setError(result.error || 'Failed to extract data from document');
+      }
+    } catch (err) {
+      setStatus('error');
+      setError(
+        err instanceof Error ? err.message : 'An unexpected error occurred'
+      );
+    }
+  };
+
+  // Step 2 Alternative: Analyze directly without column selection (for discount mode and regular imports)
+  const handleAnalyzeDirect = async () => {
+    if (!file) return;
+
+    try {
+      setStatus('analyzing');
+      setProgress(10);
+      setError('');
+
+      // Get estimated processing time for better UX
+      const estimatedTime = getEstimatedProcessingTime(file);
+      const progressSpeed = estimatedTime > 0 ? estimatedTime / 80 : 500;
+
+      // Simulate progress updates
+      const progressInterval = setInterval(() => {
+        setProgress(prev => {
+          if (prev >= 90) {
+            clearInterval(progressInterval);
+            return 90;
+          }
+          return prev + 10;
+        });
+      }, progressSpeed);
+
+      // Extract components without column selection
+      const result = await extractComponentsFromDocument(file);
 
       clearInterval(progressInterval);
       setProgress(100);
@@ -566,14 +621,29 @@ export const IntelligentDocumentUpload: React.FC<
                 )}
 
               <div className="flex gap-2">
-                <Button onClick={handleExtractHeaders} className="flex-1">
+                <Button
+                  onClick={
+                    msrpImportMode === 'column'
+                      ? handleExtractHeaders
+                      : handleAnalyzeDirect
+                  }
+                  disabled={
+                    msrpImportMode === 'discount' && !partnerDiscountPercent
+                  }
+                  className="flex-1"
+                >
                   <ChevronRight className="w-4 h-4 mr-2" />
-                  המשך לבחירת עמודות
+                  {msrpImportMode === 'column'
+                    ? 'המשך לבחירת עמודות'
+                    : 'נתח ועבור לתצוגה מקדימה'}
                 </Button>
                 <Button variant="outline" onClick={() => setFile(null)}>
                   הסר
                 </Button>
               </div>
+              {msrpImportMode === 'discount' && !partnerDiscountPercent && (
+                <p className="text-sm text-amber-600">⚠️ יש להזין אחוז הנחה</p>
+              )}
             </div>
           )}
         </div>

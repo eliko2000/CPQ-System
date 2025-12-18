@@ -32,7 +32,11 @@
       "Bash(ls:*)",
       "Bash(export SUPABASE_ACCESS_TOKEN=sbp_c483c99039ba59415eb1eadf89bcb6d2a87d8d4d)",
       "Bash(cat:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "mcp__playwright__browser_file_upload",
+      "SlashCommand(/migrate add-msrp-to-quotation-items.sql)",
+      "Bash(powershell -Command:*)",
+      "SlashCommand(/migrate add-use-msrp-pricing-to-quotations.sql)"
     ],
     "deny": [],
     "ask": []

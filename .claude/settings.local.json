@@ -36,7 +36,9 @@
       "mcp__playwright__browser_file_upload",
       "SlashCommand(/migrate add-msrp-to-quotation-items.sql)",
       "Bash(powershell -Command:*)",
-      "SlashCommand(/migrate add-use-msrp-pricing-to-quotations.sql)"
+      "SlashCommand(/migrate add-use-msrp-pricing-to-quotations.sql)",
+      "SlashCommand(/migrate:*)",
+      "Bash(grep:*)"
     ],
     "deny": [],
     "ask": []

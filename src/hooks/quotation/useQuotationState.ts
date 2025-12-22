@@ -14,8 +14,10 @@ export interface QuotationState {
   setComponentSearchText: (text: string) => void;
   showProjectPicker: boolean;
   setShowProjectPicker: (show: boolean) => void;
-  selectorTab: 'components' | 'assemblies' | 'custom';
-  setSelectorTab: (tab: 'components' | 'assemblies' | 'custom') => void;
+  selectorTab: 'components' | 'assemblies' | 'labor' | 'custom';
+  setSelectorTab: (
+    tab: 'components' | 'assemblies' | 'labor' | 'custom'
+  ) => void;
   showAssemblyDetail: boolean;
   setShowAssemblyDetail: (show: boolean) => void;
   selectedAssemblyForDetail: Assembly | null;
@@ -30,7 +32,7 @@ export function useQuotationState(): QuotationState {
   const [componentSearchText, setComponentSearchText] = useState('');
   const [showProjectPicker, setShowProjectPicker] = useState(false);
   const [selectorTab, setSelectorTab] = useState<
-    'components' | 'assemblies' | 'custom'
+    'components' | 'assemblies' | 'labor' | 'custom'
   >('components');
   const [showAssemblyDetail, setShowAssemblyDetail] = useState(false);
   const [selectedAssemblyForDetail, setSelectedAssemblyForDetail] =

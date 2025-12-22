@@ -1,4 +1,5 @@
 import { Component, Assembly } from '../../types';
+import { LaborType } from '../../types/labor.types';
 import { Button } from '../ui/button';
 import { X } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
@@ -12,18 +13,22 @@ import { CustomItemForm, CustomItemData } from './CustomItemForm';
 interface AddItemDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  tab: 'components' | 'assemblies' | 'custom';
-  onTabChange: (tab: 'components' | 'assemblies' | 'custom') => void;
+  tab: 'components' | 'assemblies' | 'labor' | 'custom';
+  onTabChange: (tab: 'components' | 'assemblies' | 'labor' | 'custom') => void;
   searchText: string;
   onSearchChange: (text: string) => void;
   components: Component[];
   assemblies: Assembly[];
+  laborTypes: LaborType[];
   filteredComponents: Component[];
   filteredAssemblies: Assembly[];
+  filteredLaborTypes: LaborType[];
   onAddComponent: (component: Component) => void;
   onAddAssembly: (assembly: Assembly) => void;
+  onAddLabor: (laborType: LaborType) => void;
   onAddCustomItem: (data: CustomItemData) => void;
   defaultMarkup?: number;
+  dayWorkCost?: number; // For displaying internal labor rates
 }
 
 export function AddItemDialog({
@@ -35,12 +40,16 @@ export function AddItemDialog({
   onSearchChange,
   components,
   assemblies,
+  laborTypes,
   filteredComponents,
   filteredAssemblies,
+  filteredLaborTypes,
   onAddComponent,
   onAddAssembly,
+  onAddLabor,
   onAddCustomItem,
   defaultMarkup: __defaultMarkup,
+  dayWorkCost = 0,
 }: AddItemDialogProps) {
   const componentSelectorRef = useRef<HTMLDivElement>(null);
 
@@ -106,7 +115,7 @@ export function AddItemDialog({
           <Tabs
             value={tab}
             onValueChange={v =>
-              onTabChange(v as 'components' | 'assemblies' | 'custom')
+              onTabChange(v as 'components' | 'assemblies' | 'labor' | 'custom')
             }
           >
             <TabsList className="mb-4">
@@ -115,6 +124,9 @@ export function AddItemDialog({
               </TabsTrigger>
               <TabsTrigger value="assemblies">
                 הרכבות ({assemblies.length})
+              </TabsTrigger>
+              <TabsTrigger value="labor">
+                עבודה ({laborTypes.length})
               </TabsTrigger>
               <TabsTrigger value="custom">פריט מותאם אישית</TabsTrigger>
             </TabsList>
@@ -129,7 +141,9 @@ export function AddItemDialog({
                   placeholder={
                     tab === 'components'
                       ? 'חפש לפי שם, יצרן או קטגוריה...'
-                      : 'חפש הרכבה לפי שם או תיאור...'
+                      : tab === 'assemblies'
+                        ? 'חפש הרכבה לפי שם או תיאור...'
+                        : 'חפש עבודה לפי שם או תיאור...'
                   }
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   autoFocus
@@ -248,6 +262,96 @@ export function AddItemDialog({
                         </div>
                       );
                     })}
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+
+            {/* Labor Tab */}
+            <TabsContent value="labor" className="mt-0">
+              <div className="overflow-y-auto max-h-[50vh]">
+                {filteredLaborTypes.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-gray-500">
+                      לא נמצאו סוגי עבודה התואמים לחיפוש
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {filteredLaborTypes.map(laborType => (
+                      <div
+                        key={laborType.id}
+                        className={`border rounded-lg p-4 hover:shadow-md transition-all cursor-pointer ${
+                          laborType.isInternalLabor
+                            ? 'border-blue-200 hover:border-blue-400 bg-blue-50'
+                            : 'border-purple-200 hover:border-purple-400 bg-purple-50'
+                        }`}
+                        onClick={() => onAddLabor(laborType)}
+                      >
+                        <div className="flex justify-between items-start mb-2">
+                          <h4 className="font-medium text-gray-900 flex items-center gap-2">
+                            <span className="text-lg">
+                              {laborType.isInternalLabor ? '🏢' : '👤'}
+                            </span>
+                            {laborType.name}
+                          </h4>
+                          <span
+                            className={`text-xs px-2 py-1 rounded ${
+                              laborType.isInternalLabor
+                                ? 'bg-blue-100 text-blue-800'
+                                : 'bg-purple-100 text-purple-800'
+                            }`}
+                          >
+                            {laborType.isInternalLabor ? 'פנימי' : 'חיצוני'}
+                          </span>
+                        </div>
+
+                        <div className="space-y-1 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">תת-סוג:</span>
+                            <span className="font-medium">
+                              {(() => {
+                                const labels: Record<string, string> = {
+                                  engineering: 'תכנון',
+                                  integration: 'אינטגרציה',
+                                  development: 'פיתוח',
+                                  testing: 'הרצה',
+                                  commissioning: 'הטמעה',
+                                  support_and_training: 'תמיכה והדרכה',
+                                };
+                                return (
+                                  labels[laborType.laborSubtype] ||
+                                  laborType.laborSubtype
+                                );
+                              })()}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">תעריף יומי:</span>
+                            <span className="font-mono font-semibold">
+                              {laborType.isInternalLabor ? (
+                                <span className="text-blue-600">
+                                  ₪{dayWorkCost.toLocaleString('he-IL')}
+                                </span>
+                              ) : (
+                                <span className="text-purple-600">
+                                  ₪
+                                  {(laborType.externalRate || 0).toLocaleString(
+                                    'he-IL'
+                                  )}
+                                </span>
+                              )}
+                            </span>
+                          </div>
+                        </div>
+
+                        {laborType.description && (
+                          <p className="text-xs text-gray-500 mt-2 line-clamp-2">
+                            {laborType.description}
+                          </p>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>

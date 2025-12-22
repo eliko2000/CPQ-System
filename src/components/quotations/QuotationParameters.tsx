@@ -102,7 +102,7 @@ export const QuotationParameters = memo(function QuotationParameters({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              עלות עבודה ליום (₪)
+              עלות עבודה פנימי ליום (₪)
             </label>
             <input
               type="number"
@@ -115,6 +115,9 @@ export const QuotationParameters = memo(function QuotationParameters({
               disabled={disabled}
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
             />
+            <p className="text-xs text-gray-500 mt-1">
+              תעריף יומי לעבודה פנימית של הצוות (לא כולל עבודה חיצונית)
+            </p>
           </div>
         </div>
 

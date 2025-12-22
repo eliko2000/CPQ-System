@@ -4,9 +4,11 @@
 export type ComponentType = 'hardware' | 'software' | 'labor';
 export type LaborSubtype =
   | 'engineering'
+  | 'integration'
+  | 'development'
+  | 'testing'
   | 'commissioning'
-  | 'installation'
-  | 'programming';
+  | 'support_and_training';
 
 // ============ Currency Types ============
 export type Currency = 'NIS' | 'USD' | 'EUR';

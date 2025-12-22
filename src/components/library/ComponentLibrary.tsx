@@ -12,15 +12,20 @@ import {
   Calendar,
   Sparkles,
   Layers,
+  Briefcase,
 } from 'lucide-react';
 import { useCPQ } from '../../contexts/CPQContext';
 import { Component, Assembly } from '../../types';
+import { LaborType } from '../../types/labor.types';
 import { ComponentForm } from './ComponentForm';
 import { AssemblyForm } from './AssemblyForm';
 import { AssemblyGrid } from './AssemblyGrid';
+import { LaborTypeForm } from '../labor/LaborTypeForm';
+import { LaborTypeList } from '../labor/LaborTypeList';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { EnhancedComponentGrid } from './EnhancedComponentGrid';
 import { ComponentAIImport } from './ComponentAIImport';
+import { useLaborTypes } from '../../hooks/useLaborTypes';
 import { toast } from 'sonner';
 import { logger } from '@/lib/logger';
 
@@ -36,15 +41,24 @@ export function ComponentLibrary() {
     modalState,
     closeModal,
   } = useCPQ();
-  const [activeTab, setActiveTab] = useState<'components' | 'assemblies'>(
-    'components'
-  );
+  const {
+    laborTypes,
+    deleteLaborType,
+    reload: reloadLaborTypes,
+  } = useLaborTypes();
+  const [activeTab, setActiveTab] = useState<
+    'components' | 'assemblies' | 'labor'
+  >('components');
   const [searchTerm, setSearchTerm] = useState('');
   const [isAIImportOpen, setIsAIImportOpen] = useState(false);
   const [selectedAssembly, setSelectedAssembly] = useState<Assembly | null>(
     null
   );
   const [isAssemblyFormOpen, setIsAssemblyFormOpen] = useState(false);
+  const [selectedLaborType, setSelectedLaborType] = useState<LaborType | null>(
+    null
+  );
+  const [isLaborFormOpen, setIsLaborFormOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<{
     isOpen: boolean;
     componentId: string | null;
@@ -104,6 +118,19 @@ export function ComponentLibrary() {
       return matchesSearch;
     });
   }, [components, searchTerm]);
+
+  // Filter labor types based on search
+  const filteredLaborTypes = useMemo(() => {
+    if (searchTerm === '') return laborTypes;
+    return laborTypes.filter(laborType => {
+      const searchLower = searchTerm.toLowerCase();
+      return (
+        laborType.name.toLowerCase().includes(searchLower) ||
+        laborType.description?.toLowerCase().includes(searchLower) ||
+        laborType.laborSubtype.toLowerCase().includes(searchLower)
+      );
+    });
+  }, [laborTypes, searchTerm]);
 
   const handleAddComponent = () => {
     setModal({ type: 'add-component', data: null });
@@ -182,6 +209,28 @@ export function ComponentLibrary() {
     }
   };
 
+  // Labor handlers
+  const handleAddLaborType = () => {
+    setSelectedLaborType(null);
+    setIsLaborFormOpen(true);
+  };
+
+  const handleEditLaborType = (laborType: LaborType) => {
+    setSelectedLaborType(laborType);
+    setIsLaborFormOpen(true);
+  };
+
+  const handleDeleteLaborType = async (id: string, name: string) => {
+    if (window.confirm(`האם אתה בטוח שברצונך למחוק את סוג העבודה "${name}"?`)) {
+      try {
+        await deleteLaborType(id);
+        toast.success('סוג העבודה נמחק בהצלחה');
+      } catch (error) {
+        toast.error('שגיאה במחיקת סוג העבודה');
+      }
+    }
+  };
+
   // Handle batch component import from AI extraction
   const handleBatchImport = async (components: Partial<Component>[]) => {
     logger.debug(
@@ -234,28 +283,35 @@ export function ComponentLibrary() {
         <div>
           <h1 className="text-3xl font-bold text-foreground">ספריית רכיבים</h1>
           <p className="text-muted-foreground">
-            נהל את הרכיבים והאסמבלים שלך ({components.length} רכיבים,{' '}
-            {assemblies.length} הרכבות)
+            נהל את הרכיבים, האסמבלים וסוגי העבודה שלך ({components.length}{' '}
+            רכיבים, {assemblies.length} הרכבות, {laborTypes.length} סוגי עבודה)
           </p>
         </div>
         <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={() => setIsAIImportOpen(true)}
-            className="gap-2"
-          >
-            <Sparkles className="h-4 w-4" />
-            ייבוא חכם
-          </Button>
+          {activeTab === 'components' && (
+            <Button
+              variant="outline"
+              onClick={() => setIsAIImportOpen(true)}
+              className="gap-2"
+            >
+              <Sparkles className="h-4 w-4" />
+              ייבוא חכם
+            </Button>
+          )}
           {activeTab === 'components' ? (
             <Button onClick={handleAddComponent}>
               <Plus className="h-4 w-4 ml-2" />
               הוסף רכיב
             </Button>
-          ) : (
+          ) : activeTab === 'assemblies' ? (
             <Button onClick={handleAddAssembly}>
               <Plus className="h-4 w-4 ml-2" />
               הוסף הרכבה
+            </Button>
+          ) : (
+            <Button onClick={handleAddLaborType}>
+              <Plus className="h-4 w-4 ml-2" />
+              הוסף סוג עבודה
             </Button>
           )}
         </div>
@@ -264,7 +320,9 @@ export function ComponentLibrary() {
       {/* Tabs */}
       <Tabs
         value={activeTab}
-        onValueChange={v => setActiveTab(v as 'components' | 'assemblies')}
+        onValueChange={v =>
+          setActiveTab(v as 'components' | 'assemblies' | 'labor')
+        }
       >
         <TabsList>
           <TabsTrigger value="components" className="gap-2">
@@ -274,6 +332,10 @@ export function ComponentLibrary() {
           <TabsTrigger value="assemblies" className="gap-2">
             <Layers className="h-4 w-4" />
             הרכבות ({assemblies.length})
+          </TabsTrigger>
+          <TabsTrigger value="labor" className="gap-2">
+            <Briefcase className="h-4 w-4" />
+            סוגי עבודה ({laborTypes.length})
           </TabsTrigger>
         </TabsList>
 
@@ -406,6 +468,55 @@ export function ComponentLibrary() {
             onDelete={handleDeleteAssembly}
           />
         </TabsContent>
+
+        {/* Labor Types Tab */}
+        <TabsContent value="labor" className="space-y-4">
+          {/* Search */}
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="חיפוש לפי שם, קטגוריה, תיאור..."
+                value={searchTerm}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                  setSearchTerm(e.target.value)
+                }
+                className="pr-10"
+              />
+            </div>
+          </div>
+
+          {/* Labor Grid */}
+          {filteredLaborTypes.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <Briefcase className="h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-semibold mb-2">
+                  {searchTerm
+                    ? 'לא נמצאו סוגי עבודה תואמים'
+                    : 'אין סוגי עבודה שנוספו עדיין'}
+                </h3>
+                <p className="text-muted-foreground text-center mb-4">
+                  {searchTerm
+                    ? 'נסה לשנות את תנאי החיפוש'
+                    : 'התחל בהוספת סוג העבודה הראשון שלך'}
+                </p>
+                {!searchTerm && (
+                  <Button onClick={handleAddLaborType}>
+                    <Plus className="h-4 w-4 ml-2" />
+                    הוסף סוג עבודה ראשון
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          ) : (
+            <LaborTypeList
+              laborTypes={filteredLaborTypes}
+              onEdit={handleEditLaborType}
+              onDelete={handleDeleteLaborType}
+            />
+          )}
+        </TabsContent>
       </Tabs>
 
       {/* Component Form Modal */}
@@ -430,6 +541,18 @@ export function ComponentLibrary() {
         onClose={() => {
           setIsAssemblyFormOpen(false);
           setSelectedAssembly(null);
+        }}
+      />
+
+      {/* Labor Type Form Modal */}
+      <LaborTypeForm
+        laborType={selectedLaborType}
+        isOpen={isLaborFormOpen}
+        onClose={() => {
+          setIsLaborFormOpen(false);
+          setSelectedLaborType(null);
+          // Reload labor types to show newly added/edited items
+          reloadLaborTypes();
         }}
       />
 

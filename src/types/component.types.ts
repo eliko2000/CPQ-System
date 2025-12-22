@@ -9,7 +9,7 @@ export interface Component {
   description?: string;
   category: string;
   componentType: ComponentType; // Hardware, Software, or Labor
-  laborSubtype?: LaborSubtype; // For labor components: engineering, commissioning, installation, programming
+  laborSubtype?: LaborSubtype; // For labor components: engineering, integration, development, testing, commissioning, support_and_training
   productType?: string; // סוג מוצר כמו "שסתומים", "חיישנים", וכו'
   manufacturer: string;
   manufacturerPN: string;

@@ -109,6 +109,8 @@ export function convertDbQuotationToQuotationProject(
         componentId: dbItem.component_id,
         assemblyId: dbItem.assembly_id, // CRITICAL: Preserve assembly link for assembly items
         isCustomItem: dbItem.is_custom_item || false, // Track custom items created directly in quotation
+        laborTypeId: (dbItem as any).labor_type_id, // ✅ Load labor type ID for labor items
+        isInternalLabor: (dbItem as any).is_internal_labor, // ✅ Load internal/external labor flag
         componentName: dbItem.item_name,
         componentCategory: dbItem.component?.category || 'כללי',
         itemType: dbItem.item_type || 'hardware',
@@ -163,7 +165,8 @@ export function convertDbQuotationToQuotationProject(
       eurToIlsRate: dbQuotation.eur_to_ils_rate || defaultParams.eurToIlsRate,
       markupPercent:
         dbQuotation.margin_percentage || defaultParams.markupPercent,
-      dayWorkCost: defaultParams.dayWorkCost,
+      dayWorkCost:
+        (dbQuotation as any).day_work_cost || defaultParams.dayWorkCost, // ✅ Load from database
       profitPercent: defaultParams.profitPercent,
       riskPercent: dbQuotation.risk_percentage || defaultParams.riskPercent,
       useMsrpPricing: dbQuotation.use_msrp_pricing || false, // Load MSRP toggle state

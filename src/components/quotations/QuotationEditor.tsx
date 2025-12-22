@@ -8,6 +8,7 @@ import { useQuotationState } from '../../hooks/quotation/useQuotationState';
 import { useQuotationActions } from '../../hooks/quotation/useQuotationActions';
 import { useQuotationCalculations } from '../../hooks/quotation/useQuotationCalculations';
 import { useQuotations } from '../../hooks/useQuotations';
+import { useLaborTypes } from '../../hooks/useLaborTypes';
 // NOTE: useTableConfig is handled ONLY in QuotationItemsGrid to avoid duplicate hook race conditions
 import { QuotationHeader } from './QuotationHeader';
 import { QuotationItemsGrid } from './QuotationItemsGrid';
@@ -31,6 +32,9 @@ export function QuotationEditor() {
 
   // Use quotations hook for Supabase persistence
   const quotationsHook = useQuotations();
+
+  // Load labor types
+  const { laborTypes } = useLaborTypes();
 
   // NOTE: Table configuration (useTableConfig) is handled ONLY in QuotationItemsGrid
   // to avoid duplicate hook calls causing race conditions and resize issues
@@ -199,26 +203,16 @@ export function QuotationEditor() {
   }, []);
 
   // Grid column definitions
-  const columnDefs = useMemo(
-    () =>
-      createQuotationItemColumnDefs({
-        currentQuotation,
-        gridData,
-        getUniqueValues,
-        handleColumnMenuClick,
-        handleFilterClick,
-        openComponentSelector,
-        deleteItem,
-        components,
-        assemblies,
-        setModal,
-        setSelectedAssemblyForDetail: state.setSelectedAssemblyForDetail,
-        setShowAssemblyDetail: state.setShowAssemblyDetail,
-        quotationsHook,
-        setCurrentQuotation,
-        updateQuotation,
-      }),
-    [
+  const columnDefs = useMemo(() => {
+    logger.debug('🔧 Creating column definitions with functions:', {
+      openComponentSelector: typeof openComponentSelector,
+      deleteItem: typeof deleteItem,
+      setModal: typeof setModal,
+      componentsCount: components?.length,
+      assembliesCount: assemblies?.length,
+    });
+
+    return createQuotationItemColumnDefs({
       currentQuotation,
       gridData,
       getUniqueValues,
@@ -229,13 +223,29 @@ export function QuotationEditor() {
       components,
       assemblies,
       setModal,
-      state.setSelectedAssemblyForDetail,
-      state.setShowAssemblyDetail,
+      setSelectedAssemblyForDetail: state.setSelectedAssemblyForDetail,
+      setShowAssemblyDetail: state.setShowAssemblyDetail,
       quotationsHook,
       setCurrentQuotation,
       updateQuotation,
-    ]
-  );
+    });
+  }, [
+    currentQuotation,
+    gridData,
+    getUniqueValues,
+    handleColumnMenuClick,
+    handleFilterClick,
+    openComponentSelector,
+    deleteItem,
+    components,
+    assemblies,
+    setModal,
+    state.setSelectedAssemblyForDetail,
+    state.setShowAssemblyDetail,
+    quotationsHook,
+    setCurrentQuotation,
+    updateQuotation,
+  ]);
 
   // Filter components for popup
   const filteredComponents = useMemo(() => {
@@ -267,6 +277,23 @@ export function QuotationEditor() {
           .includes(state.componentSearchText.toLowerCase())
     );
   }, [assemblies, state.componentSearchText]);
+
+  // Filter labor types for popup
+  const filteredLaborTypes = useMemo(() => {
+    if (!state.componentSearchText) return laborTypes;
+    return laborTypes.filter(
+      labor =>
+        labor.name
+          .toLowerCase()
+          .includes(state.componentSearchText.toLowerCase()) ||
+        labor.description
+          ?.toLowerCase()
+          .includes(state.componentSearchText.toLowerCase()) ||
+        labor.laborSubtype
+          .toLowerCase()
+          .includes(state.componentSearchText.toLowerCase())
+    );
+  }, [laborTypes, state.componentSearchText]);
 
   // NOTE: Grid event handlers (onGridReady, onColumnResized, onColumnMoved, onFilterChanged)
   // are now handled internally by QuotationItemsGrid to avoid duplicate useTableConfig hook calls
@@ -437,12 +464,16 @@ export function QuotationEditor() {
         onSearchChange={state.setComponentSearchText}
         components={components}
         assemblies={assemblies}
+        laborTypes={laborTypes}
         filteredComponents={filteredComponents}
         filteredAssemblies={filteredAssemblies}
+        filteredLaborTypes={filteredLaborTypes}
         onAddComponent={actions.addComponentToSystem}
         onAddAssembly={actions.addAssemblyToSystem}
+        onAddLabor={actions.addLaborTypeToSystem}
         onAddCustomItem={actions.addCustomItemToSystem}
         defaultMarkup={currentQuotation?.parameters?.markupPercent}
+        dayWorkCost={currentQuotation?.parameters?.dayWorkCost || 0}
       />
 
       {/* Modals */}

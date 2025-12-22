@@ -50,13 +50,17 @@ export interface QuotationItem {
   componentName: string;
   componentCategory: string;
   itemType: ComponentType; // Hardware, Software, or Labor
-  laborSubtype?: LaborSubtype; // For labor items: engineering, commissioning, installation, programming
+  laborSubtype?: LaborSubtype; // For labor items: engineering, integration, development, testing, commissioning, support_and_training
 
   // Assembly tracking
   assemblyId?: string; // Link to assembly in library if this is an assembly line item
 
   // Custom item flag (for items created directly in quotation, not from library)
   isCustomItem?: boolean; // If true, componentId will be null/undefined
+
+  // ⭐ Labor type tracking (NEW - for labor separation)
+  laborTypeId?: string; // Reference to labor_types table (for labor items)
+  isInternalLabor?: boolean; // If true, recalculate when dayWorkCost changes
 
   // Quantities and pricing
   quantity: number;
@@ -147,6 +151,7 @@ export interface QuotationCalculations {
 // ============ Database Schema Types ============
 export interface DbQuotation {
   id: string;
+  team_id?: string; // Multi-tenant team association
   quotation_number: string;
   version?: number;
   customer_name: string;
@@ -159,6 +164,7 @@ export interface DbQuotation {
   eur_to_ils_rate?: number;
   margin_percentage: number;
   risk_percentage?: number;
+  day_work_cost?: number; // Internal labor cost per day (can override global setting)
   use_msrp_pricing?: boolean; // Global toggle for MSRP pricing
   status: 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired';
   valid_until_date?: string;
@@ -199,15 +205,22 @@ export interface DbQuotationItem {
   component_id?: string;
   assembly_id?: string; // Link to assembly if this item represents an assembly
   is_custom_item?: boolean; // Custom items created directly in quotation (not from library)
+
+  // ⭐ Labor type tracking (NEW - for labor separation)
+  labor_type_id?: string; // Reference to labor_types table (for labor items)
+  is_internal_labor?: boolean; // Track if this item uses internal rate
+
   item_name: string;
   manufacturer?: string;
   manufacturer_part_number?: string;
   item_type: 'hardware' | 'software' | 'labor';
   labor_subtype?:
     | 'engineering'
+    | 'integration'
+    | 'development'
+    | 'testing'
     | 'commissioning'
-    | 'installation'
-    | 'programming';
+    | 'support_and_training';
   quantity: number;
   unit_cost?: number;
   total_cost?: number;

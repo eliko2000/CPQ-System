@@ -6,6 +6,7 @@ import {
   Component,
   Assembly,
 } from '../../types';
+import { LaborType } from '../../types/labor.types';
 import {
   convertToAllCurrencies,
   type ExchangeRates,
@@ -441,6 +442,147 @@ export function useQuotationActions({
     ]
   );
 
+  // Add labor type to system
+  const addLaborTypeToSystem = useCallback(
+    async (laborType: LaborType) => {
+      logger.info('Adding labor type to system:', {
+        laborTypeName: laborType.name,
+        laborSubtype: laborType.laborSubtype,
+        isInternalLabor: laborType.isInternalLabor,
+      });
+
+      if (!currentQuotation || !selectedSystemId) {
+        logger.error('Cannot add labor: missing quotation or system ID');
+        return;
+      }
+
+      const system = currentQuotation.systems.find(
+        s => s.id === selectedSystemId
+      );
+      if (!system) {
+        logger.error('System not found:', selectedSystemId);
+        return;
+      }
+
+      const itemOrder =
+        currentQuotation.items.filter(
+          item => item.systemId === selectedSystemId
+        ).length + 1;
+
+      const quotationRates: ExchangeRates = {
+        usdToIlsRate: currentQuotation.parameters.usdToIlsRate,
+        eurToIlsRate: currentQuotation.parameters.eurToIlsRate,
+      };
+
+      try {
+        // Calculate rate per day
+        const ratePerDay = laborType.isInternalLabor
+          ? currentQuotation.parameters.dayWorkCost || 0
+          : laborType.externalRate || 0;
+
+        // Convert to all currencies (rate is in NIS)
+        const convertedPrices = convertToAllCurrencies(
+          ratePerDay,
+          'NIS',
+          quotationRates
+        );
+
+        // Calculate totals (quantity = number of days)
+        // Default to 1 day - user can adjust in grid
+        const quantity = 1;
+        const totalPriceUSD = convertedPrices.unitCostUSD * quantity;
+        const totalPriceILS = convertedPrices.unitCostNIS * quantity;
+        const markupPercent = currentQuotation.parameters.markupPercent || 0.75;
+        const customerPriceILS = totalPriceILS * (1 + markupPercent);
+
+        // Persist to database
+        const dbItem = await quotationsHook.addQuotationItem({
+          quotation_system_id: selectedSystemId,
+          component_id: undefined,
+          assembly_id: undefined,
+          is_custom_item: false,
+          labor_type_id: laborType.id, // Link to labor type
+          is_internal_labor: laborType.isInternalLabor, // Track internal/external
+          item_name: laborType.name,
+          manufacturer: undefined,
+          manufacturer_part_number: undefined,
+          item_type: 'labor',
+          labor_subtype: laborType.laborSubtype,
+          quantity,
+          unit_cost: convertedPrices.unitCostNIS,
+          total_cost: totalPriceILS,
+          unit_price: convertedPrices.unitCostNIS,
+          total_price: totalPriceILS,
+          margin_percentage: markupPercent,
+          notes: laborType.description,
+          sort_order: itemOrder,
+          original_currency: 'NIS',
+          original_cost: ratePerDay,
+        });
+
+        if (!dbItem) {
+          throw new Error('Failed to create labor item in database');
+        }
+
+        // Create local item
+        const newItem: QuotationItem = {
+          id: dbItem.id,
+          systemId: selectedSystemId,
+          systemOrder: system.order,
+          itemOrder,
+          displayNumber: `${system.order}.${itemOrder}`,
+          componentId: undefined,
+          isCustomItem: false,
+          laborTypeId: laborType.id,
+          isInternalLabor: laborType.isInternalLabor,
+          componentName: laborType.name,
+          componentCategory: 'עבודה',
+          itemType: 'labor',
+          laborSubtype: laborType.laborSubtype,
+          quantity,
+          unitPriceUSD: convertedPrices.unitCostUSD,
+          unitPriceILS: convertedPrices.unitCostNIS,
+          unitPriceEUR: convertedPrices.unitCostEUR,
+          totalPriceUSD,
+          totalPriceILS,
+          originalCurrency: 'NIS',
+          originalCost: ratePerDay,
+          itemMarkupPercent: markupPercent,
+          customerPriceILS,
+          notes: laborType.description,
+          createdAt: dbItem.created_at,
+          updatedAt: dbItem.updated_at,
+        };
+
+        // Renumber items
+        const updatedItems = [...currentQuotation.items, newItem];
+        const renumberedItems = renumberItems(updatedItems);
+
+        const updatedQuotation = {
+          ...currentQuotation,
+          items: renumberedItems,
+        };
+
+        setCurrentQuotation(updatedQuotation);
+        updateQuotation(currentQuotation.id, { items: renumberedItems });
+        logger.info('Successfully added labor type to quotation');
+        // Don't close dialog - allows adding multiple labor types
+      } catch (error) {
+        logger.error('Failed to add labor type:', error);
+        alert(
+          `שגיאה בהוספת עבודה: ${error instanceof Error ? error.message : 'Unknown error'}`
+        );
+      }
+    },
+    [
+      currentQuotation,
+      selectedSystemId,
+      setCurrentQuotation,
+      updateQuotation,
+      quotationsHook,
+    ]
+  );
+
   // Delete item
   const deleteItem = useCallback(
     async (itemId: string) => {
@@ -528,6 +670,10 @@ export function useQuotationActions({
         parameters.usdToIlsRate !== currentQuotation.parameters.usdToIlsRate ||
         parameters.eurToIlsRate !== currentQuotation.parameters.eurToIlsRate;
 
+      // Check if dayWorkCost changed (for internal labor recalculation)
+      const dayWorkCostChanged =
+        parameters.dayWorkCost !== currentQuotation.parameters.dayWorkCost;
+
       // If rates changed, recalculate all item prices
       let updatedItems = currentQuotation.items;
       if (ratesChanged) {
@@ -585,6 +731,41 @@ export function useQuotationActions({
         });
       }
 
+      // If dayWorkCost changed, recalculate ONLY internal labor items
+      if (dayWorkCostChanged) {
+        logger.debug('💼 dayWorkCost changed, recalculating internal labor:', {
+          oldCost: currentQuotation.parameters.dayWorkCost,
+          newCost: parameters.dayWorkCost,
+        });
+
+        updatedItems = updatedItems.map(item => {
+          // Only recalculate internal labor items
+          if (item.itemType === 'labor' && item.isInternalLabor) {
+            const newUnitPriceILS = parameters.dayWorkCost;
+            const newUnitPriceUSD = newUnitPriceILS / parameters.usdToIlsRate;
+            const newUnitPriceEUR = newUnitPriceILS / parameters.eurToIlsRate;
+
+            logger.debug(`  💼 ${item.componentName}:`, {
+              oldPrice: item.unitPriceILS,
+              newPrice: newUnitPriceILS,
+              quantity: item.quantity,
+            });
+
+            return {
+              ...item,
+              unitPriceILS: newUnitPriceILS,
+              unitPriceUSD: newUnitPriceUSD,
+              unitPriceEUR: newUnitPriceEUR,
+              totalPriceILS: newUnitPriceILS * item.quantity,
+              totalPriceUSD: newUnitPriceUSD * item.quantity,
+              originalCost: newUnitPriceILS,
+            };
+          }
+          // External labor and hardware items remain unchanged
+          return item;
+        });
+      }
+
       const updatedQuotation = {
         ...currentQuotation,
         parameters,
@@ -599,6 +780,7 @@ export function useQuotationActions({
         eur_to_ils_rate: parameters.eurToIlsRate,
         margin_percentage: parameters.markupPercent,
         risk_percentage: parameters.riskPercent,
+        day_work_cost: parameters.dayWorkCost, // ✅ Save dayWorkCost to database
         use_msrp_pricing: parameters.useMsrpPricing || false, // Save MSRP toggle state
       };
 
@@ -676,6 +858,7 @@ export function useQuotationActions({
     addSystem,
     addComponentToSystem,
     addAssemblyToSystem,
+    addLaborTypeToSystem,
     addCustomItemToSystem,
     deleteItem,
     updateItem,

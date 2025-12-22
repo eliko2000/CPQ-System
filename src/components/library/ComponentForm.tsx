@@ -335,7 +335,6 @@ export function ComponentForm({
                   >
                     <option value="hardware">חומרה (Hardware)</option>
                     <option value="software">תוכנה (Software)</option>
-                    <option value="labor">עבודה (Labor)</option>
                   </select>
                   {formData.name &&
                     (() => {
@@ -355,9 +354,7 @@ export function ComponentForm({
                               הצעה:{' '}
                               {suggestion.componentType === 'hardware'
                                 ? 'חומרה'
-                                : suggestion.componentType === 'software'
-                                  ? 'תוכנה'
-                                  : 'עבודה'}{' '}
+                                : 'תוכנה'}{' '}
                               ({(suggestion.confidence * 100).toFixed(0)}%
                               ביטחון)
                             </span>

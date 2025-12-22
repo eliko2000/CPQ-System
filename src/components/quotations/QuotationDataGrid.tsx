@@ -516,11 +516,13 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
 
         if (projectError) throw projectError;
 
-        // Load pricing settings from Supabase/cache
+        // Load pricing settings from Supabase/cache with team scope
         const { loadDefaultQuotationParameters } = await import(
           '../../utils/quotationCalculations'
         );
-        const defaultParams = await loadDefaultQuotationParameters();
+        const defaultParams = await loadDefaultQuotationParameters(
+          currentTeam?.id
+        );
 
         // Generate quotation number (optional feature)
         if (!currentTeam) throw new Error('No active team');
@@ -556,7 +558,10 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
           project_id: projectId,
           currency: 'ILS',
           exchange_rate: defaultParams.usdToIlsRate,
+          eur_to_ils_rate: defaultParams.eurToIlsRate,
           margin_percentage: defaultParams.markupPercent,
+          day_work_cost: defaultParams.dayWorkCost,
+          risk_percentage: defaultParams.riskPercent,
           status: 'draft',
           total_cost: 0,
           total_price: 0,

@@ -5,6 +5,7 @@ import { Button } from '../ui/button';
 import { Settings, ChevronDown } from 'lucide-react';
 import { useClickOutside } from '../../hooks/useClickOutside';
 import { useTableConfig } from '../../hooks/useTableConfig';
+import { logger } from '@/lib/logger';
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
 
@@ -316,7 +317,20 @@ export function QuotationItemsGrid({
 
           {/* Add System Button */}
           <Button
-            onClick={onAddSystem}
+            onClick={e => {
+              e.stopPropagation();
+              logger.debug('🟢 Add System button clicked', {
+                onAddSystem: typeof onAddSystem,
+              });
+
+              if (typeof onAddSystem !== 'function') {
+                logger.error('❌ onAddSystem is not a function!');
+                alert('שגיאה: הפונקציה להוספת מערכת לא זמינה');
+                return;
+              }
+
+              onAddSystem();
+            }}
             className="bg-green-600 text-white hover:bg-green-700"
           >
             הוסף מערכת
@@ -343,6 +357,7 @@ export function QuotationItemsGrid({
           onSelectionChanged={onSelectionChanged}
           rowSelection="single"
           animateRows={true}
+          singleClickEdit={true}
           enableCellTextSelection={true}
         />
       </div>

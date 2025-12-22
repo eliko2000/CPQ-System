@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { useCPQ } from '../../contexts/CPQContext';
+import { useTeam } from '../../contexts/TeamContext';
 import { useQuotations } from '../../hooks/useQuotations';
 import { useProjects } from '../../hooks/useProjects';
 import { convertDbQuotationToQuotationProject } from '../../lib/utils';
@@ -84,6 +85,7 @@ function AuthenticatedApp() {
     viewingProjectId,
     setViewingProjectId,
   } = useCPQ();
+  const { currentTeam } = useTeam();
   const { getQuotation, addQuotation } = useQuotations();
   const { getProject } = useProjects();
   const { handleError } = useErrorHandler();
@@ -108,8 +110,10 @@ function AuthenticatedApp() {
         return;
       }
 
-      // Load default parameters
-      const defaultParams = await loadDefaultQuotationParameters();
+      // Load default parameters with team ID for team-scoped settings
+      const defaultParams = await loadDefaultQuotationParameters(
+        currentTeam?.id
+      );
 
       // Use the hook's addQuotation function (includes team_id automatically)
       const newQuotation = await addQuotation({
@@ -119,7 +123,10 @@ function AuthenticatedApp() {
         project_id: projectId,
         currency: 'ILS',
         exchange_rate: defaultParams.usdToIlsRate,
+        eur_to_ils_rate: defaultParams.eurToIlsRate,
         margin_percentage: defaultParams.markupPercent,
+        day_work_cost: defaultParams.dayWorkCost, // ✅ Save global dayWorkCost to database
+        risk_percentage: defaultParams.riskPercent,
         status: 'draft',
         total_cost: 0,
         total_price: 0,

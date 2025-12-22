@@ -417,8 +417,11 @@ export function getDefaultQuotationParameters(): QuotationParameters {
 /**
  * Load default quotation parameters from Supabase (async)
  * Use this when initializing the app or creating new quotations
+ * @param teamId - Optional team ID for team-scoped settings
  */
-export async function loadDefaultQuotationParameters(): Promise<QuotationParameters> {
+export async function loadDefaultQuotationParameters(
+  teamId?: string
+): Promise<QuotationParameters> {
   try {
     const { loadSetting } = await import('../services/settingsService');
     const result = await loadSetting<{
@@ -429,7 +432,7 @@ export async function loadDefaultQuotationParameters(): Promise<QuotationParamet
       dayWorkCost: number;
       vatRate: number;
       deliveryTime: string;
-    }>('pricing');
+    }>('pricing', teamId); // ✅ Pass teamId to loadSetting
 
     if (result.success && result.data) {
       const pricing = result.data;

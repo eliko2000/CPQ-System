@@ -105,6 +105,7 @@ export function useComponents() {
         `
           )
           .eq('team_id', currentTeam.id)
+          .neq('component_type', 'labor') // Exclude labor components (managed separately)
           .order('name');
 
         // OPTIMIZATION: Support pagination for large datasets

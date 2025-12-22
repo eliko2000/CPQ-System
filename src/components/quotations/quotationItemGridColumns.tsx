@@ -53,6 +53,208 @@ export const USDCurrencyRenderer = memo((props: ICellRendererParams) => {
 });
 USDCurrencyRenderer.displayName = 'USDCurrencyRenderer';
 
+// Actions cell renderer - NOT memoized to ensure fresh event handlers
+export const ActionsCellRenderer = (
+  props: ICellRendererParams & {
+    openComponentSelector: (systemId: string) => void;
+    deleteItem: (itemId: string) => Promise<void>;
+    components: Component[];
+    assemblies: Assembly[];
+    setModal: (modal: any) => void;
+    currentQuotation: QuotationProject | null;
+    quotationsHook: any;
+    setCurrentQuotation: (quotation: QuotationProject | null) => void;
+    updateQuotation: (id: string, updates: any) => void;
+  }
+) => {
+  // DEBUG: Log what props we receive
+  logger.debug('🎨 ActionsCellRenderer received props:', {
+    hasOpenComponentSelector: typeof props.openComponentSelector,
+    hasDeleteItem: typeof props.deleteItem,
+    hasComponents: !!props.components,
+    hasSetModal: typeof props.setModal,
+    allPropKeys: Object.keys(props),
+  });
+
+  const {
+    data,
+    openComponentSelector,
+    deleteItem,
+    components,
+    setModal,
+    currentQuotation,
+    quotationsHook,
+    setCurrentQuotation,
+    updateQuotation,
+  } = props;
+
+  if (data?.isSystemGroup) {
+    return (
+      <div
+        className="flex gap-1 items-center justify-end"
+        style={{ direction: 'ltr' }}
+      >
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={async e => {
+            e.stopPropagation();
+            logger.debug('🗑️ Delete system button clicked', {
+              systemId: data.systemId,
+            });
+
+            if (!currentQuotation) {
+              logger.error('❌ currentQuotation is null');
+              return;
+            }
+
+            const systemId = data.systemId;
+
+            try {
+              const itemsToDelete = currentQuotation.items.filter(
+                item => item.systemId === systemId
+              );
+              for (const item of itemsToDelete) {
+                await quotationsHook.deleteQuotationItem(item.id);
+              }
+
+              await quotationsHook.deleteQuotationSystem(systemId);
+
+              const { renumberItems } = await import(
+                '../../utils/quotationCalculations'
+              );
+              const updatedSystems = currentQuotation.systems
+                .filter(s => s.id !== systemId)
+                .map((s, index) => ({
+                  ...s,
+                  order: index + 1,
+                }));
+
+              for (const system of updatedSystems) {
+                await quotationsHook.updateQuotationSystem(system.id, {
+                  sort_order: system.order,
+                });
+              }
+
+              const updatedItems = currentQuotation.items.filter(
+                item => item.systemId !== systemId
+              );
+
+              const renumberedItems = renumberItems(
+                updatedItems,
+                updatedSystems
+              );
+
+              for (const item of renumberedItems) {
+                await quotationsHook.updateQuotationItem(item.id, {
+                  sort_order: item.itemOrder,
+                });
+              }
+
+              const updatedQuotation = {
+                ...currentQuotation,
+                systems: updatedSystems,
+                items: renumberedItems,
+              };
+
+              setCurrentQuotation(updatedQuotation);
+              updateQuotation(currentQuotation.id, {
+                systems: updatedSystems,
+                items: renumberedItems,
+              });
+            } catch (error) {
+              logger.error('Failed to delete system:', error);
+              alert('שגיאה במחיקת מערכת. נסה שוב.');
+            }
+          }}
+          className="h-8 w-8 p-0 text-red-600 hover:text-red-800"
+          title="מחק מערכת"
+        >
+          <Trash2 className="h-3 w-3" />
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={e => {
+            e.stopPropagation();
+            logger.debug('➕ Add item button clicked', {
+              systemId: data.systemId,
+            });
+            openComponentSelector(data.systemId);
+          }}
+          className="h-8 w-8 p-0"
+          title="הוסף פריט"
+        >
+          <Plus className="h-3 w-3" />
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="flex gap-1 items-center justify-end"
+      style={{ direction: 'ltr' }}
+    >
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={e => {
+          e.stopPropagation();
+          logger.debug('✏️ Edit item button clicked', {
+            itemId: data.id,
+            itemName: data.componentName,
+          });
+
+          const isCustomItem = data.isCustomItem;
+          const isLaborItem = data.itemType === 'labor';
+
+          if (isCustomItem || isLaborItem) {
+            const rowIndex = props.node.rowIndex;
+            if (rowIndex !== null && rowIndex !== undefined) {
+              props.api.startEditingCell({
+                rowIndex,
+                colKey: 'componentName',
+              });
+            }
+          } else {
+            const component = components.find(
+              comp => comp.name === data.componentName
+            );
+            if (component) {
+              setModal({ type: 'edit-component', data: component });
+            }
+          }
+        }}
+        className="h-8 w-8 p-0"
+        title={
+          data.isCustomItem || data.itemType === 'labor'
+            ? 'ערוך שם פריט'
+            : 'ערוך פריט'
+        }
+      >
+        <Edit className="h-3 w-3" />
+      </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={async e => {
+          e.stopPropagation();
+          logger.debug('🗑️ Delete item button clicked', {
+            itemId: data.id,
+            itemName: data.componentName,
+          });
+          await deleteItem(data.id);
+        }}
+        className="h-8 w-8 p-0 text-red-600 hover:text-red-800"
+        title="מחק"
+      >
+        <Trash2 className="h-3 w-3" />
+      </Button>
+    </div>
+  );
+};
+
 // Simple text editor for system names
 export class SystemNameEditor {
   private eInput!: HTMLInputElement;
@@ -406,7 +608,9 @@ export const createQuotationItemColumnDefs = (
       width: 300,
       resizable: true,
       editable: (editParams: any) =>
-        editParams.data?.isSystemGroup || editParams.data?.isCustomItem, // ✅ Systems and custom items editable
+        editParams.data?.isSystemGroup ||
+        editParams.data?.isCustomItem ||
+        editParams.data?.itemType === 'labor', // ✅ Labor items also editable
       cellEditor: SystemNameEditor, // ✅ Direct class assignment
       cellClass: cellParams =>
         cellParams.data?.isSystemGroup
@@ -765,154 +969,17 @@ export const createQuotationItemColumnDefs = (
         cellParams.data?.isSystemGroup
           ? 'ag-cell-bold text-right'
           : 'text-right',
-      cellRenderer: (cellParams: ICellRendererParams) => {
-        if (cellParams.data?.isSystemGroup) {
-          return (
-            <div
-              className="flex gap-1 items-center justify-end"
-              style={{ direction: 'ltr' }}
-            >
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={async () => {
-                  // Delete system and all its items
-                  if (!currentQuotation) return;
-
-                  const systemId = cellParams.data.systemId;
-
-                  // Delete from Supabase first
-                  try {
-                    // Delete all items in this system
-                    const itemsToDelete = currentQuotation.items.filter(
-                      item => item.systemId === systemId
-                    );
-                    for (const item of itemsToDelete) {
-                      await quotationsHook.deleteQuotationItem(item.id);
-                    }
-
-                    // Delete the system itself
-                    await quotationsHook.deleteQuotationSystem(systemId);
-
-                    // Remove from local state and renumber
-                    const { renumberItems } = await import(
-                      '../../utils/quotationCalculations'
-                    );
-                    const updatedSystems = currentQuotation.systems
-                      .filter(s => s.id !== systemId)
-                      .map((s, index) => ({
-                        ...s,
-                        order: index + 1,
-                      }));
-
-                    // CRITICAL: Update sort_order in database for all remaining systems
-                    // This ensures numbering persists after page reload
-                    for (const system of updatedSystems) {
-                      await quotationsHook.updateQuotationSystem(system.id, {
-                        sort_order: system.order,
-                      });
-                    }
-
-                    const updatedItems = currentQuotation.items.filter(
-                      item => item.systemId !== systemId
-                    );
-
-                    // Renumber all items with new system orders
-                    const renumberedItems = renumberItems(
-                      updatedItems,
-                      updatedSystems
-                    );
-
-                    // CRITICAL: Update item sort_order in database to match new system numbering
-                    // Group items by system and update their sort_order in the database
-                    for (const item of renumberedItems) {
-                      await quotationsHook.updateQuotationItem(item.id, {
-                        sort_order: item.itemOrder,
-                      });
-                    }
-
-                    const updatedQuotation = {
-                      ...currentQuotation,
-                      systems: updatedSystems,
-                      items: renumberedItems,
-                    };
-
-                    setCurrentQuotation(updatedQuotation);
-                    updateQuotation(currentQuotation.id, {
-                      systems: updatedSystems,
-                      items: renumberedItems,
-                    });
-                  } catch (error) {
-                    logger.error('Failed to delete system:', error);
-                    alert('שגיאה במחיקת מערכת. נסה שוב.');
-                  }
-                }}
-                className="h-8 w-8 p-0 text-red-600 hover:text-red-800"
-                title="מחק מערכת"
-              >
-                <Trash2 className="h-3 w-3" />
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => openComponentSelector(cellParams.data.systemId)}
-                className="h-8 w-8 p-0"
-                title="הוסף פריט"
-              >
-                <Plus className="h-3 w-3" />
-              </Button>
-            </div>
-          );
-        }
-
-        return (
-          <div
-            className="flex gap-1 items-center justify-end"
-            style={{ direction: 'ltr' }}
-          >
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                const isCustomItem = cellParams.data.isCustomItem;
-
-                if (isCustomItem) {
-                  // For custom items: Start editing the name cell
-                  const rowIndex = cellParams.node.rowIndex;
-                  if (rowIndex !== null && rowIndex !== undefined) {
-                    cellParams.api.startEditingCell({
-                      rowIndex,
-                      colKey: 'componentName',
-                    });
-                  }
-                } else {
-                  // For library items: Open component form modal
-                  const component = components.find(
-                    comp => comp.name === cellParams.data.componentName
-                  );
-                  if (component) {
-                    setModal({ type: 'edit-component', data: component });
-                  }
-                }
-              }}
-              className="h-8 w-8 p-0"
-              title={
-                cellParams.data.isCustomItem ? 'ערוך שם פריט' : 'ערוך פריט'
-              }
-            >
-              <Edit className="h-3 w-3" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => deleteItem(cellParams.data.id)}
-              className="h-8 w-8 p-0 text-red-600 hover:text-red-800"
-              title="מחק"
-            >
-              <Trash2 className="h-3 w-3" />
-            </Button>
-          </div>
-        );
+      cellRenderer: ActionsCellRenderer,
+      cellRendererParams: {
+        openComponentSelector,
+        deleteItem,
+        components,
+        assemblies,
+        setModal,
+        currentQuotation,
+        quotationsHook,
+        setCurrentQuotation,
+        updateQuotation,
       },
     },
   ];

@@ -114,40 +114,21 @@ export default defineConfig(({ mode }) => {
       cssCodeSplit: true, // Split CSS into separate files per chunk
       minify: 'esbuild', // Fast minification with esbuild
 
+      // Ensure proper module resolution order
+      commonjsOptions: {
+        include: [/node_modules/],
+        transformMixedEsModules: true,
+      },
+
       rollupOptions: {
         output: {
+          // Simplified chunking: Only split truly massive libraries
+          // Let Vite automatically handle vendor chunking for React ecosystem
           manualChunks: id => {
-            // Core React vendors - must load first
-            // CRITICAL: Include use-sync-external-store with React to prevent undefined errors
-            if (id.includes('node_modules/react/')) {
-              return 'react-vendor';
-            }
-            if (id.includes('node_modules/react-dom/')) {
-              return 'react-vendor';
-            }
-            if (id.includes('node_modules/scheduler/')) {
-              return 'react-vendor';
-            }
-            if (id.includes('node_modules/use-sync-external-store/')) {
-              return 'react-vendor';
-            }
+            // Only chunk the absolute largest libraries that don't use React
+            // This prevents chunk loading order issues
 
-            // AG Grid (large library)
-            if (id.includes('ag-grid')) {
-              return 'agGrid';
-            }
-
-            // Supabase client
-            if (id.includes('@supabase/supabase-js')) {
-              return 'supabase';
-            }
-
-            // Radix UI components
-            if (id.includes('@radix-ui')) {
-              return 'radix';
-            }
-
-            // PDF and Excel parsing libraries
+            // PDF and Excel parsing libraries (1.3MB+ combined)
             if (
               id.includes('xlsx') ||
               id.includes('exceljs') ||
@@ -157,24 +138,13 @@ export default defineConfig(({ mode }) => {
               return 'parsers';
             }
 
-            // Charts and analytics
-            if (id.includes('recharts') || id.includes('d3')) {
-              return 'charts';
+            // AG Grid (896KB - independent of React hooks)
+            if (id.includes('ag-grid')) {
+              return 'agGrid';
             }
 
-            // Route-based splitting for heavy components
-            if (id.includes('/components/analytics/')) {
-              return 'route-analytics';
-            }
-            if (id.includes('/components/quotations/QuotationEditor')) {
-              return 'route-quotation-editor';
-            }
-            if (id.includes('/components/library/')) {
-              return 'route-library';
-            }
-            if (id.includes('/components/projects/')) {
-              return 'route-projects';
-            }
+            // Let Vite automatically chunk everything else
+            // This ensures proper dependency resolution and loading order
           },
         },
       },

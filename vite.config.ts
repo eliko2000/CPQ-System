@@ -36,6 +36,10 @@ export default defineConfig(({ mode }) => {
     define: {
       // Environment variables will be loaded from .env.local
     },
+    optimizeDeps: {
+      include: ['react', 'react-dom', 'react/jsx-runtime'],
+      exclude: [],
+    },
     test: {
       globals: true,
       environment: 'happy-dom',
@@ -111,12 +115,15 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         output: {
           manualChunks: id => {
-            // Core React vendors
-            if (
-              id.includes('node_modules/react') ||
-              id.includes('node_modules/react-dom')
-            ) {
-              return 'vendor';
+            // Core React vendors - must load first
+            if (id.includes('node_modules/react/')) {
+              return 'react-vendor';
+            }
+            if (id.includes('node_modules/react-dom/')) {
+              return 'react-vendor';
+            }
+            if (id.includes('node_modules/scheduler/')) {
+              return 'react-vendor';
             }
 
             // AG Grid (large library)

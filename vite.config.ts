@@ -2,27 +2,14 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import { fileURLToPath, URL } from 'node:url';
-import viteCompression from 'vite-plugin-compression';
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   return {
     plugins: [
       react(),
-      // Gzip compression for production builds
-      viteCompression({
-        algorithm: 'gzip',
-        ext: '.gz',
-        threshold: 10240, // Only compress files larger than 10KB
-        deleteOriginFile: false,
-      }),
-      // Brotli compression for modern browsers
-      viteCompression({
-        algorithm: 'brotliCompress',
-        ext: '.br',
-        threshold: 10240,
-        deleteOriginFile: false,
-      }),
+      // Note: Compression is handled automatically by Cloudflare Pages edge network
+      // No need for vite-plugin-compression
     ],
     server: {
       port: 3001, // Different from Kurate's port 3000

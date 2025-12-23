@@ -118,6 +118,7 @@ export default defineConfig(({ mode }) => {
         output: {
           manualChunks: id => {
             // Core React vendors - must load first
+            // CRITICAL: Include use-sync-external-store with React to prevent undefined errors
             if (id.includes('node_modules/react/')) {
               return 'react-vendor';
             }
@@ -125,6 +126,9 @@ export default defineConfig(({ mode }) => {
               return 'react-vendor';
             }
             if (id.includes('node_modules/scheduler/')) {
+              return 'react-vendor';
+            }
+            if (id.includes('node_modules/use-sync-external-store/')) {
               return 'react-vendor';
             }
 

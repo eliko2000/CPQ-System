@@ -214,13 +214,7 @@ export interface DbQuotationItem {
   manufacturer?: string;
   manufacturer_part_number?: string;
   item_type: 'hardware' | 'software' | 'labor';
-  labor_subtype?:
-    | 'engineering'
-    | 'integration'
-    | 'development'
-    | 'testing'
-    | 'commissioning'
-    | 'support_and_training';
+  labor_subtype?: LaborSubtype;
   quantity: number;
   unit_cost?: number;
   total_cost?: number;

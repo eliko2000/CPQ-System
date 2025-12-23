@@ -847,7 +847,7 @@ export function EnhancedComponentGrid({
     [config.filterState]
   );
 
-  const onFirstDataRendered = useCallback((params: any) => {
+  const onFirstDataRendered = useCallback((__params: any) => {
     // DON'T call sizeColumnsToFit - let AG Grid use the default column widths
     console.log(
       '[EnhancedComponentGrid] onFirstDataRendered - using default/saved column widths'

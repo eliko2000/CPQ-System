@@ -417,8 +417,12 @@ export function ComponentForm({
                         ) {
                           const hebrewLabels: Record<LaborSubtype, string> = {
                             engineering: 'פיתוח והנדסה',
+                            integration: 'אינטגרציה',
+                            development: 'פיתוח',
+                            testing: 'בדיקות',
                             programming: 'תכנות',
                             commissioning: 'הזמנה והפעלה',
+                            support_and_training: 'תמיכה והדרכה',
                             installation: 'התקנה',
                           };
                           return (

@@ -12,7 +12,7 @@ import {
 } from '../ui/dropdown-menu';
 import { Button } from '../ui/button';
 import { ChevronsUpDown, Check, Plus, Users } from 'lucide-react';
-import { cn } from '../../lib/utils';
+import { cn as __cn } from '../../lib/utils';
 
 export function TeamSwitcher({ collapsed = false }: { collapsed?: boolean }) {
   const { teams, currentTeam, switchTeam } = useTeam();

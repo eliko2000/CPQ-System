@@ -106,6 +106,57 @@ const LABOR_KEYWORDS: Record<LaborSubtype, string[]> = {
     'software',
     'development',
   ],
+  integration: [
+    // Hebrew
+    'אינטגרציה',
+    'שילוב',
+    'חיבור',
+    'הטמעה',
+    // English
+    'integration',
+    'integrate',
+    'interfacing',
+    'connecting',
+  ],
+  development: [
+    // Hebrew
+    'פיתוח',
+    'תוכנה',
+    'מערכת',
+    // English
+    'development',
+    'developing',
+    'dev',
+    'application',
+  ],
+  testing: [
+    // Hebrew
+    'בדיקות',
+    'בדיקה',
+    'טסטים',
+    'איכות',
+    // English
+    'testing',
+    'test',
+    'qa',
+    'quality',
+    'validation',
+  ],
+  support_and_training: [
+    // Hebrew
+    'תמיכה',
+    'הדרכה',
+    'אימון',
+    'שירות',
+    'סיוע',
+    // English
+    'support',
+    'training',
+    'maintenance',
+    'service',
+    'assistance',
+    'help',
+  ],
 };
 
 /**
@@ -124,7 +175,11 @@ export function classifyLaborSubtype(
   // Track matches for each subtype
   const matches: Record<LaborSubtype, { count: number; keywords: string[] }> = {
     engineering: { count: 0, keywords: [] },
+    integration: { count: 0, keywords: [] },
+    development: { count: 0, keywords: [] },
+    testing: { count: 0, keywords: [] },
     commissioning: { count: 0, keywords: [] },
+    support_and_training: { count: 0, keywords: [] },
     installation: { count: 0, keywords: [] },
     programming: { count: 0, keywords: [] },
   };

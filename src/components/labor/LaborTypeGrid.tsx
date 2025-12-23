@@ -38,16 +38,16 @@ export function LaborTypeGrid({
       'description',
     ],
     columnWidths: {},
-    visibleColumns: {
-      actions: true,
-      name: true,
-      category: true,
-      laborSubtype: true,
-      type: true,
-      rate: true,
-      defaultDays: true,
-      description: true,
-    },
+    visibleColumns: [
+      'actions',
+      'name',
+      'category',
+      'laborSubtype',
+      'type',
+      'rate',
+      'defaultDays',
+      'description',
+    ],
     filterState: {},
   });
 
@@ -256,7 +256,9 @@ export function LaborTypeGrid({
         headerName: 'פעולות',
         field: 'actions',
         width: 120,
-        pinned: preferences?.gridDirection === 'rtl' ? 'right' : 'left',
+        pinned: (preferences?.gridDirection === 'rtl' ? 'right' : 'left') as
+          | 'right'
+          | 'left',
         lockPosition: true,
         cellRenderer: ActionsCellRenderer,
         suppressMovable: true,

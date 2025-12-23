@@ -9,10 +9,13 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
-import { useComponents } from '../hooks/useComponents';
-import { useQuotations } from '../hooks/useQuotations';
-import { useTeam } from '../contexts/TeamContext';
+import {
+  renderHook as __renderHook,
+  waitFor as __waitFor,
+} from '@testing-library/react';
+import { useComponents as __useComponents } from '../hooks/useComponents';
+import { useQuotations as __useQuotations } from '../hooks/useQuotations';
+import { useTeam as __useTeam } from '../contexts/TeamContext';
 import { supabase } from '../supabaseClient';
 
 // Mock team context

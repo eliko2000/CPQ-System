@@ -38,7 +38,9 @@
       "Bash(powershell -Command:*)",
       "SlashCommand(/migrate add-use-msrp-pricing-to-quotations.sql)",
       "SlashCommand(/migrate:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "mcp__context7__resolve-library-id",
+      "mcp__context7__get-library-docs"
     ],
     "deny": [],
     "ask": []

@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useTeam } from '../../contexts/TeamContext';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
-import { Label } from '../ui/label';
+import { Label as __Label } from '../ui/label';
 import {
   Dialog,
   DialogContent,
@@ -62,8 +62,6 @@ export function JoinTeamDialog({
       // If RLS is strict, this query will return empty.
       // We might need a "public_teams" view or function.
       // For now, let's assume we can search by domain if it matches user's email domain
-
-      const userEmailDomain = user?.email?.split('@')[1];
 
       let query = supabase.from('teams').select('*').is('deleted_at', null);
 

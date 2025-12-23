@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Card, CardContent } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -225,11 +225,11 @@ export function LaborTypesPage() {
         isOpen={deleteConfirm.isOpen}
         title="אישור מחיקה"
         message={`האם אתה בטוח שברצונך למחוק את סוג העבודה "${deleteConfirm.laborTypeName}"?`}
-        confirmLabel="מחק"
-        cancelLabel="ביטול"
+        confirmText="מחק"
+        cancelText="ביטול"
         onConfirm={confirmDelete}
         onCancel={cancelDelete}
-        variant="danger"
+        type="danger"
       />
     </div>
   );

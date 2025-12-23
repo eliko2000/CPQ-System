@@ -6,7 +6,7 @@ import {
   Check,
   Users,
   Plus,
-  ChevronLeft,
+  ChevronLeft as __ChevronLeft,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';

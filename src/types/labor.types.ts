@@ -23,13 +23,7 @@ export interface DbLaborType {
   id: string;
   team_id: string;
   name: string;
-  labor_subtype:
-    | 'engineering'
-    | 'integration'
-    | 'development'
-    | 'testing'
-    | 'commissioning'
-    | 'support_and_training';
+  labor_subtype: LaborSubtype;
 
   // ⭐ Internal vs External Labor
   is_internal_labor: boolean;

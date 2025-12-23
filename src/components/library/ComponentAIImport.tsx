@@ -35,7 +35,7 @@ export const ComponentAIImport: React.FC<ComponentAIImportProps> = ({
 
   const handleExtractionComplete = (
     result: AIExtractionResult,
-    file: File,
+    __file: File,
     options: MSRPImportOptions
   ) => {
     setExtractionResult(result);

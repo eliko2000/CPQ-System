@@ -9,6 +9,7 @@ interface AppearancePreferences {
   showTooltips: boolean;
   autoSave: boolean;
   confirmActions: boolean;
+  gridDirection?: 'ltr' | 'rtl';
 }
 
 const DEFAULT_PREFERENCES: AppearancePreferences = {

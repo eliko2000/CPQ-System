@@ -34,9 +34,9 @@ export function UserProfilePage() {
     setSaving(true);
 
     try {
-      const { error } = await updateProfile({ full_name: fullName });
+      const result = await updateProfile({ full_name: fullName });
 
-      if (error) throw error;
+      if (result?.error) throw result.error;
 
       toast.success('Profile updated successfully');
     } catch (error: any) {
@@ -47,7 +47,7 @@ export function UserProfilePage() {
     }
   };
 
-  const handleAvatarUpload = (url: string) => {
+  const handleAvatarUpload = (__url: string) => {
     // The component handles the upload and profile update
     // We just need to refresh the local state if needed,
     // but useUser subscribes to changes via re-fetching or local state update

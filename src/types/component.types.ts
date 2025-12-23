@@ -37,11 +37,7 @@ export interface DbComponent {
   manufacturer_part_number?: string;
   category?: string;
   component_type: 'hardware' | 'software' | 'labor';
-  labor_subtype?:
-    | 'engineering'
-    | 'commissioning'
-    | 'installation'
-    | 'programming';
+  labor_subtype?: LaborSubtype;
   description?: string;
   unit_cost_usd?: number;
   unit_cost_ils?: number;

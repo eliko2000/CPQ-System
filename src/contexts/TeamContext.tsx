@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { useAuth } from './AuthContext';
-import { Team, TeamMember } from '../types/auth.types';
+import { Team, TeamMember as __TeamMember } from '../types/auth.types';
 import { toast } from 'sonner';
 
 interface TeamContextType {

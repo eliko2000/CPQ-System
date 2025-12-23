@@ -428,7 +428,7 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
     [config.filterState]
   );
 
-  const onFirstDataRendered = useCallback((params: any) => {
+  const onFirstDataRendered = useCallback((__params: any) => {
     // DON'T call sizeColumnsToFit - let AG Grid use the saved column widths from columnDefs
   }, []);
 

@@ -8,7 +8,9 @@ export type LaborSubtype =
   | 'development'
   | 'testing'
   | 'commissioning'
-  | 'support_and_training';
+  | 'support_and_training'
+  | 'installation'
+  | 'programming';
 
 // ============ Currency Types ============
 export type Currency = 'NIS' | 'USD' | 'EUR';

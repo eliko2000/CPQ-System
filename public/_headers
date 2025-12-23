@@ -47,8 +47,10 @@
 /manifest.json
   Cache-Control: public, max-age=86400
 
-# Compression
-# Prefer Brotli, then Gzip
+# Disable Cloudflare automatic compression (files already optimized by Vite)
+# no-transform prevents Cloudflare from compressing/modifying content
 /*
-  Content-Encoding: br, gzip
-  Vary: Accept-Encoding
+  Cache-Control: public, no-transform
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  X-XSS-Protection: 1; mode=block

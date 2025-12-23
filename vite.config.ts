@@ -32,6 +32,8 @@ export default defineConfig(({ mode }) => {
         '@types': path.resolve(__dirname, './src/types'),
         '@lib': path.resolve(__dirname, './src/lib'),
       },
+      // Force all packages to use the same React instance (fixes duplicate React error)
+      dedupe: ['react', 'react-dom', 'use-sync-external-store'],
     },
     define: {
       // Environment variables will be loaded from .env.local

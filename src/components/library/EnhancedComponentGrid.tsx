@@ -124,6 +124,13 @@ export function EnhancedComponentGrid({
     getRowId: component => component.id,
   });
 
+  // Force refresh row styles when selection changes
+  useEffect(() => {
+    if (gridRef.current?.api) {
+      gridRef.current.api.redrawRows();
+    }
+  }, [selection.selectedIds]);
+
   // Close column manager when clicking outside
   const columnManagerRef = useClickOutside<HTMLDivElement>(() => {
     setShowColumnManager(false);
@@ -1231,6 +1238,20 @@ export function EnhancedComponentGrid({
             box-shadow: none !important;
             border: none !important;
             ring: 0 !important;
+          }
+
+          /* Remove blue border from AG Grid cell focus */
+          .cpq-selection-grid .ag-cell[col-id="selection"]:focus,
+          .cpq-selection-grid .ag-cell[col-id="selection"].ag-cell-focus,
+          .cpq-selection-grid .ag-cell[col-id="selection"]:focus-within {
+            outline: none !important;
+            border: none !important;
+            box-shadow: none !important;
+          }
+
+          /* Force remove AG Grid's cell focus border */
+          .cpq-selection-grid .ag-cell[col-id="selection"].ag-cell-inline-editing {
+            border: none !important;
           }
         `}</style>
         <AgGridReact

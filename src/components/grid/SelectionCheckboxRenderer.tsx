@@ -39,13 +39,10 @@ export const SelectionCheckboxRenderer = (
       <Checkbox
         checked={checked}
         onCheckedChange={() => {}} // Handled by onClick above
-        className="cursor-pointer checkbox-hover-target focus:outline-none focus:ring-0 focus:ring-offset-0 focus-visible:outline-none focus-visible:ring-0"
+        className="cursor-pointer checkbox-hover-target focus:outline-none focus:ring-0 focus:ring-offset-0 focus-visible:outline-none focus-visible:ring-0 !border !border-zinc-900"
         style={{
           opacity: checked ? 1 : 0,
           transition: 'opacity 0.15s ease',
-          // Force border visibility for unchecked state (AG Grid strips Tailwind classes)
-          border: checked ? undefined : '1px solid hsl(var(--primary))',
-          borderRadius: '0.125rem',
         }}
       />
     </div>

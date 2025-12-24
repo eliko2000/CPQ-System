@@ -522,9 +522,9 @@ export function EnhancedComponentGrid({
         sortable: false,
         filter: false,
         resizable: false,
-        width: 36,
-        maxWidth: 36,
-        minWidth: 36,
+        width: 48,
+        maxWidth: 48,
+        minWidth: 48,
         pinned: 'right' as const, // Pinned to right in RTL = visually left (outside table)
         lockPosition: true,
         lockVisible: true,
@@ -1210,7 +1210,8 @@ export function EnhancedComponentGrid({
           }
 
           /* Show checkbox on row hover - overrides inline style */
-          .cpq-selection-grid .ag-row:hover .checkbox-hover-target {
+          .cpq-selection-grid .ag-row:hover .checkbox-hover-target,
+          .cpq-selection-grid .ag-row-hover .checkbox-hover-target {
             opacity: 1 !important;
           }
 
@@ -1219,17 +1220,15 @@ export function EnhancedComponentGrid({
             background-color: #eff6ff !important;
           }
 
-          /* Remove focus ring from checkbox */
+          /* Remove focus ring from checkbox (but keep border for visibility) */
           .cpq-selection-grid .ag-cell[col-id="selection"] button {
             outline: none !important;
             box-shadow: none !important;
-            border: none !important;
           }
 
           .cpq-selection-grid .ag-cell[col-id="selection"] button:focus {
             outline: none !important;
             box-shadow: none !important;
-            border: none !important;
             ring: 0 !important;
           }
 

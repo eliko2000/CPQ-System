@@ -33,12 +33,8 @@ export const SelectionCheckboxRenderer = (
 
   return (
     <div
-      className="flex items-center justify-center h-full group-hover:opacity-100 transition-opacity"
+      className="flex items-center justify-center h-full"
       onClick={handleClick}
-      style={{
-        // ClickUp style: Hide checkbox unless selected or row hovered
-        opacity: checked ? 1 : 0,
-      }}
     >
       <Checkbox
         checked={checked}

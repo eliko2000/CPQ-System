@@ -515,10 +515,12 @@ export function EnhancedComponentGrid({
         sortable: false,
         filter: false,
         resizable: false,
-        width: 50,
-        pinned: 'right' as const, // Pinned to right in RTL = visually left
+        width: 40,
+        pinned: 'right' as const, // Pinned to right in RTL = visually left (outside table)
         lockPosition: true,
         suppressMenu: true,
+        suppressMovable: true,
+        cellClass: 'selection-checkbox-cell',
         cellRenderer: SelectionCheckboxRenderer,
         cellRendererParams: {
           onSelectionToggle: selection.toggleSelection,
@@ -1177,9 +1179,22 @@ export function EnhancedComponentGrid({
         style={{ height: '600px', width: '100%' }}
       >
         <style>{`
-          /* ClickUp-style hover checkbox - show checkbox cell on row hover */
-          .cpq-selection-grid .ag-row:hover .ag-cell[col-id="selection"] > div {
+          /* ClickUp-style selection checkbox positioning */
+          .cpq-selection-grid .ag-cell[col-id="selection"] {
+            background: transparent !important;
+            border: none !important;
+          }
+
+          /* Show checkbox on row hover - visible checkbox */
+          .cpq-selection-grid .ag-row:hover .selection-checkbox-cell > div,
+          .cpq-selection-grid .ag-row-selected .selection-checkbox-cell > div {
             opacity: 1 !important;
+          }
+
+          /* Hide checkbox by default */
+          .cpq-selection-grid .selection-checkbox-cell > div {
+            opacity: 0;
+            transition: opacity 0.2s ease;
           }
         `}</style>
         <AgGridReact

@@ -111,10 +111,19 @@ export function useGridSelection<T = any>(
           });
           newSelectedData = Array.from(selectedDataMap.values());
         }
-        // Regular Click: Replace selection
+        // Regular Click: Add to selection (ClickUp behavior)
         else {
-          newSelectedIds = [id];
-          newSelectedData = [data];
+          if (prev.includes(id)) {
+            // Clicking already-selected row: deselect it
+            newSelectedIds = prev.filter(selectedId => selectedId !== id);
+            newSelectedData = selectedData.filter(
+              item => getRowId(item) !== id
+            );
+          } else {
+            // Clicking new row: add to selection
+            newSelectedIds = [...prev, id];
+            newSelectedData = [...selectedData, data];
+          }
           lastSelectedIndexRef.current = rowIndex;
         }
 

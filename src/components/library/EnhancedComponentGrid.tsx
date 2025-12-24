@@ -515,12 +515,15 @@ export function EnhancedComponentGrid({
         sortable: false,
         filter: false,
         resizable: false,
-        width: 40,
+        width: 36,
+        maxWidth: 36,
+        minWidth: 36,
         pinned: 'right' as const, // Pinned to right in RTL = visually left (outside table)
         lockPosition: true,
+        lockVisible: true,
         suppressMenu: true,
         suppressMovable: true,
-        cellClass: 'selection-checkbox-cell',
+        suppressNavigable: true,
         cellRenderer: SelectionCheckboxRenderer,
         cellRendererParams: {
           onSelectionToggle: selection.toggleSelection,
@@ -1179,26 +1182,34 @@ export function EnhancedComponentGrid({
         style={{ height: '600px', width: '100%' }}
       >
         <style>{`
-          /* ClickUp-style: Checkbox outside table with border */
+          /* ClickUp-style: Checkbox OUTSIDE table - visual separation */
           .cpq-selection-grid .ag-pinned-right-cols-container {
-            border-left: 1px solid #e5e7eb !important;
-            margin-left: 8px;
+            background: #f8fafc !important;
+            border-left: 2px solid #e2e8f0 !important;
+            margin-left: 12px !important;
+            padding-left: 8px !important;
+          }
+
+          .cpq-selection-grid .ag-pinned-right-header {
+            background: #f8fafc !important;
+            border-left: 2px solid #e2e8f0 !important;
+            margin-left: 12px !important;
           }
 
           .cpq-selection-grid .ag-cell[col-id="selection"] {
-            background: #f9fafb !important;
+            background: #f8fafc !important;
             border: none !important;
-            border-right: 1px solid #e5e7eb !important;
+            padding: 0 !important;
           }
 
-          /* Show checkbox on row hover OR when row has selected class */
-          .cpq-selection-grid .ag-row:hover .selection-checkbox-cell,
-          .cpq-selection-grid .selection-checkbox-cell.checkbox-selected {
+          /* Show checkbox on row hover OR when has checkbox-selected class */
+          .cpq-selection-grid .ag-row:hover .ag-cell[col-id="selection"] .selection-checkbox-cell,
+          .cpq-selection-grid .ag-cell[col-id="selection"] .checkbox-selected {
             opacity: 1 !important;
           }
 
           /* Hide checkbox by default */
-          .cpq-selection-grid .selection-checkbox-cell {
+          .cpq-selection-grid .ag-cell[col-id="selection"] .selection-checkbox-cell {
             opacity: 0;
             transition: opacity 0.15s ease;
           }
@@ -1206,6 +1217,12 @@ export function EnhancedComponentGrid({
           /* Row highlighting when selected */
           .cpq-selection-grid .ag-row.row-selected {
             background-color: #eff6ff !important;
+          }
+
+          /* Remove cell borders in checkbox column */
+          .cpq-selection-grid .ag-cell[col-id="selection"] {
+            border-right: none !important;
+            border-left: none !important;
           }
         `}</style>
         <AgGridReact

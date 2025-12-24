@@ -1209,19 +1209,8 @@ export function EnhancedComponentGrid({
             padding: 0 !important;
           }
 
-          /* Hide checkbox button by default - simplified selector */
-          .cpq-selection-grid [col-id="selection"] button {
-            opacity: 0 !important;
-            transition: opacity 0.15s ease;
-          }
-
-          /* Show checkbox on row hover (unselected rows) */
-          .cpq-selection-grid .ag-row:hover [col-id="selection"] button {
-            opacity: 1 !important;
-          }
-
-          /* ALWAYS show checkbox when selected (regardless of hover) */
-          .cpq-selection-grid [col-id="selection"] .checkbox-selected button {
+          /* Show checkbox on row hover - overrides inline style */
+          .cpq-selection-grid .ag-row:hover .checkbox-hover-target {
             opacity: 1 !important;
           }
 

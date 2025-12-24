@@ -883,9 +883,16 @@ export function EnhancedComponentGrid({
 
   // Filter and reorder columns based on config
   const visibleColumnDefs = useMemo(() => {
+    // Ensure 'selection' is always in visible columns
+    const visibleColumnsWithSelection = config.visibleColumns.includes(
+      'selection'
+    )
+      ? config.visibleColumns
+      : ['selection', ...config.visibleColumns];
+
     // First filter by visibility, then reorder
     const visible = columnDefs.filter(col =>
-      config.visibleColumns.includes(col.field!)
+      visibleColumnsWithSelection.includes(col.field!)
     );
 
     // Reorder according to config.columnOrder

@@ -41,7 +41,7 @@ export interface TableColumnDefinition {
 }
 
 export const COMPONENT_LIBRARY_COLUMNS: TableColumnDefinition[] = [
-  { id: 'actions', label: 'פעולות', field: 'actions', defaultVisible: true },
+  { id: 'selection', label: '', field: 'selection', defaultVisible: true },
   {
     id: 'manufacturerPN',
     label: 'מק"ט יצרן',

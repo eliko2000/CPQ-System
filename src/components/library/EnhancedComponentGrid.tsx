@@ -1039,11 +1039,11 @@ export function EnhancedComponentGrid({
     [saveConfig]
   );
 
-  // Handle cell click to open component card (except for actions column)
+  // Handle cell click to open component card (except for selection column)
   const onCellClicked = useCallback(
     (params: any) => {
-      // Don't open form if clicking on the actions column
-      if (params.colDef.field === 'actions') return;
+      // Don't open form if clicking on the selection checkbox column
+      if (params.colDef.field === 'selection') return;
 
       if (params.data && onEdit) {
         onEdit(params.data);
@@ -1173,9 +1173,15 @@ export function EnhancedComponentGrid({
 
       {/* Grid */}
       <div
-        className="ag-theme-alpine"
+        className="ag-theme-alpine cpq-selection-grid"
         style={{ height: '600px', width: '100%' }}
       >
+        <style>{`
+          /* ClickUp-style hover checkbox - show checkbox cell on row hover */
+          .cpq-selection-grid .ag-row:hover .ag-cell[col-id="selection"] > div {
+            opacity: 1 !important;
+          }
+        `}</style>
         <AgGridReact
           ref={gridRef}
           rowData={components}
@@ -1189,7 +1195,7 @@ export function EnhancedComponentGrid({
           onColumnMoved={onColumnMoved}
           onFilterChanged={onFilterChanged}
           onCellClicked={onCellClicked}
-          rowSelection="single"
+          rowSelection="multiple"
           animateRows={true}
           pagination={true}
           paginationPageSize={preferences.itemsPerPage}

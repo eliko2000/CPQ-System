@@ -2,7 +2,7 @@
  * SelectionCheckboxRenderer
  *
  * AG Grid cell renderer for row selection checkboxes
- * Supports click-to-select with row highlighting
+ * ClickUp-style: Checkbox only visible on row hover or when selected
  */
 
 import { ICellRendererParams } from 'ag-grid-community';
@@ -20,8 +20,10 @@ export const SelectionCheckboxRenderer = (
 
   if (!data) return null;
 
-  const handleChange = (event: React.MouseEvent) => {
+  const handleClick = (event: React.MouseEvent) => {
+    // CRITICAL: Stop propagation to prevent cell click from opening component
     event.stopPropagation();
+
     if (onSelectionToggle && data.id) {
       onSelectionToggle(data.id, data, event);
     }
@@ -31,8 +33,12 @@ export const SelectionCheckboxRenderer = (
 
   return (
     <div
-      className="flex items-center justify-center h-full"
-      onClick={handleChange}
+      className="flex items-center justify-center h-full group-hover:opacity-100 transition-opacity"
+      onClick={handleClick}
+      style={{
+        // ClickUp style: Hide checkbox unless selected or row hovered
+        opacity: checked ? 1 : 0,
+      }}
     >
       <Checkbox
         checked={checked}

@@ -1209,16 +1209,20 @@ export function EnhancedComponentGrid({
             padding: 0 !important;
           }
 
-          /* Show checkbox ONLY on row hover OR when selected */
-          .cpq-selection-grid .ag-row:hover .ag-cell[col-id="selection"] .selection-checkbox-cell,
-          .cpq-selection-grid .ag-cell[col-id="selection"] .checkbox-selected {
+          /* Hide checkbox by default */
+          .cpq-selection-grid .ag-cell[col-id="selection"] .selection-checkbox-cell {
+            opacity: 0;
+            transition: opacity 0.15s ease;
+          }
+
+          /* Show checkbox on row hover (for unselected rows) */
+          .cpq-selection-grid .ag-row:hover .ag-cell[col-id="selection"] .selection-checkbox-cell {
             opacity: 1 !important;
           }
 
-          /* Hide checkbox by default - MUST be hidden */
-          .cpq-selection-grid .ag-cell[col-id="selection"] .selection-checkbox-cell {
-            opacity: 0 !important;
-            transition: opacity 0.15s ease;
+          /* ALWAYS show checkbox when selected (regardless of hover) */
+          .cpq-selection-grid .ag-cell[col-id="selection"] .selection-checkbox-cell.checkbox-selected {
+            opacity: 1 !important;
           }
 
           /* Row highlighting when selected - light blue */

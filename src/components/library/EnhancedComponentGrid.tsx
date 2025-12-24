@@ -5,7 +5,14 @@ import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import { Settings, ChevronDown } from 'lucide-react';
+import {
+  Settings,
+  ChevronDown,
+  Eye,
+  Edit as EditIcon,
+  Trash2,
+  Copy,
+} from 'lucide-react';
 import { Component } from '../../types';
 import { useClickOutside } from '../../hooks/useClickOutside';
 import { useTableConfig } from '../../hooks/useTableConfig';
@@ -18,7 +25,12 @@ import {
   CATEGORIES_UPDATED_EVENT,
 } from '../../constants/settings';
 import { logger } from '@/lib/logger';
-import { ComponentActionsRenderer } from './componentGridRenderers';
+import { SelectionCheckboxRenderer } from '../grid/SelectionCheckboxRenderer';
+import { FloatingActionToolbar } from '../grid/FloatingActionToolbar';
+import { useGridSelection } from '../../hooks/useGridSelection';
+import { GridAction } from '../../types/grid.types';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
+import { toast } from 'sonner';
 
 interface EnhancedComponentGridProps {
   components: Component[];
@@ -92,11 +104,24 @@ export function EnhancedComponentGrid({
       'manufacturer',
       'name',
       'manufacturerPN',
-      'actions',
+      'selection', // Replaced 'actions' with 'selection'
     ],
     columnWidths: {},
     visibleColumns: getTableColumnSettings('component_library'),
     filterState: {},
+  });
+
+  // Selection state and delete confirmation
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    open: boolean;
+    count: number;
+    items: Component[];
+  }>({ open: false, count: 0, items: [] });
+
+  // Initialize grid selection hook
+  const selection = useGridSelection<Component>({
+    gridApi: gridRef.current?.api,
+    getRowId: component => component.id,
   });
 
   // Close column manager when clicking outside
@@ -159,15 +184,130 @@ export function EnhancedComponentGrid({
     // Smart filter is now handled by the CustomHeader component
   }, []);
 
-  // Grid context for action handlers
+  // Bulk delete handler with partial failure support
+  const handleBulkDelete = useCallback(
+    async (selectedIds: string[], selectedData: Component[]) => {
+      setDeleteConfirm({
+        open: true,
+        count: selectedIds.length,
+        items: selectedData,
+      });
+    },
+    []
+  );
+
+  // Confirm bulk delete
+  const confirmBulkDelete = useCallback(async () => {
+    const { items } = deleteConfirm;
+    const failures: Array<{ id: string; reason: string; itemName: string }> =
+      [];
+    let successCount = 0;
+
+    for (const component of items) {
+      try {
+        await onDelete(component.id, component.name);
+        successCount++;
+      } catch (error: any) {
+        failures.push({
+          id: component.id,
+          itemName: component.name,
+          reason: error.message || 'שגיאה לא ידועה',
+        });
+      }
+    }
+
+    // Close dialog
+    setDeleteConfirm({ open: false, count: 0, items: [] });
+
+    // Show results
+    if (failures.length === 0) {
+      toast.success(`${successCount} רכיבים נמחקו בהצלחה`);
+    } else if (successCount === 0) {
+      toast.error(`מחיקה נכשלה עבור כל ${failures.length} הרכיבים`);
+    } else {
+      toast.warning(
+        `${successCount} רכיבים נמחקו בהצלחה, ${failures.length} נכשלו`
+      );
+      // Show failures
+      failures.forEach(f => {
+        toast.error(`${f.itemName}: ${f.reason}`, { duration: 5000 });
+      });
+    }
+
+    // Clear selection
+    selection.clearSelection();
+  }, [deleteConfirm, onDelete, selection]);
+
+  // Define grid actions for floating toolbar
+  const gridActions = useMemo<GridAction[]>(() => {
+    const actions: GridAction[] = [];
+
+    // View action (single-row only)
+    if (onView) {
+      actions.push({
+        type: 'view',
+        label: 'צפה',
+        icon: Eye,
+        variant: 'outline',
+        singleOnly: true,
+        handler: async (__ids, data) => {
+          if (data.length === 1) {
+            onView(data[0]);
+          }
+        },
+      });
+    }
+
+    // Edit action (single-row only)
+    actions.push({
+      type: 'edit',
+      label: 'ערוך',
+      icon: EditIcon,
+      variant: 'outline',
+      singleOnly: true,
+      handler: async (__ids, data) => {
+        if (data.length === 1) {
+          onEdit(data[0]);
+        }
+      },
+    });
+
+    // Duplicate action (works for single or multiple)
+    if (onDuplicate) {
+      actions.push({
+        type: 'duplicate',
+        label: 'שכפל',
+        icon: Copy,
+        variant: 'outline',
+        handler: async (__ids, data) => {
+          for (const component of data) {
+            onDuplicate(component);
+          }
+          toast.success(`${data.length} רכיבים שוכפלו בהצלחה`);
+        },
+      });
+    }
+
+    // Delete action (works for single or multiple)
+    actions.push({
+      type: 'delete',
+      label: 'מחק',
+      icon: Trash2,
+      variant: 'destructive',
+      confirmRequired: true,
+      handler: handleBulkDelete,
+    });
+
+    return actions;
+  }, [onView, onEdit, onDuplicate, handleBulkDelete]);
+
+  // Grid context for selection (updated to include selection handlers)
   const gridContext = useMemo(
     () => ({
-      onEdit,
-      onDelete,
-      onDuplicate,
-      onView,
+      onSelectionToggle: selection.toggleSelection,
+      isSelected: selection.isSelected,
     }),
-    [onEdit, onDelete, onDuplicate, onView]
+    [selection.toggleSelection, selection.isSelected]
   );
 
   // Column definitions with enhanced filtering and editing - RTL order
@@ -370,13 +510,20 @@ export function EnhancedComponentGrid({
         },
       },
       {
-        headerName: 'פעולות',
-        field: 'actions',
+        headerName: '',
+        field: 'selection',
         sortable: false,
         filter: false,
         resizable: false,
-        width: 180,
-        cellRenderer: ComponentActionsRenderer,
+        width: 50,
+        pinned: 'right' as const, // Pinned to right in RTL = visually left
+        lockPosition: true,
+        suppressMenu: true,
+        cellRenderer: SelectionCheckboxRenderer,
+        cellRendererParams: {
+          onSelectionToggle: selection.toggleSelection,
+          isSelected: selection.isSelected,
+        },
       },
       {
         headerName: 'קטגוריה',
@@ -727,10 +874,10 @@ export function EnhancedComponentGrid({
       categories,
       getUniqueValues,
       handleCellEdit,
-      onEdit,
-      onDelete,
-      onView,
-      onDuplicate,
+      selection.toggleSelection,
+      selection.isSelected,
+      handleColumnMenuClick,
+      handleFilterClick,
     ]
   );
 
@@ -957,7 +1104,7 @@ export function EnhancedComponentGrid({
                     e.stopPropagation();
                     saveConfig({
                       visibleColumns: [
-                        'actions',
+                        'selection',
                         'manufacturerPN',
                         'name',
                         'manufacturer',
@@ -982,7 +1129,7 @@ export function EnhancedComponentGrid({
                         'manufacturer',
                         'name',
                         'manufacturerPN',
-                        'actions',
+                        'selection',
                       ],
                     });
                   }}
@@ -1080,6 +1227,30 @@ export function EnhancedComponentGrid({
           }}
         />
       </div>
+
+      {/* Floating Action Toolbar */}
+      <FloatingActionToolbar
+        selectedCount={selection.selectionCount}
+        actions={gridActions}
+        onClear={selection.clearSelection}
+        onAction={selection.handleAction}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={deleteConfirm.open}
+        title="מחיקת רכיבים"
+        message={
+          deleteConfirm.count === 1
+            ? `האם אתה בטוח שברצונך למחוק את הרכיב "${deleteConfirm.items[0]?.name}"?`
+            : `האם אתה בטוח שברצונך למחוק ${deleteConfirm.count} רכיבים?`
+        }
+        confirmText="מחק"
+        cancelText="ביטול"
+        onConfirm={confirmBulkDelete}
+        onCancel={() => setDeleteConfirm({ open: false, count: 0, items: [] })}
+        type="danger"
+      />
     </div>
   );
 }

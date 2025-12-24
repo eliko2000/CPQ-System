@@ -43,6 +43,9 @@ export const SelectionCheckboxRenderer = (
         style={{
           opacity: checked ? 1 : 0,
           transition: 'opacity 0.15s ease',
+          // Force border visibility for unchecked state (AG Grid strips Tailwind classes)
+          border: checked ? undefined : '1px solid hsl(var(--primary))',
+          borderRadius: '0.125rem',
         }}
       />
     </div>

@@ -40,7 +40,8 @@
       "SlashCommand(/migrate:*)",
       "Bash(grep:*)",
       "mcp__context7__resolve-library-id",
-      "mcp__context7__get-library-docs"
+      "mcp__context7__get-library-docs",
+      "mcp__playwright__browser_hover"
     ],
     "deny": [],
     "ask": []

@@ -130,7 +130,7 @@ export function useGridSelection<T = any>(
         // Update selected data state
         setSelectedData(newSelectedData);
 
-        // Sync with AG Grid API
+        // Sync with AG Grid API and refresh row styles
         if (gridApi) {
           gridApi.deselectAll();
           newSelectedIds.forEach(selectedId => {
@@ -139,6 +139,9 @@ export function useGridSelection<T = any>(
               node.setSelected(true, false, 'api');
             }
           });
+
+          // Force refresh row styles to update background color
+          gridApi.redrawRows();
         }
 
         return newSelectedIds;

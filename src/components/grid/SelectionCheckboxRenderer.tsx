@@ -39,7 +39,7 @@ export const SelectionCheckboxRenderer = (
       <Checkbox
         checked={checked}
         onCheckedChange={() => {}} // Handled by onClick above
-        className="cursor-pointer"
+        className="cursor-pointer focus:outline-none focus:ring-0 focus:ring-offset-0 focus-visible:outline-none focus-visible:ring-0"
       />
     </div>
   );

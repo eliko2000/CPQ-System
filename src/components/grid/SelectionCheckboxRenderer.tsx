@@ -33,7 +33,7 @@ export const SelectionCheckboxRenderer = (
 
   return (
     <div
-      className="flex items-center justify-center h-full"
+      className={`flex items-center justify-center h-full ${checked ? 'checkbox-selected' : ''}`}
       onClick={handleClick}
     >
       <Checkbox

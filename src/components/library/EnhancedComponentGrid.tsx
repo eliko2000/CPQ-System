@@ -1179,22 +1179,33 @@ export function EnhancedComponentGrid({
         style={{ height: '600px', width: '100%' }}
       >
         <style>{`
-          /* ClickUp-style selection checkbox positioning */
-          .cpq-selection-grid .ag-cell[col-id="selection"] {
-            background: transparent !important;
-            border: none !important;
+          /* ClickUp-style: Checkbox outside table with border */
+          .cpq-selection-grid .ag-pinned-right-cols-container {
+            border-left: 1px solid #e5e7eb !important;
+            margin-left: 8px;
           }
 
-          /* Show checkbox on row hover - visible checkbox */
-          .cpq-selection-grid .ag-row:hover .selection-checkbox-cell > div,
-          .cpq-selection-grid .ag-row-selected .selection-checkbox-cell > div {
+          .cpq-selection-grid .ag-cell[col-id="selection"] {
+            background: #f9fafb !important;
+            border: none !important;
+            border-right: 1px solid #e5e7eb !important;
+          }
+
+          /* Show checkbox on row hover OR when row has selected class */
+          .cpq-selection-grid .ag-row:hover .selection-checkbox-cell,
+          .cpq-selection-grid .selection-checkbox-cell.checkbox-selected {
             opacity: 1 !important;
           }
 
           /* Hide checkbox by default */
-          .cpq-selection-grid .selection-checkbox-cell > div {
+          .cpq-selection-grid .selection-checkbox-cell {
             opacity: 0;
-            transition: opacity 0.2s ease;
+            transition: opacity 0.15s ease;
+          }
+
+          /* Row highlighting when selected */
+          .cpq-selection-grid .ag-row.row-selected {
+            background-color: #eff6ff !important;
           }
         `}</style>
         <AgGridReact
@@ -1211,6 +1222,10 @@ export function EnhancedComponentGrid({
           onFilterChanged={onFilterChanged}
           onCellClicked={onCellClicked}
           rowSelection="multiple"
+          getRowClass={params => {
+            const isSelected = selection.isSelected(params.data?.id);
+            return isSelected ? 'row-selected' : '';
+          }}
           animateRows={true}
           pagination={true}
           paginationPageSize={preferences.itemsPerPage}

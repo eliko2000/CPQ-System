@@ -5,7 +5,7 @@ import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import { Edit, Trash2, Eye, Settings, ChevronDown, Copy } from 'lucide-react';
+import { Settings, ChevronDown } from 'lucide-react';
 import { Component } from '../../types';
 import { useClickOutside } from '../../hooks/useClickOutside';
 import { useTableConfig } from '../../hooks/useTableConfig';
@@ -18,6 +18,7 @@ import {
   CATEGORIES_UPDATED_EVENT,
 } from '../../constants/settings';
 import { logger } from '@/lib/logger';
+import { ComponentActionsRenderer } from './componentGridRenderers';
 
 interface EnhancedComponentGridProps {
   components: Component[];
@@ -157,6 +158,17 @@ export function EnhancedComponentGrid({
     logger.debug('Filter clicked:', columnId);
     // Smart filter is now handled by the CustomHeader component
   }, []);
+
+  // Grid context for action handlers
+  const gridContext = useMemo(
+    () => ({
+      onEdit,
+      onDelete,
+      onDuplicate,
+      onView,
+    }),
+    [onEdit, onDelete, onDuplicate, onView]
+  );
 
   // Column definitions with enhanced filtering and editing - RTL order
   const columnDefs = useMemo(
@@ -364,50 +376,7 @@ export function EnhancedComponentGrid({
         filter: false,
         resizable: false,
         width: 180,
-        cellRenderer: (params: ICellRendererParams) => (
-          <div className="flex gap-1 items-center justify-center">
-            {onView && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onView(params.data)}
-                className="h-8 w-8 p-0"
-                title="צפה"
-              >
-                <Eye className="h-3 w-3" />
-              </Button>
-            )}
-            {onDuplicate && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onDuplicate(params.data)}
-                className="h-8 w-8 p-0 text-blue-600 hover:text-blue-800"
-                title="שכפל"
-              >
-                <Copy className="h-3 w-3" />
-              </Button>
-            )}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onEdit(params.data)}
-              className="h-8 w-8 p-0"
-              title="ערוך"
-            >
-              <Edit className="h-3 w-3" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onDelete(params.data.id, params.data.name)}
-              className="h-8 w-8 p-0 text-red-600 hover:text-red-800"
-              title="מחק"
-            >
-              <Trash2 className="h-3 w-3" />
-            </Button>
-          </div>
-        ),
+        cellRenderer: ComponentActionsRenderer,
       },
       {
         headerName: 'קטגוריה',
@@ -1057,6 +1026,7 @@ export function EnhancedComponentGrid({
           ref={gridRef}
           rowData={components}
           columnDefs={visibleColumnDefs}
+          context={gridContext}
           defaultColDef={defaultColDef}
           enableRtl={true}
           onGridReady={onGridReady}

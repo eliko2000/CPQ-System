@@ -22,7 +22,6 @@ import { AssemblyForm } from './AssemblyForm';
 import { AssemblyGrid } from './AssemblyGrid';
 import { LaborTypeForm } from '../labor/LaborTypeForm';
 import { LaborTypeList } from '../labor/LaborTypeList';
-import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { EnhancedComponentGrid } from './EnhancedComponentGrid';
 import { ComponentAIImport } from './ComponentAIImport';
 import { useLaborTypes } from '../../hooks/useLaborTypes';
@@ -59,15 +58,6 @@ export function ComponentLibrary() {
     null
   );
   const [isLaborFormOpen, setIsLaborFormOpen] = useState(false);
-  const [deleteConfirm, setDeleteConfirm] = useState<{
-    isOpen: boolean;
-    componentId: string | null;
-    componentName: string;
-  }>({
-    isOpen: false,
-    componentId: null,
-    componentName: '',
-  });
 
   // Handle inline component updates
   const handleComponentUpdate = useCallback(
@@ -158,28 +148,6 @@ export function ComponentLibrary() {
       notes: component.notes || '',
     };
     setModal({ type: 'add-component', data: duplicatedComponent });
-  };
-
-  const handleDeleteComponent = (
-    componentId: string,
-    componentName: string
-  ) => {
-    setDeleteConfirm({
-      isOpen: true,
-      componentId,
-      componentName,
-    });
-  };
-
-  const confirmDelete = async () => {
-    if (deleteConfirm.componentId) {
-      await deleteComponent(deleteConfirm.componentId);
-      setDeleteConfirm({ isOpen: false, componentId: null, componentName: '' });
-    }
-  };
-
-  const cancelDelete = () => {
-    setDeleteConfirm({ isOpen: false, componentId: null, componentName: '' });
   };
 
   // Assembly handlers
@@ -383,7 +351,7 @@ export function ComponentLibrary() {
             <EnhancedComponentGrid
               components={filteredComponents}
               onEdit={handleEditComponent}
-              onDelete={handleDeleteComponent}
+              onDelete={deleteComponent}
               onDuplicate={handleDuplicateComponent}
               onComponentUpdate={handleComponentUpdate}
             />
@@ -561,18 +529,6 @@ export function ComponentLibrary() {
         isOpen={isAIImportOpen}
         onClose={() => setIsAIImportOpen(false)}
         onImport={handleBatchImport}
-      />
-
-      {/* Delete Confirmation Dialog */}
-      <ConfirmDialog
-        isOpen={deleteConfirm.isOpen}
-        title="מחיקת רכיב"
-        message={`האם אתה בטוח שברצונך למחוק את הרכיב "${deleteConfirm.componentName}"? פעולה זו אינה ניתנת לביטול.`}
-        confirmText="מחק"
-        cancelText="ביטול"
-        type="danger"
-        onConfirm={confirmDelete}
-        onCancel={cancelDelete}
       />
     </div>
   );

@@ -35,7 +35,7 @@ import { toast } from 'sonner';
 interface EnhancedComponentGridProps {
   components: Component[];
   onEdit: (component: Component) => void;
-  onDelete: (componentId: string, componentName: string) => void;
+  onDelete: (componentId: string) => Promise<void>;
   onDuplicate?: (component: Component) => void;
   onView?: (component: Component) => void;
   onComponentUpdate?: (componentId: string, field: string, value: any) => void;
@@ -210,9 +210,13 @@ export function EnhancedComponentGrid({
       [];
     let successCount = 0;
 
+    // Close dialog first
+    setDeleteConfirm({ open: false, count: 0, items: [] });
+
+    // Perform actual deletion
     for (const component of items) {
       try {
-        await onDelete(component.id, component.name);
+        await onDelete(component.id);
         successCount++;
       } catch (error: any) {
         failures.push({
@@ -223,25 +227,38 @@ export function EnhancedComponentGrid({
       }
     }
 
-    // Close dialog
-    setDeleteConfirm({ open: false, count: 0, items: [] });
-
-    // Show results
+    // Show results AFTER deletion completes
     if (failures.length === 0) {
       toast.success(`${successCount} רכיבים נמחקו בהצלחה`);
     } else if (successCount === 0) {
       toast.error(`מחיקה נכשלה עבור כל ${failures.length} הרכיבים`);
+      // Show detailed failure messages
+      failures.forEach(f => {
+        toast.error(
+          <div className="space-y-1">
+            <div className="font-semibold">{f.itemName}</div>
+            <div className="text-sm whitespace-pre-line">{f.reason}</div>
+          </div>,
+          { duration: 10000 }
+        );
+      });
     } else {
       toast.warning(
         `${successCount} רכיבים נמחקו בהצלחה, ${failures.length} נכשלו`
       );
-      // Show failures
+      // Show detailed failure messages
       failures.forEach(f => {
-        toast.error(`${f.itemName}: ${f.reason}`, { duration: 5000 });
+        toast.error(
+          <div className="space-y-1">
+            <div className="font-semibold">{f.itemName}</div>
+            <div className="text-sm whitespace-pre-line">{f.reason}</div>
+          </div>,
+          { duration: 10000 }
+        );
       });
     }
 
-    // Clear selection
+    // Clear selection AFTER successful deletion
     selection.clearSelection();
   }, [deleteConfirm, onDelete, selection]);
 
@@ -1212,6 +1229,11 @@ export function EnhancedComponentGrid({
           /* Show checkbox on row hover - overrides inline style */
           .cpq-selection-grid .ag-row:hover .checkbox-hover-target,
           .cpq-selection-grid .ag-row-hover .checkbox-hover-target {
+            opacity: 1 !important;
+          }
+
+          /* CRITICAL: Show checkbox for selected rows even when not hovering */
+          .cpq-selection-grid .ag-row.row-selected .checkbox-hover-target {
             opacity: 1 !important;
           }
 

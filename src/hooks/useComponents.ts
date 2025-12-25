@@ -226,6 +226,50 @@ export function useComponents() {
     try {
       setError(null);
 
+      // First, check if this component is used in any quotations
+      const { data: usedInQuotations, error: checkError } = await supabase
+        .from('quotation_items')
+        .select(
+          `
+          id,
+          quotation_system_id,
+          quotation_systems!inner (
+            id,
+            quotation_id,
+            quotations!inner (
+              id,
+              quotation_number,
+              project_name,
+              customer_name
+            )
+          )
+        `
+        )
+        .eq('component_id', id);
+
+      if (checkError) throw checkError;
+
+      // If component is used in quotations, throw detailed error
+      if (usedInQuotations && usedInQuotations.length > 0) {
+        const quotationNames = usedInQuotations
+          .map(item => {
+            const quotation = (item.quotation_systems as any)?.quotations;
+            if (quotation) {
+              return `${quotation.quotation_number || 'ללא מספר'} - ${quotation.project_name || quotation.customer_name || 'ללא שם'}`;
+            }
+            return null;
+          })
+          .filter(Boolean);
+
+        // Remove duplicates
+        const uniqueQuotations = Array.from(new Set(quotationNames));
+
+        throw new Error(
+          `לא ניתן למחוק רכיב זה כיוון שהוא בשימוש בהצעות מחיר הבאות:\n${uniqueQuotations.join('\n')}`
+        );
+      }
+
+      // Component is not in use, safe to delete
       const { error } = await supabase
         .from('components')
         .delete()

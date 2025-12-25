@@ -194,8 +194,15 @@ export function useGridSelection<T = any>(
       // Execute the action handler
       await action.handler(selectedIds, selectedData);
 
-      // Clear selection after action completes (except for view/edit)
-      if (action.type !== 'view' && action.type !== 'edit') {
+      // Clear selection after action completes
+      // EXCEPT for:
+      // - view/edit actions (user may want to keep selection)
+      // - actions with confirmRequired (they will clear selection after user confirms)
+      if (
+        action.type !== 'view' &&
+        action.type !== 'edit' &&
+        !action.confirmRequired
+      ) {
         clearSelection();
       }
     },

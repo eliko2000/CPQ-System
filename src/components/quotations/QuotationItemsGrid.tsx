@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, useRef } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { AgGridReact } from 'ag-grid-react';
 import { ColDef } from 'ag-grid-community';
 import { Button } from '../ui/button';
@@ -6,33 +6,39 @@ import { Settings, ChevronDown } from 'lucide-react';
 import { useClickOutside } from '../../hooks/useClickOutside';
 import { useTableConfig } from '../../hooks/useTableConfig';
 import { logger } from '@/lib/logger';
+import { SelectionCheckboxRenderer } from '../grid/SelectionCheckboxRenderer';
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
 
 interface QuotationItemsGridProps {
+  gridRef: React.RefObject<AgGridReact>;
   gridData: any[];
   columnDefs: ColDef[];
   onCellValueChanged: (params: any) => void;
   onCellDoubleClicked: (params: any) => void;
   onSelectionChanged: (params: any) => void;
   onAddSystem: () => void;
+  onAddItemToSystem: (systemId: string) => void;
+  selection: any; // useGridSelection return type
 }
 
 export function QuotationItemsGrid({
+  gridRef,
   gridData,
   columnDefs,
   onCellValueChanged,
   onCellDoubleClicked,
   onSelectionChanged,
   onAddSystem,
+  onAddItemToSystem,
+  selection,
 }: QuotationItemsGridProps) {
   const [showColumnManager, setShowColumnManager] = useState(false);
-  const gridRef = useRef<AgGridReact>(null);
 
   // Use table configuration hook
   const { config, saveConfig, loading } = useTableConfig('quotation_editor', {
     columnOrder: [
-      'actions',
+      'selection',
       'displayNumber',
       'componentName',
       'itemType',
@@ -45,7 +51,7 @@ export function QuotationItemsGrid({
     ],
     columnWidths: {},
     visibleColumns: [
-      'actions',
+      'selection',
       'displayNumber',
       'componentName',
       'itemType',
@@ -71,7 +77,7 @@ export function QuotationItemsGrid({
   const visibleColumnDefs = useMemo(() => {
     // Default column order if not configured
     const defaultOrder = [
-      'actions',
+      'selection',
       'displayNumber',
       'componentName',
       'quantity',
@@ -91,12 +97,12 @@ export function QuotationItemsGrid({
         ? config.columnOrder
         : defaultOrder;
 
-    // ALWAYS ensure 'actions' is in visibleColumns
+    // ALWAYS ensure 'selection' is in visibleColumns
     const ensuredVisibleColumns =
       config.visibleColumns && config.visibleColumns.length > 0
-        ? config.visibleColumns.includes('actions')
+        ? config.visibleColumns.includes('selection')
           ? config.visibleColumns
-          : ['actions', ...config.visibleColumns]
+          : ['selection', ...config.visibleColumns]
         : defaultOrder;
 
     // Removed debug logging to reduce re-renders
@@ -339,15 +345,104 @@ export function QuotationItemsGrid({
       </div>
 
       <div
-        className="ag-theme-alpine"
+        className="ag-theme-alpine cpq-quotation-grid"
         style={{ height: '400px', width: '100%' }}
       >
+        <style>{`
+          /* ClickUp-style: Checkbox OUTSIDE table - completely transparent */
+          .cpq-quotation-grid .ag-pinned-right-cols-container {
+            background: transparent !important;
+            border: none !important;
+            margin-left: 0 !important;
+            padding-left: 0 !important;
+          }
+
+          .cpq-quotation-grid .ag-pinned-right-header {
+            background: transparent !important;
+            border: none !important;
+            margin-left: 0 !important;
+          }
+
+          .cpq-quotation-grid .ag-cell[col-id="selection"] {
+            background: transparent !important;
+            border: none !important;
+            padding: 0 !important;
+          }
+
+          /* Show checkbox on row hover - overrides inline style */
+          .cpq-quotation-grid .ag-row:hover .checkbox-hover-target,
+          .cpq-quotation-grid .ag-row-hover .checkbox-hover-target {
+            opacity: 1 !important;
+          }
+
+          /* CRITICAL: Show checkbox for selected rows even when not hovering */
+          .cpq-quotation-grid .ag-row.row-selected .checkbox-hover-target {
+            opacity: 1 !important;
+          }
+
+          /* Row highlighting when selected - light blue */
+          .cpq-quotation-grid .ag-row.row-selected {
+            background-color: #eff6ff !important;
+          }
+
+          /* Remove focus ring from checkbox (but keep border for visibility) */
+          .cpq-quotation-grid .ag-cell[col-id="selection"] button {
+            outline: none !important;
+            box-shadow: none !important;
+          }
+
+          .cpq-quotation-grid .ag-cell[col-id="selection"] button:focus {
+            outline: none !important;
+            box-shadow: none !important;
+            ring: 0 !important;
+          }
+
+          /* Remove blue border from AG Grid cell focus */
+          .cpq-quotation-grid .ag-cell[col-id="selection"]:focus,
+          .cpq-quotation-grid .ag-cell[col-id="selection"].ag-cell-focus,
+          .cpq-quotation-grid .ag-cell[col-id="selection"]:focus-within {
+            outline: none !important;
+            border: none !important;
+            box-shadow: none !important;
+          }
+
+          /* System number button: hide number text and show + icon on hover */
+          .cpq-quotation-grid .ag-row:hover .system-number-btn .number-text,
+          .cpq-quotation-grid .ag-row-hover .system-number-btn .number-text {
+            display: none !important;
+          }
+
+          .cpq-quotation-grid .ag-row:hover .system-number-btn .plus-icon,
+          .cpq-quotation-grid .ag-row-hover .system-number-btn .plus-icon {
+            display: inline-flex !important;
+          }
+
+          /* Ensure system number button is always clickable */
+          .cpq-quotation-grid .system-number-btn {
+            pointer-events: auto !important;
+            cursor: pointer !important;
+          }
+
+          /* Prevent displayNumber cell from blocking clicks */
+          .cpq-quotation-grid .ag-cell[col-id="displayNumber"] {
+            overflow: visible !important;
+            z-index: 1 !important;
+          }
+        `}</style>
         <AgGridReact
           ref={gridRef}
           rowData={gridData}
           columnDefs={visibleColumnDefs}
           defaultColDef={defaultColDef}
+          context={{ onAddItemToSystem }}
+          components={{ SelectionCheckboxRenderer }}
           enableRtl={true}
+          suppressRowClickSelection={true}
+          rowSelection="multiple"
+          getRowClass={params => {
+            const isSelected = selection.isSelected(params.data?.id);
+            return isSelected ? 'row-selected' : '';
+          }}
           onGridReady={handleGridReady}
           onColumnResized={handleColumnResized}
           onColumnMoved={handleColumnMoved}
@@ -355,7 +450,6 @@ export function QuotationItemsGrid({
           onCellValueChanged={onCellValueChanged}
           onCellDoubleClicked={onCellDoubleClicked}
           onSelectionChanged={onSelectionChanged}
-          rowSelection="single"
           animateRows={true}
           singleClickEdit={true}
           enableCellTextSelection={true}

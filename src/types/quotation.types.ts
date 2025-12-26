@@ -229,6 +229,7 @@ export interface DbQuotationItem {
   // MSRP pricing (for distributed components)
   msrp_price?: number;
   msrp_currency?: Currency;
+  use_msrp_pricing?: boolean; // Toggle: true = use MSRP, false = use cost + margin
   partner_discount_percent?: number;
   created_at: string;
   updated_at: string;

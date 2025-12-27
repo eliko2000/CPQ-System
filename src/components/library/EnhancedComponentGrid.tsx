@@ -5,7 +5,14 @@ import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import { Settings, ChevronDown } from 'lucide-react';
+import {
+  Settings,
+  ChevronDown,
+  Eye,
+  Edit as EditIcon,
+  Trash2,
+  Copy,
+} from 'lucide-react';
 import { Component } from '../../types';
 import { useClickOutside } from '../../hooks/useClickOutside';
 import { useTableConfig } from '../../hooks/useTableConfig';
@@ -18,12 +25,17 @@ import {
   CATEGORIES_UPDATED_EVENT,
 } from '../../constants/settings';
 import { logger } from '@/lib/logger';
-import { ComponentActionsRenderer } from './componentGridRenderers';
+import { SelectionCheckboxRenderer } from '../grid/SelectionCheckboxRenderer';
+import { FloatingActionToolbar } from '../grid/FloatingActionToolbar';
+import { useGridSelection } from '../../hooks/useGridSelection';
+import { GridAction } from '../../types/grid.types';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
+import { toast } from 'sonner';
 
 interface EnhancedComponentGridProps {
   components: Component[];
   onEdit: (component: Component) => void;
-  onDelete: (componentId: string, componentName: string) => void;
+  onDelete: (componentId: string) => Promise<void>;
   onDuplicate?: (component: Component) => void;
   onView?: (component: Component) => void;
   onComponentUpdate?: (componentId: string, field: string, value: any) => void;
@@ -92,12 +104,32 @@ export function EnhancedComponentGrid({
       'manufacturer',
       'name',
       'manufacturerPN',
-      'actions',
+      'selection', // Replaced 'actions' with 'selection'
     ],
     columnWidths: {},
     visibleColumns: getTableColumnSettings('component_library'),
     filterState: {},
   });
+
+  // Selection state and delete confirmation
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    open: boolean;
+    count: number;
+    items: Component[];
+  }>({ open: false, count: 0, items: [] });
+
+  // Initialize grid selection hook
+  const selection = useGridSelection<Component>({
+    gridApi: gridRef.current?.api,
+    getRowId: component => component.id,
+  });
+
+  // Force refresh row styles when selection changes
+  useEffect(() => {
+    if (gridRef.current?.api) {
+      gridRef.current.api.redrawRows();
+    }
+  }, [selection.selectedIds]);
 
   // Close column manager when clicking outside
   const columnManagerRef = useClickOutside<HTMLDivElement>(() => {
@@ -159,15 +191,147 @@ export function EnhancedComponentGrid({
     // Smart filter is now handled by the CustomHeader component
   }, []);
 
-  // Grid context for action handlers
+  // Bulk delete handler with partial failure support
+  const handleBulkDelete = useCallback(
+    async (selectedIds: string[], selectedData: Component[]) => {
+      setDeleteConfirm({
+        open: true,
+        count: selectedIds.length,
+        items: selectedData,
+      });
+    },
+    []
+  );
+
+  // Confirm bulk delete
+  const confirmBulkDelete = useCallback(async () => {
+    const { items } = deleteConfirm;
+    const failures: Array<{ id: string; reason: string; itemName: string }> =
+      [];
+    let successCount = 0;
+
+    // Close dialog first
+    setDeleteConfirm({ open: false, count: 0, items: [] });
+
+    // Perform actual deletion
+    for (const component of items) {
+      try {
+        await onDelete(component.id);
+        successCount++;
+      } catch (error: any) {
+        failures.push({
+          id: component.id,
+          itemName: component.name,
+          reason: error.message || 'שגיאה לא ידועה',
+        });
+      }
+    }
+
+    // Show results AFTER deletion completes
+    if (failures.length === 0) {
+      toast.success(`${successCount} רכיבים נמחקו בהצלחה`);
+    } else if (successCount === 0) {
+      toast.error(`מחיקה נכשלה עבור כל ${failures.length} הרכיבים`);
+      // Show detailed failure messages
+      failures.forEach(f => {
+        toast.error(
+          <div className="space-y-1">
+            <div className="font-semibold">{f.itemName}</div>
+            <div className="text-sm whitespace-pre-line">{f.reason}</div>
+          </div>,
+          { duration: 10000 }
+        );
+      });
+    } else {
+      toast.warning(
+        `${successCount} רכיבים נמחקו בהצלחה, ${failures.length} נכשלו`
+      );
+      // Show detailed failure messages
+      failures.forEach(f => {
+        toast.error(
+          <div className="space-y-1">
+            <div className="font-semibold">{f.itemName}</div>
+            <div className="text-sm whitespace-pre-line">{f.reason}</div>
+          </div>,
+          { duration: 10000 }
+        );
+      });
+    }
+
+    // Clear selection AFTER successful deletion
+    selection.clearSelection();
+  }, [deleteConfirm, onDelete, selection]);
+
+  // Define grid actions for floating toolbar
+  const gridActions = useMemo<GridAction[]>(() => {
+    const actions: GridAction[] = [];
+
+    // View action (single-row only)
+    if (onView) {
+      actions.push({
+        type: 'view',
+        label: 'צפה',
+        icon: Eye,
+        variant: 'outline',
+        singleOnly: true,
+        handler: async (__ids, data) => {
+          if (data.length === 1) {
+            onView(data[0]);
+          }
+        },
+      });
+    }
+
+    // Edit action (single-row only)
+    actions.push({
+      type: 'edit',
+      label: 'ערוך',
+      icon: EditIcon,
+      variant: 'outline',
+      singleOnly: true,
+      handler: async (__ids, data) => {
+        if (data.length === 1) {
+          onEdit(data[0]);
+        }
+      },
+    });
+
+    // Duplicate action (works for single or multiple)
+    if (onDuplicate) {
+      actions.push({
+        type: 'duplicate',
+        label: 'שכפל',
+        icon: Copy,
+        variant: 'outline',
+        handler: async (__ids, data) => {
+          for (const component of data) {
+            onDuplicate(component);
+          }
+          toast.success(`${data.length} רכיבים שוכפלו בהצלחה`);
+        },
+      });
+    }
+
+    // Delete action (works for single or multiple)
+    actions.push({
+      type: 'delete',
+      label: 'מחק',
+      icon: Trash2,
+      variant: 'destructive',
+      confirmRequired: true,
+      handler: handleBulkDelete,
+    });
+
+    return actions;
+  }, [onView, onEdit, onDuplicate, handleBulkDelete]);
+
+  // Grid context for selection (updated to include selection handlers)
   const gridContext = useMemo(
     () => ({
-      onEdit,
-      onDelete,
-      onDuplicate,
-      onView,
+      onSelectionToggle: selection.toggleSelection,
+      isSelected: selection.isSelected,
     }),
-    [onEdit, onDelete, onDuplicate, onView]
+    [selection.toggleSelection, selection.isSelected]
   );
 
   // Column definitions with enhanced filtering and editing - RTL order
@@ -370,13 +534,25 @@ export function EnhancedComponentGrid({
         },
       },
       {
-        headerName: 'פעולות',
-        field: 'actions',
+        headerName: '',
+        field: 'selection',
         sortable: false,
         filter: false,
         resizable: false,
-        width: 180,
-        cellRenderer: ComponentActionsRenderer,
+        width: 48,
+        maxWidth: 48,
+        minWidth: 48,
+        pinned: 'right' as const, // Pinned to right in RTL = visually left (outside table)
+        lockPosition: true,
+        lockVisible: true,
+        suppressMenu: true,
+        suppressMovable: true,
+        suppressNavigable: true,
+        cellRenderer: SelectionCheckboxRenderer,
+        cellRendererParams: {
+          onSelectionToggle: selection.toggleSelection,
+          isSelected: selection.isSelected,
+        },
       },
       {
         headerName: 'קטגוריה',
@@ -727,18 +903,25 @@ export function EnhancedComponentGrid({
       categories,
       getUniqueValues,
       handleCellEdit,
-      onEdit,
-      onDelete,
-      onView,
-      onDuplicate,
+      selection.toggleSelection,
+      selection.isSelected,
+      handleColumnMenuClick,
+      handleFilterClick,
     ]
   );
 
   // Filter and reorder columns based on config
   const visibleColumnDefs = useMemo(() => {
+    // Ensure 'selection' is always in visible columns
+    const visibleColumnsWithSelection = config.visibleColumns.includes(
+      'selection'
+    )
+      ? config.visibleColumns
+      : ['selection', ...config.visibleColumns];
+
     // First filter by visibility, then reorder
     const visible = columnDefs.filter(col =>
-      config.visibleColumns.includes(col.field!)
+      visibleColumnsWithSelection.includes(col.field!)
     );
 
     // Reorder according to config.columnOrder
@@ -885,11 +1068,11 @@ export function EnhancedComponentGrid({
     [saveConfig]
   );
 
-  // Handle cell click to open component card (except for actions column)
+  // Handle cell click to open component card (except for selection column)
   const onCellClicked = useCallback(
     (params: any) => {
-      // Don't open form if clicking on the actions column
-      if (params.colDef.field === 'actions') return;
+      // Don't open form if clicking on the selection checkbox column
+      if (params.colDef.field === 'selection') return;
 
       if (params.data && onEdit) {
         onEdit(params.data);
@@ -957,7 +1140,7 @@ export function EnhancedComponentGrid({
                     e.stopPropagation();
                     saveConfig({
                       visibleColumns: [
-                        'actions',
+                        'selection',
                         'manufacturerPN',
                         'name',
                         'manufacturer',
@@ -982,7 +1165,7 @@ export function EnhancedComponentGrid({
                         'manufacturer',
                         'name',
                         'manufacturerPN',
-                        'actions',
+                        'selection',
                       ],
                     });
                   }}
@@ -1019,9 +1202,72 @@ export function EnhancedComponentGrid({
 
       {/* Grid */}
       <div
-        className="ag-theme-alpine"
+        className="ag-theme-alpine cpq-selection-grid"
         style={{ height: '600px', width: '100%' }}
       >
+        <style>{`
+          /* ClickUp-style: Checkbox OUTSIDE table - completely transparent */
+          .cpq-selection-grid .ag-pinned-right-cols-container {
+            background: transparent !important;
+            border: none !important;
+            margin-left: 0 !important;
+            padding-left: 0 !important;
+          }
+
+          .cpq-selection-grid .ag-pinned-right-header {
+            background: transparent !important;
+            border: none !important;
+            margin-left: 0 !important;
+          }
+
+          .cpq-selection-grid .ag-cell[col-id="selection"] {
+            background: transparent !important;
+            border: none !important;
+            padding: 0 !important;
+          }
+
+          /* Show checkbox on row hover - overrides inline style */
+          .cpq-selection-grid .ag-row:hover .checkbox-hover-target,
+          .cpq-selection-grid .ag-row-hover .checkbox-hover-target {
+            opacity: 1 !important;
+          }
+
+          /* CRITICAL: Show checkbox for selected rows even when not hovering */
+          .cpq-selection-grid .ag-row.row-selected .checkbox-hover-target {
+            opacity: 1 !important;
+          }
+
+          /* Row highlighting when selected - light blue */
+          .cpq-selection-grid .ag-row.row-selected {
+            background-color: #eff6ff !important;
+          }
+
+          /* Remove focus ring from checkbox (but keep border for visibility) */
+          .cpq-selection-grid .ag-cell[col-id="selection"] button {
+            outline: none !important;
+            box-shadow: none !important;
+          }
+
+          .cpq-selection-grid .ag-cell[col-id="selection"] button:focus {
+            outline: none !important;
+            box-shadow: none !important;
+            ring: 0 !important;
+          }
+
+          /* Remove blue border from AG Grid cell focus */
+          .cpq-selection-grid .ag-cell[col-id="selection"]:focus,
+          .cpq-selection-grid .ag-cell[col-id="selection"].ag-cell-focus,
+          .cpq-selection-grid .ag-cell[col-id="selection"]:focus-within {
+            outline: none !important;
+            border: none !important;
+            box-shadow: none !important;
+          }
+
+          /* Force remove AG Grid's cell focus border */
+          .cpq-selection-grid .ag-cell[col-id="selection"].ag-cell-inline-editing {
+            border: none !important;
+          }
+        `}</style>
         <AgGridReact
           ref={gridRef}
           rowData={components}
@@ -1035,7 +1281,11 @@ export function EnhancedComponentGrid({
           onColumnMoved={onColumnMoved}
           onFilterChanged={onFilterChanged}
           onCellClicked={onCellClicked}
-          rowSelection="single"
+          rowSelection="multiple"
+          getRowClass={params => {
+            const isSelected = selection.isSelected(params.data?.id);
+            return isSelected ? 'row-selected' : '';
+          }}
           animateRows={true}
           pagination={true}
           paginationPageSize={preferences.itemsPerPage}
@@ -1080,6 +1330,30 @@ export function EnhancedComponentGrid({
           }}
         />
       </div>
+
+      {/* Floating Action Toolbar */}
+      <FloatingActionToolbar
+        selectedCount={selection.selectionCount}
+        actions={gridActions}
+        onClear={selection.clearSelection}
+        onAction={selection.handleAction}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={deleteConfirm.open}
+        title="מחיקת רכיבים"
+        message={
+          deleteConfirm.count === 1
+            ? `האם אתה בטוח שברצונך למחוק את הרכיב "${deleteConfirm.items[0]?.name}"?`
+            : `האם אתה בטוח שברצונך למחוק ${deleteConfirm.count} רכיבים?`
+        }
+        confirmText="מחק"
+        cancelText="ביטול"
+        onConfirm={confirmBulkDelete}
+        onCancel={() => setDeleteConfirm({ open: false, count: 0, items: [] })}
+        type="danger"
+      />
     </div>
   );
 }

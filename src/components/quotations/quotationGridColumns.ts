@@ -4,11 +4,8 @@ import {
   StatusCellEditor,
   QUOTATION_STATUS_OPTIONS,
 } from '../grid/StatusCellEditor';
-import {
-  StatusRenderer,
-  CurrencyRenderer,
-  ActionsRenderer,
-} from './quotationGridRenderers';
+import { StatusRenderer, CurrencyRenderer } from './quotationGridRenderers';
+import { SelectionCheckboxRenderer } from '../grid/SelectionCheckboxRenderer';
 import { logger } from '@/lib/logger';
 
 export interface QuotationColumnDefsParams {
@@ -185,11 +182,21 @@ export const createQuotationColumnDefs = ({
     }),
   },
   {
-    headerName: 'פעולות',
-    field: 'actions',
-    width: 160,
+    headerName: '',
+    field: 'selection',
     sortable: false,
     filter: false,
-    cellRenderer: ActionsRenderer,
+    resizable: false,
+    width: 48,
+    maxWidth: 48,
+    minWidth: 48,
+    pinned: 'right' as const, // Pinned to right in RTL = visually left
+    lockPosition: true,
+    lockVisible: true,
+    suppressMenu: true,
+    suppressMovable: true,
+    suppressNavigable: true,
+    cellRenderer: SelectionCheckboxRenderer,
+    // cellRendererParams will be provided by the grid
   },
 ];

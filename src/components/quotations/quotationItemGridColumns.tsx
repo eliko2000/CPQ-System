@@ -362,8 +362,6 @@ export interface QuotationItemColumnDefsParams {
   getUniqueValues: (field: string) => string[];
   handleColumnMenuClick: (columnId: string) => void;
   handleFilterClick: (columnId: string) => void;
-  openComponentSelector: (systemId: string) => void;
-  deleteItem: (itemId: string) => Promise<void>;
   components: Component[];
   assemblies: Assembly[];
   setModal: (modal: any) => void;
@@ -387,8 +385,6 @@ export const createQuotationItemColumnDefs = (
     getUniqueValues,
     handleColumnMenuClick,
     handleFilterClick,
-    openComponentSelector,
-    deleteItem,
     components,
     assemblies,
     setModal,
@@ -621,8 +617,19 @@ export const createQuotationItemColumnDefs = (
         if (cellParams.data?.isSystemGroup) {
           return (
             <span
-              className="font-bold w-full block text-right"
+              className="font-bold w-full block text-right cursor-pointer hover:text-blue-600"
               style={{ direction: 'rtl' }}
+              onClick={e => {
+                e.stopPropagation();
+                const rowIndex = cellParams.node.rowIndex;
+                if (rowIndex !== null && rowIndex !== undefined) {
+                  cellParams.api.startEditingCell({
+                    rowIndex,
+                    colKey: 'componentName',
+                  });
+                }
+              }}
+              title="לחץ לעריכת שם המערכת"
             >
               {cellParams.value}
             </span>
@@ -926,12 +933,54 @@ export const createQuotationItemColumnDefs = (
     {
       headerName: 'מס"ד',
       field: 'displayNumber',
-      width: 80,
+      width: 120, // Reduced back since button is now just a plus icon
       resizable: true,
       cellRenderer: (cellParams: ICellRendererParams) => {
         if (cellParams.data?.isSystemGroup) {
+          const systemId = cellParams.data.systemId;
+          const { onAddItemToSystem } = cellParams.context || {};
+
+          if (onAddItemToSystem) {
+            // System number as a button that shows + on hover
+            return (
+              <button
+                className="system-number-btn font-bold text-blue-700 bg-blue-50 px-2 py-1 rounded hover:bg-blue-100 cursor-pointer transition-all duration-150 inline-flex items-center justify-center"
+                style={{ minWidth: '2rem' }}
+                onClick={e => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  logger.debug('➕ Add Component button clicked', { systemId });
+                  onAddItemToSystem(systemId);
+                }}
+                onMouseDown={e => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                }}
+                title="הוסף רכיב למערכת"
+                type="button"
+              >
+                <span className="number-text">{cellParams.value}</span>
+                <span className="plus-icon" style={{ display: 'none' }}>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-4 w-4"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </span>
+              </button>
+            );
+          }
+
+          // Fallback if no onAddItemToSystem
           return (
-            <span className="font-bold text-blue-700 bg-blue-50 px-2 py-1 rounded">
+            <span className="font-bold text-blue-700 bg-blue-50 px-2 py-1 rounded inline-block">
               {cellParams.value}
             </span>
           );
@@ -959,28 +1008,23 @@ export const createQuotationItemColumnDefs = (
       }),
     },
     {
-      headerName: 'פעולות',
-      field: 'actions',
-      width: 150,
-      resizable: true,
+      headerName: '',
+      field: 'selection' as any, // Custom field for selection column
+      width: 48,
+      maxWidth: 48,
+      minWidth: 48,
+      pinned: 'right' as const, // In RTL, this appears on the left
+      lockPosition: true,
+      lockVisible: true,
+      resizable: false,
       sortable: false,
       filter: false,
-      cellClass: cellParams =>
-        cellParams.data?.isSystemGroup
-          ? 'ag-cell-bold text-right'
-          : 'text-right',
-      cellRenderer: ActionsCellRenderer,
-      cellRendererParams: {
-        openComponentSelector,
-        deleteItem,
-        components,
-        assemblies,
-        setModal,
-        currentQuotation,
-        quotationsHook,
-        setCurrentQuotation,
-        updateQuotation,
-      },
+      suppressMenu: true,
+      suppressMovable: true,
+      suppressNavigable: true,
+      cellRenderer: 'SelectionCheckboxRenderer', // Will be provided via framework components
+      // cellRendererParams will be provided by the grid
+      cellClass: 'selection-cell',
     },
   ];
 };

@@ -1,10 +1,8 @@
 import { ColDef, ValueSetterParams } from 'ag-grid-community';
 import { CustomHeader } from '../grid/CustomHeader';
 import {
-  NameCellRenderer,
-  CategoryBadgeRenderer,
+  CategoryRenderer,
   CurrencyBadgeRenderer,
-  ActionsRenderer,
 } from './componentGridRenderers';
 import { Component } from '../../types';
 import { logger } from '@/lib/logger';
@@ -190,7 +188,6 @@ export const createComponentColumnDefs = ({
       column: params.column,
       uniqueValues: getUniqueValues('name'),
     }),
-    cellRenderer: NameCellRenderer,
     filterParams: {
       values: (_params: any) => getUniqueValues('name'),
     },
@@ -221,15 +218,6 @@ export const createComponentColumnDefs = ({
     },
   },
   {
-    headerName: 'פעולות',
-    field: 'actions',
-    sortable: false,
-    filter: false,
-    resizable: false,
-    width: 180,
-    cellRenderer: ActionsRenderer,
-  },
-  {
     headerName: 'קטגוריה',
     field: 'category',
     sortable: true,
@@ -252,7 +240,7 @@ export const createComponentColumnDefs = ({
       column: params.column,
       uniqueValues: getUniqueValues('category'),
     }),
-    cellRenderer: CategoryBadgeRenderer,
+    cellRenderer: CategoryRenderer,
     filterParams: {
       values: categories,
     },

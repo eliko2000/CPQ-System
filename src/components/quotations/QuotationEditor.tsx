@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useEffect } from 'react';
+import { useCallback, useMemo, useEffect, useRef } from 'react';
 import { useCPQ } from '../../contexts/CPQContext';
 import { QuotationParameters } from './QuotationParameters';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
@@ -17,6 +17,14 @@ import { AddItemDialog } from './AddItemDialog';
 import { QuotationModals } from './QuotationModals';
 import { createQuotationItemColumnDefs } from './quotationItemGridColumns';
 import { calculateItemTotals } from '../../utils/quotationCalculations';
+import { useGridSelection } from '../../hooks/useGridSelection';
+import { FloatingActionToolbar } from '../grid/FloatingActionToolbar';
+import { GridAction } from '../../types/grid.types';
+import { QuotationSystem } from '../../types/quotation.types';
+import { convertDbQuotationToQuotationProject } from '../../lib/utils';
+import { Edit, Trash2, Copy } from 'lucide-react';
+import { toast } from 'sonner';
+import { AgGridReact } from 'ag-grid-react';
 
 export function QuotationEditor() {
   const {
@@ -46,6 +54,22 @@ export function QuotationEditor() {
 
   // State management
   const state = useQuotationState();
+
+  // Grid reference for AG Grid API access
+  const gridRef = useRef<AgGridReact>(null);
+
+  // Initialize grid selection hook
+  const selection = useGridSelection({
+    gridApi: gridRef.current?.api,
+    getRowId: item => item.id,
+  });
+
+  // Force refresh row styles when selection changes
+  useEffect(() => {
+    if (gridRef.current?.api) {
+      gridRef.current.api.redrawRows();
+    }
+  }, [selection.selectedIds]);
 
   // Actions
   const actions = useQuotationActions({
@@ -106,6 +130,299 @@ export function QuotationEditor() {
     },
     [currentQuotation, quotationsHook, setCurrentQuotation, updateQuotation]
   );
+
+  // Bulk delete handler
+  const handleBulkDelete = useCallback(
+    async (__selectedIds: string[], selectedData: any[]) => {
+      if (!currentQuotation) return;
+
+      // Separate system rows and component items
+      const systemRows = selectedData.filter(item => item.isSystemGroup);
+      const itemsToDelete = selectedData.filter(item => !item.isSystemGroup);
+
+      // If only systems selected, delete the systems
+      if (systemRows.length > 0 && itemsToDelete.length === 0) {
+        // Delete systems
+        for (const systemRow of systemRows) {
+          const systemId = systemRow.systemId;
+
+          try {
+            // Delete all items in this system
+            const itemsInSystem = currentQuotation.items.filter(
+              item => item.systemId === systemId
+            );
+            for (const item of itemsInSystem) {
+              await quotationsHook.deleteQuotationItem(item.id);
+            }
+
+            // Delete the system itself
+            await quotationsHook.deleteQuotationSystem(systemId);
+          } catch (error) {
+            logger.error('Failed to delete system:', error);
+          }
+        }
+
+        // Update local state
+        const deletedSystemIds = systemRows.map(s => s.systemId);
+        const updatedSystems = currentQuotation.systems
+          .filter(s => !deletedSystemIds.includes(s.id))
+          .map((s, index) => ({
+            ...s,
+            order: index + 1,
+          }));
+
+        const updatedItems = currentQuotation.items.filter(
+          item => !deletedSystemIds.includes(item.systemId)
+        );
+
+        // Renumber items
+        const { renumberItems: renumber } = await import(
+          '../../utils/quotationCalculations'
+        );
+        const renumberedItems = renumber(updatedItems, updatedSystems);
+
+        const updatedQuotation = {
+          ...currentQuotation,
+          systems: updatedSystems,
+          items: renumberedItems,
+        };
+
+        setCurrentQuotation(updatedQuotation);
+        updateQuotation(currentQuotation.id, {
+          systems: updatedSystems,
+          items: renumberedItems,
+        });
+
+        toast.success(`${systemRows.length} מערכות נמחקו בהצלחה`);
+        selection.clearSelection();
+        return;
+      }
+
+      // Filter out system rows (only delete component items)
+      if (itemsToDelete.length === 0) {
+        toast.warning('לא ניתן למחוק רק שורות מערכת');
+        return;
+      }
+
+      // Delete from Supabase
+      for (const item of itemsToDelete) {
+        try {
+          await quotationsHook.deleteQuotationItem(item.id);
+        } catch (error) {
+          logger.error('Failed to delete item:', error);
+        }
+      }
+
+      // Remove from local state
+      const deletedIds = itemsToDelete.map(item => item.id);
+      const updatedItems = currentQuotation.items.filter(
+        item => !deletedIds.includes(item.id)
+      );
+
+      // Renumber items
+      const { renumberItems: renumber } = await import(
+        '../../utils/quotationCalculations'
+      );
+      const renumberedItems = renumber(updatedItems);
+
+      const updatedQuotation = {
+        ...currentQuotation,
+        items: renumberedItems,
+      };
+
+      setCurrentQuotation(updatedQuotation);
+      updateQuotation(currentQuotation.id, { items: renumberedItems });
+
+      toast.success(`${itemsToDelete.length} פריטים נמחקו בהצלחה`);
+      selection.clearSelection();
+    },
+    [
+      currentQuotation,
+      quotationsHook,
+      setCurrentQuotation,
+      updateQuotation,
+      selection,
+    ]
+  );
+
+  // Define grid actions for floating toolbar - filtered based on selection type
+  const gridActions = useMemo<GridAction[]>(() => {
+    const selectedData = selection.selectedData;
+    const hasSystemRows = selectedData.some((item: any) => item.isSystemGroup);
+    const hasComponentItems = selectedData.some(
+      (item: any) => !item.isSystemGroup
+    );
+
+    const actions: GridAction[] = [];
+
+    // Edit action (only show for component items, not systems)
+    if (!hasSystemRows && hasComponentItems) {
+      actions.push({
+        type: 'edit',
+        label: 'ערוך',
+        icon: Edit,
+        variant: 'outline',
+        singleOnly: true,
+        handler: async (__ids, data) => {
+          if (data.length === 1 && !data[0].isSystemGroup) {
+            const item = data[0];
+            const component = components.find(c => c.id === item.componentId);
+            if (component) {
+              setModal({ type: 'edit-component', data: component });
+            }
+          }
+        },
+      });
+    }
+
+    // Duplicate action (only show for system rows, not component items)
+    if (hasSystemRows && !hasComponentItems) {
+      actions.push({
+        type: 'duplicate',
+        label: 'שכפל מערכת',
+        icon: Copy,
+        variant: 'outline',
+        handler: async (__ids, data) => {
+          if (!currentQuotation) return;
+
+          const systemsToDuplicate = data.filter(item => item.isSystemGroup);
+          const itemsToDuplicate = data.filter(item => !item.isSystemGroup);
+
+          // Only allow duplicating systems, not individual items
+          if (itemsToDuplicate.length > 0) {
+            toast.warning('ניתן לשכפל רק מערכות שלמות, לא פריטים בודדים');
+            return;
+          }
+
+          if (systemsToDuplicate.length === 0) {
+            toast.warning('אנא בחר מערכת לשכפול');
+            return;
+          }
+
+          let successCount = 0;
+
+          try {
+            // Duplicate systems (with all their items)
+            for (const systemRow of systemsToDuplicate) {
+              const sourceSystem = currentQuotation.systems.find(
+                s => s.id === systemRow.systemId
+              );
+              if (!sourceSystem) continue;
+
+              // Create new system in database
+              const newSystemOrder = currentQuotation.systems.length + 1;
+              const dbSystem = await quotationsHook.addQuotationSystem({
+                quotation_id: currentQuotation.id,
+                system_name: `${sourceSystem.name} (עותק)`,
+                system_description: sourceSystem.description || '',
+                quantity: sourceSystem.quantity,
+                sort_order: newSystemOrder,
+                unit_cost: 0,
+                total_cost: 0,
+                unit_price: 0,
+                total_price: 0,
+              });
+
+              if (!dbSystem) {
+                logger.error('Failed to create duplicated system');
+                continue;
+              }
+
+              // Create local system object
+              const newSystem: QuotationSystem = {
+                id: dbSystem.id,
+                name: dbSystem.system_name,
+                description: dbSystem.system_description || '',
+                order: dbSystem.sort_order,
+                quantity: dbSystem.quantity,
+                createdAt: dbSystem.created_at,
+              };
+
+              // Duplicate all items in this system
+              const itemsInSystem = currentQuotation.items.filter(
+                item => item.systemId === systemRow.systemId
+              );
+
+              for (const sourceItem of itemsInSystem) {
+                await quotationsHook.addQuotationItem({
+                  quotation_system_id: newSystem.id,
+                  component_id: sourceItem.componentId,
+                  assembly_id: sourceItem.assemblyId,
+                  item_name: sourceItem.componentName,
+                  item_type: sourceItem.itemType,
+                  labor_subtype: sourceItem.laborSubtype,
+                  quantity: sourceItem.quantity,
+                  unit_cost: sourceItem.unitPriceILS || 0,
+                  total_cost: sourceItem.totalPriceILS || 0,
+                  margin_percentage: currentQuotation.parameters.profitPercent,
+                  unit_price: sourceItem.unitPriceILS || 0,
+                  total_price: sourceItem.totalPriceILS || 0,
+                  original_currency: sourceItem.originalCurrency,
+                  original_cost: sourceItem.originalCost,
+                  notes: sourceItem.notes,
+                  sort_order: sourceItem.itemOrder,
+                  is_custom_item: sourceItem.isCustomItem,
+                  msrp_price: sourceItem.msrpPrice,
+                  msrp_currency: sourceItem.msrpCurrency,
+                  use_msrp_pricing: sourceItem.useMsrpPricing,
+                });
+              }
+
+              // Update local state
+              const updatedQuotation = {
+                ...currentQuotation,
+                systems: [...currentQuotation.systems, newSystem],
+              };
+              setCurrentQuotation(updatedQuotation);
+
+              successCount++;
+            }
+
+            // Reload quotation to get fresh data with all duplicated items
+            if (currentQuotation.id) {
+              const refreshed = await quotationsHook.getQuotation(
+                currentQuotation.id
+              );
+              if (refreshed) {
+                const quotationProject =
+                  convertDbQuotationToQuotationProject(refreshed);
+                setCurrentQuotation(quotationProject);
+              }
+            }
+
+            if (successCount > 0) {
+              toast.success(`${successCount} מערכות שוכפלו בהצלחה`);
+            }
+          } catch (error) {
+            logger.error('Failed to duplicate:', error);
+            toast.error('שגיאה בשכפול. נסה שוב.');
+          } finally {
+            selection.clearSelection();
+          }
+        },
+      });
+    }
+
+    // Delete action (works for single or multiple, non-system rows only)
+    actions.push({
+      type: 'delete',
+      label: 'מחק',
+      icon: Trash2,
+      variant: 'destructive',
+      confirmRequired: true,
+      handler: handleBulkDelete,
+    });
+
+    return actions;
+  }, [
+    components,
+    setModal,
+    currentQuotation,
+    setCurrentQuotation,
+    updateQuotation,
+    handleBulkDelete,
+    selection.selectedData,
+  ]);
 
   // Prepare grid data with tree structure
   const gridData = useMemo(() => {
@@ -212,14 +529,12 @@ export function QuotationEditor() {
       assembliesCount: assemblies?.length,
     });
 
-    return createQuotationItemColumnDefs({
+    const baseCols = createQuotationItemColumnDefs({
       currentQuotation,
       gridData,
       getUniqueValues,
       handleColumnMenuClick,
       handleFilterClick,
-      openComponentSelector,
-      deleteItem,
       components,
       assemblies,
       setModal,
@@ -228,6 +543,20 @@ export function QuotationEditor() {
       quotationsHook,
       setCurrentQuotation,
       updateQuotation,
+    });
+
+    // Add cellRendererParams to selection column
+    return baseCols.map(col => {
+      if (col.field === 'selection') {
+        return {
+          ...col,
+          cellRendererParams: {
+            onSelectionToggle: selection.toggleSelection,
+            isSelected: selection.isSelected,
+          },
+        };
+      }
+      return col;
     });
   }, [
     currentQuotation,
@@ -245,6 +574,8 @@ export function QuotationEditor() {
     quotationsHook,
     setCurrentQuotation,
     updateQuotation,
+    selection.toggleSelection,
+    selection.isSelected,
   ]);
 
   // Filter components for popup
@@ -417,6 +748,7 @@ export function QuotationEditor() {
         <TabsContent value="items" className="space-y-6">
           {/* Systems and Items Grid */}
           <QuotationItemsGrid
+            gridRef={gridRef}
             gridData={gridData}
             columnDefs={columnDefs}
             onCellValueChanged={onCellValueChanged}
@@ -427,6 +759,8 @@ export function QuotationEditor() {
               )
             }
             onAddSystem={actions.addSystem}
+            onAddItemToSystem={openComponentSelector}
+            selection={selection}
           />
 
           {/* Calculations Summary */}
@@ -453,6 +787,14 @@ export function QuotationEditor() {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Floating Action Toolbar */}
+      <FloatingActionToolbar
+        selectedCount={selection.selectionCount}
+        actions={gridActions}
+        onClear={selection.clearSelection}
+        onAction={selection.handleAction}
+      />
 
       {/* Component/Assembly Selector Dialog */}
       <AddItemDialog

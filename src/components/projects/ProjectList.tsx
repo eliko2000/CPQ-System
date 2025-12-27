@@ -1,11 +1,11 @@
-import { useRef, useState, useMemo, useCallback } from 'react';
+import { useRef, useState, useMemo, useCallback, useEffect } from 'react';
 import { AgGridReact } from 'ag-grid-react';
 import { ColDef, ColumnState } from 'ag-grid-community';
 import { Card, CardContent } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
-import { FolderOpen, Plus, Edit, Trash2, Eye, Search } from 'lucide-react';
+import { FolderOpen, Plus, Edit, Trash2, Search } from 'lucide-react';
 import { useProjects } from '../../hooks/useProjects';
 import { useTableConfig } from '../../hooks/useTableConfig';
 import { CustomHeader } from '../grid/CustomHeader';
@@ -18,6 +18,10 @@ import { ProjectSummary, ProjectFormData, ProjectStatus } from '../../types';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { toast } from 'sonner';
 import { logger } from '@/lib/logger';
+import { useGridSelection } from '../../hooks/useGridSelection';
+import { SelectionCheckboxRenderer } from '../grid/SelectionCheckboxRenderer';
+import { FloatingActionToolbar } from '../grid/FloatingActionToolbar';
+import { GridAction } from '../../types/grid.types';
 
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
@@ -47,40 +51,7 @@ const StatusBadgeRenderer = (props: any) => {
   );
 };
 
-// Actions renderer
-const ActionsRenderer = (props: any) => {
-  const { onView, onEdit, onDelete } = props.context;
-  const project: ProjectSummary = props.data;
-
-  return (
-    <div className="flex gap-1 items-center justify-end">
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => onView(project.id)}
-        title="צפה בפרויקט"
-      >
-        <Eye className="h-4 w-4" />
-      </Button>
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => onEdit(project)}
-        title="ערוך פרויקט"
-      >
-        <Edit className="h-4 w-4" />
-      </Button>
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => onDelete(project.id, project.projectName)}
-        title="מחק פרויקט"
-      >
-        <Trash2 className="h-4 w-4 text-red-500" />
-      </Button>
-    </div>
-  );
-};
+// (ActionsRenderer removed - replaced with SelectionCheckboxRenderer)
 
 interface ProjectListProps {
   onViewProject?: (projectId: string) => void;
@@ -96,16 +67,23 @@ export function ProjectList({ onViewProject }: ProjectListProps = {}) {
     null
   );
   const [deleteConfirm, setDeleteConfirm] = useState<{
-    isOpen: boolean;
-    projectId: string | null;
-    projectName: string;
-    quotationCount: number;
-  }>({
-    isOpen: false,
-    projectId: null,
-    projectName: '',
-    quotationCount: 0,
+    open: boolean;
+    count: number;
+    items: ProjectSummary[];
+  }>({ open: false, count: 0, items: [] });
+
+  // Initialize grid selection hook
+  const selection = useGridSelection<ProjectSummary>({
+    gridApi: gridRef.current?.api,
+    getRowId: project => project.id,
   });
+
+  // Force refresh row styles when selection changes
+  useEffect(() => {
+    if (gridRef.current?.api) {
+      gridRef.current.api.redrawRows();
+    }
+  }, [selection.selectedIds]);
 
   // Use table configuration hook for persistence
   const {
@@ -114,26 +92,39 @@ export function ProjectList({ onViewProject }: ProjectListProps = {}) {
     loading: configLoading,
   } = useTableConfig('projects_list', {
     columnOrder: [
+      'selection',
       'projectNumber',
       'projectName',
       'companyName',
       'status',
       'quotationCount',
       'createdAt',
-      'actions',
     ],
     columnWidths: {},
     visibleColumns: [
+      'selection',
       'projectNumber',
       'projectName',
       'companyName',
       'status',
       'quotationCount',
       'createdAt',
-      'actions',
     ],
     filterState: {},
   });
+
+  // Ensure selection column is in saved config (migration from old config)
+  useEffect(() => {
+    if (config.visibleColumns && !config.visibleColumns.includes('selection')) {
+      saveConfig({
+        ...config,
+        visibleColumns: ['selection', ...config.visibleColumns],
+        columnOrder: config.columnOrder?.includes('selection')
+          ? config.columnOrder
+          : ['selection', ...(config.columnOrder || [])],
+      });
+    }
+  }, [config.visibleColumns, config.columnOrder, saveConfig]);
 
   // Filter projects based on search
   const filteredProjects = useMemo(() => {
@@ -326,17 +317,85 @@ export function ProjectList({ onViewProject }: ProjectListProps = {}) {
         }),
       },
       {
-        headerName: 'פעולות',
-        cellRenderer: ActionsRenderer,
-        flex: 1,
-        minWidth: 150,
+        headerName: '',
+        field: 'selection' as any, // Custom field for selection column
         sortable: false,
         filter: false,
-        cellStyle: { textAlign: 'left' },
+        resizable: false,
+        width: 48,
+        maxWidth: 48,
+        minWidth: 48,
+        pinned: 'right' as const, // Pinned to right in RTL = visually left
+        lockPosition: true,
+        lockVisible: true,
+        suppressMenu: true,
+        suppressMovable: true,
+        suppressNavigable: true,
+        cellRenderer: SelectionCheckboxRenderer,
+        cellRendererParams: {
+          onSelectionToggle: selection.toggleSelection,
+          isSelected: selection.isSelected,
+        },
       },
     ],
-    [getUniqueValues, handleColumnMenuClick, handleFilterClick, updateProject]
+    [
+      getUniqueValues,
+      handleColumnMenuClick,
+      handleFilterClick,
+      updateProject,
+      selection.toggleSelection,
+      selection.isSelected,
+    ]
   );
+
+  // Filter and reorder columns based on config (ensure selection column is always visible)
+  const visibleColumnDefs = useMemo(() => {
+    // Ensure 'selection' is always in visible columns
+    const visibleColumnsWithSelection =
+      config.visibleColumns && config.visibleColumns.includes('selection')
+        ? config.visibleColumns
+        : ['selection', ...(config.visibleColumns || [])];
+
+    // If no visible columns configured, show all columns
+    if (!config.visibleColumns || config.visibleColumns.length === 0) {
+      return columnDefs;
+    }
+
+    const visible = columnDefs.filter(col =>
+      visibleColumnsWithSelection.includes(col.field as string)
+    );
+
+    // If filtering results in no columns, fall back to all columns
+    if (visible.length === 0) {
+      return columnDefs;
+    }
+
+    // Reorder according to config.columnOrder
+    const effectiveOrder =
+      config.columnOrder && config.columnOrder.length > 0
+        ? config.columnOrder
+        : config.visibleColumns;
+
+    const ordered = effectiveOrder
+      .filter(fieldId => visible.some(col => col.field === fieldId))
+      .map(fieldId => visible.find(col => col.field === fieldId)!);
+
+    // Apply saved column widths to prevent flash of default widths
+    const withSavedWidths = ordered.map(col => {
+      const savedWidth = config.columnWidths[col.field as string];
+      if (savedWidth) {
+        return { ...col, width: savedWidth };
+      }
+      return col;
+    });
+
+    return withSavedWidths.length > 0 ? withSavedWidths : visible;
+  }, [
+    columnDefs,
+    config.visibleColumns,
+    config.columnOrder,
+    config.columnWidths,
+  ]);
 
   const defaultColDef = useMemo<ColDef>(
     () => ({
@@ -381,58 +440,115 @@ export function ProjectList({ onViewProject }: ProjectListProps = {}) {
     setIsFormOpen(true);
   }, []);
 
-  // Handle delete project
-  const handleDeleteProject = useCallback(
-    (projectId: string, projectName: string) => {
-      // Find the project to get quotation count
-      const project = projects.find(p => p.id === projectId);
-      const quotationCount = project?.quotationCount || 0;
-
+  // Bulk delete handler
+  const handleBulkDelete = useCallback(
+    async (selectedIds: string[], selectedData: ProjectSummary[]) => {
       setDeleteConfirm({
-        isOpen: true,
-        projectId,
-        projectName,
-        quotationCount,
+        open: true,
+        count: selectedIds.length,
+        items: selectedData,
       });
     },
-    [projects]
+    []
   );
 
-  // Confirm delete
-  const confirmDelete = async () => {
-    if (deleteConfirm.projectId) {
-      try {
-        const result = await deleteProject(deleteConfirm.projectId);
-        const deletedQuotations = result?.quotationCount || 0;
+  // Confirm bulk delete
+  const confirmBulkDelete = useCallback(async () => {
+    const { items } = deleteConfirm;
+    const failures: Array<{ id: string; reason: string; itemName: string }> =
+      [];
+    let successCount = 0;
+    let totalQuotationsDeleted = 0;
 
-        if (deletedQuotations > 0) {
-          toast.success(
-            `הפרויקט ו-${deletedQuotations} הצעות מחיר נמחקו בהצלחה`
-          );
-        } else {
-          toast.success('הפרויקט נמחק בהצלחה');
-        }
-      } catch (error) {
-        logger.error('Failed to delete project:', error);
-        toast.error('שגיאה במחיקת הפרויקט');
+    // Close dialog first
+    setDeleteConfirm({ open: false, count: 0, items: [] });
+
+    // Perform actual deletion
+    for (const project of items) {
+      try {
+        const result = await deleteProject(project.id);
+        successCount++;
+        totalQuotationsDeleted += result?.quotationCount || 0;
+      } catch (error: any) {
+        failures.push({
+          id: project.id,
+          itemName: project.projectName,
+          reason: error.message || 'שגיאה לא ידועה',
+        });
       }
-      setDeleteConfirm({
-        isOpen: false,
-        projectId: null,
-        projectName: '',
-        quotationCount: 0,
+    }
+
+    // Show results AFTER deletion completes
+    if (failures.length === 0) {
+      if (totalQuotationsDeleted > 0) {
+        toast.success(
+          `${successCount} פרויקטים ו-${totalQuotationsDeleted} הצעות מחיר נמחקו בהצלחה`
+        );
+      } else {
+        toast.success(`${successCount} פרויקטים נמחקו בהצלחה`);
+      }
+    } else if (successCount === 0) {
+      toast.error(`מחיקה נכשלה עבור כל ${failures.length} הפרויקטים`);
+      // Show detailed failure messages
+      failures.forEach(f => {
+        toast.error(
+          <div className="space-y-1">
+            <div className="font-semibold">{f.itemName}</div>
+            <div className="text-sm whitespace-pre-line">{f.reason}</div>
+          </div>,
+          { duration: 10000 }
+        );
+      });
+    } else {
+      toast.warning(
+        `${successCount} פרויקטים נמחקו בהצלחה, ${failures.length} נכשלו`
+      );
+      // Show detailed failure messages
+      failures.forEach(f => {
+        toast.error(
+          <div className="space-y-1">
+            <div className="font-semibold">{f.itemName}</div>
+            <div className="text-sm whitespace-pre-line">{f.reason}</div>
+          </div>,
+          { duration: 10000 }
+        );
       });
     }
-  };
 
-  const cancelDelete = () => {
-    setDeleteConfirm({
-      isOpen: false,
-      projectId: null,
-      projectName: '',
-      quotationCount: 0,
+    // Clear selection AFTER successful deletion
+    selection.clearSelection();
+  }, [deleteConfirm, deleteProject, selection]);
+
+  // Define grid actions for floating toolbar
+  const gridActions = useMemo<GridAction[]>(() => {
+    const actions: GridAction[] = [];
+
+    // Edit action (single-row only)
+    actions.push({
+      type: 'edit',
+      label: 'ערוך',
+      icon: Edit,
+      variant: 'outline',
+      singleOnly: true,
+      handler: async (__ids, data) => {
+        if (data.length === 1) {
+          handleEditProject(data[0]);
+        }
+      },
     });
-  };
+
+    // Delete action (works for single or multiple)
+    actions.push({
+      type: 'delete',
+      label: 'מחק',
+      icon: Trash2,
+      variant: 'destructive',
+      confirmRequired: true,
+      handler: handleBulkDelete,
+    });
+
+    return actions;
+  }, [handleEditProject, handleBulkDelete]);
 
   // Handle row double-click to view project
   const onRowDoubleClicked = useCallback(
@@ -454,15 +570,22 @@ export function ProjectList({ onViewProject }: ProjectListProps = {}) {
     });
   }, []);
 
-  // Context for cell renderers
+  // Grid context for selection
   const context = useMemo(
     () => ({
-      onView: handleViewProject,
-      onEdit: handleEditProject,
-      onDelete: handleDeleteProject,
+      onSelectionToggle: selection.toggleSelection,
+      isSelected: selection.isSelected,
     }),
-    [handleViewProject, handleEditProject, handleDeleteProject]
+    [selection.toggleSelection, selection.isSelected]
   );
+
+  // Handle cell click to prevent selection column from opening edit form
+  const onCellClicked = useCallback((event: any) => {
+    // Don't open form if clicking selection checkbox column
+    if (event.colDef.field === 'selection') return;
+
+    // For other cells, the double-click handler will open the project
+  }, []);
 
   return (
     <div className="space-y-6" dir="rtl">
@@ -531,23 +654,90 @@ export function ProjectList({ onViewProject }: ProjectListProps = {}) {
             </div>
           ) : (
             <div
-              className="ag-theme-alpine"
+              className="ag-theme-alpine cpq-selection-grid"
               style={{ height: '600px', width: '100%' }}
               dir="rtl"
             >
+              <style>{`
+                /* ClickUp-style: Checkbox OUTSIDE table - completely transparent */
+                .cpq-selection-grid .ag-pinned-right-cols-container {
+                  background: transparent !important;
+                  border: none !important;
+                  margin-left: 0 !important;
+                  padding-left: 0 !important;
+                }
+
+                .cpq-selection-grid .ag-pinned-right-header {
+                  background: transparent !important;
+                  border: none !important;
+                  margin-left: 0 !important;
+                }
+
+                .cpq-selection-grid .ag-cell[col-id="selection"] {
+                  background: transparent !important;
+                  border: none !important;
+                  padding: 0 !important;
+                }
+
+                /* Show checkbox on row hover - overrides inline style */
+                .cpq-selection-grid .ag-row:hover .checkbox-hover-target,
+                .cpq-selection-grid .ag-row-hover .checkbox-hover-target {
+                  opacity: 1 !important;
+                }
+
+                /* CRITICAL: Show checkbox for selected rows even when not hovering */
+                .cpq-selection-grid .ag-row.row-selected .checkbox-hover-target {
+                  opacity: 1 !important;
+                }
+
+                /* Row highlighting when selected - light blue */
+                .cpq-selection-grid .ag-row.row-selected {
+                  background-color: #eff6ff !important;
+                }
+
+                /* Remove focus ring from checkbox (but keep border for visibility) */
+                .cpq-selection-grid .ag-cell[col-id="selection"] button {
+                  outline: none !important;
+                  box-shadow: none !important;
+                }
+
+                .cpq-selection-grid .ag-cell[col-id="selection"] button:focus {
+                  outline: none !important;
+                  box-shadow: none !important;
+                  ring: 0 !important;
+                }
+
+                /* Remove blue border from AG Grid cell focus */
+                .cpq-selection-grid .ag-cell[col-id="selection"]:focus,
+                .cpq-selection-grid .ag-cell[col-id="selection"].ag-cell-focus,
+                .cpq-selection-grid .ag-cell[col-id="selection"]:focus-within {
+                  outline: none !important;
+                  border: none !important;
+                  box-shadow: none !important;
+                }
+              `}</style>
               <AgGridReact<ProjectSummary>
                 ref={gridRef}
                 rowData={filteredProjects}
-                columnDefs={columnDefs}
+                columnDefs={visibleColumnDefs}
                 defaultColDef={defaultColDef}
+                context={context}
                 pagination={true}
                 paginationPageSize={20}
                 domLayout="normal"
                 enableRtl={true}
+                suppressRowClickSelection={true}
+                rowSelection="multiple"
+                getRowClass={params => {
+                  const isSelected = selection.isSelected(
+                    params.data?.id || ''
+                  );
+                  return isSelected ? 'row-selected' : '';
+                }}
                 singleClickEdit={true}
                 onRowDoubleClicked={onRowDoubleClicked}
+                onCellClicked={onCellClicked}
                 onCellValueChanged={handleCellValueChanged}
-                context={context}
                 animateRows={true}
                 onGridReady={() => {
                   // Apply saved column state if available
@@ -555,12 +745,29 @@ export function ProjectList({ onViewProject }: ProjectListProps = {}) {
                     const columnState: ColumnState[] = config.columnOrder.map(
                       colId => ({
                         colId,
-                        hide: Array.isArray(config.visibleColumns)
-                          ? !config.visibleColumns.includes(colId)
-                          : (config.visibleColumns as any)?.[colId] === false,
+                        hide:
+                          colId === 'selection'
+                            ? false // ALWAYS show selection column
+                            : Array.isArray(config.visibleColumns)
+                              ? !config.visibleColumns.includes(colId)
+                              : (config.visibleColumns as any)?.[colId] ===
+                                false,
                         width: (config.columnWidths as any)?.[colId],
                       })
                     );
+
+                    // Ensure selection column is in the state even if not in saved config
+                    const hasSelection = columnState.some(
+                      col => col.colId === 'selection'
+                    );
+                    if (!hasSelection) {
+                      columnState.unshift({
+                        colId: 'selection',
+                        hide: false,
+                        width: 48,
+                      });
+                    }
+
                     gridRef.current.api.applyColumnState({
                       state: columnState,
                     });
@@ -586,9 +793,15 @@ export function ProjectList({ onViewProject }: ProjectListProps = {}) {
                 onColumnVisible={event => {
                   if (event.column && gridRef.current) {
                     const columnState = gridRef.current.api.getColumnState();
-                    const visibleColumns: string[] = columnState
+                    let visibleColumns: string[] = columnState
                       .filter(col => !col.hide)
                       .map(col => col.colId);
+
+                    // Ensure selection column is always in visible columns
+                    if (!visibleColumns.includes('selection')) {
+                      visibleColumns = ['selection', ...visibleColumns];
+                    }
+
                     saveConfig({ ...config, visibleColumns });
                   }
                 }}
@@ -597,6 +810,14 @@ export function ProjectList({ onViewProject }: ProjectListProps = {}) {
           )}
         </CardContent>
       </Card>
+
+      {/* Floating Action Toolbar */}
+      <FloatingActionToolbar
+        selectedCount={selection.selectionCount}
+        actions={gridActions}
+        onClear={selection.clearSelection}
+        onAction={selection.handleAction}
+      />
 
       {/* Project Form Modal */}
       <ProjectFormModal
@@ -611,20 +832,24 @@ export function ProjectList({ onViewProject }: ProjectListProps = {}) {
 
       {/* Delete Confirmation Dialog */}
       <ConfirmDialog
-        isOpen={deleteConfirm.isOpen}
-        title="מחיקת פרויקט"
+        isOpen={deleteConfirm.open}
+        title="מחיקת פרויקטים"
         message={
-          deleteConfirm.quotationCount > 0
-            ? `האם אתה בטוח שברצונך למחוק את הפרויקט "${deleteConfirm.projectName}"?\n\n⚠️ הפרויקט מכיל ${deleteConfirm.quotationCount} הצעות מחיר שיימחקו גם כן.\n\nפעולה זו אינה הפיכה ותמחק את כל הנתונים הקשורים.`
-            : `האם אתה בטוח שברצונך למחוק את הפרויקט "${deleteConfirm.projectName}"?\n\nפעולה זו אינה הפיכה.`
+          deleteConfirm.count === 1
+            ? deleteConfirm.items[0]?.quotationCount > 0
+              ? `האם אתה בטוח שברצונך למחוק את הפרויקט "${deleteConfirm.items[0]?.projectName}"?\n\n⚠️ הפרויקט מכיל ${deleteConfirm.items[0]?.quotationCount} הצעות מחיר שיימחקו גם כן.\n\nפעולה זו אינה הפיכה ותמחק את כל הנתונים הקשורים.`
+              : `האם אתה בטוח שברצונך למחוק את הפרויקט "${deleteConfirm.items[0]?.projectName}"?\n\nפעולה זו אינה הפיכה.`
+            : `האם אתה בטוח שברצונך למחוק ${deleteConfirm.count} פרויקטים?\n\nפרויקטים שיימחקו:\n${deleteConfirm.items.map(p => `• ${p.projectName}${p.quotationCount > 0 ? ` (${p.quotationCount} הצעות מחיר)` : ''}`).join('\n')}\n\n⚠️ כל הצעות המחיר הקשורות יימחקו גם כן.\n\nפעולה זו אינה הפיכה.`
         }
         confirmText="מחק"
         cancelText="ביטול"
-        onConfirm={confirmDelete}
-        onCancel={cancelDelete}
+        onConfirm={confirmBulkDelete}
+        onCancel={() => setDeleteConfirm({ open: false, count: 0, items: [] })}
         type="danger"
-        requireConfirmation={deleteConfirm.quotationCount > 0}
-        confirmationText={deleteConfirm.projectName}
+        requireConfirmation={deleteConfirm.items.some(
+          p => p.quotationCount > 0
+        )}
+        confirmationText={deleteConfirm.items[0]?.projectName}
         confirmationPlaceholder="הקלד את שם הפרויקט"
       />
     </div>

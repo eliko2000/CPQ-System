@@ -17,7 +17,15 @@ import {
   formatCurrency,
   convertDbQuotationToQuotationProject,
 } from '../../lib/utils';
-import { Plus, Settings, ChevronDown } from 'lucide-react';
+import {
+  Plus,
+  Settings,
+  ChevronDown,
+  Edit,
+  Trash2,
+  Copy,
+  FileText,
+} from 'lucide-react';
 import { useClickOutside } from '../../hooks/useClickOutside';
 import { useTableConfig } from '../../hooks/useTableConfig';
 import { useAppearancePreferences } from '../../hooks/useAppearancePreferences';
@@ -28,6 +36,10 @@ import { logger } from '@/lib/logger';
 import { createQuotationColumnDefs } from './quotationGridColumns';
 import { generateQuotationNumber } from '../../services/numberingService';
 import { useTeam } from '../../contexts/TeamContext';
+import { useGridSelection } from '../../hooks/useGridSelection';
+import { FloatingActionToolbar } from '../grid/FloatingActionToolbar';
+import { GridAction } from '../../types/grid.types';
+import { toast } from 'sonner';
 
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
@@ -58,15 +70,21 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
   const { preferences } = useAppearancePreferences();
 
   const gridRef = useRef<AgGridReact>(null);
-  const [selectedQuotations, setSelectedQuotations] = useState<string[]>([]);
-  const [deleteDialog, setDeleteDialog] = useState<{
+  const [deleteConfirm, setDeleteConfirm] = useState<{
     open: boolean;
-    quotation?: DbQuotation;
-  }>({ open: false });
+    count: number;
+    items: DbQuotation[];
+  }>({ open: false, count: 0, items: [] });
   const [creatingNew, setCreatingNew] = useState(false);
   const [showColumnManager, setShowColumnManager] = useState(false);
   const [showProjectPicker, setShowProjectPicker] = useState(false);
   const isInitialMount = useRef(true);
+
+  // Initialize grid selection hook
+  const selection = useGridSelection<DbQuotation>({
+    gridApi: gridRef.current?.api,
+    getRowId: quotation => quotation.id,
+  });
 
   // Refetch quotations when component mounts to ensure fresh data after navigation
   useEffect(() => {
@@ -76,7 +94,7 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
   // Use table configuration hook - RTL order (stored order matches desired display order)
   const { config, saveConfig } = useTableConfig('quotation_data_grid', {
     columnOrder: [
-      'actions',
+      'selection',
       'customer_name',
       'project_name',
       'version',
@@ -116,92 +134,199 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
     logger.debug('Filter clicked:', columnId);
   }, []);
 
-  // Handle edit
-  const handleEdit = useCallback(
-    (quotation: DbQuotation) => {
-      if (onQuotationEdit) {
-        onQuotationEdit(quotation);
-      } else {
-        // Convert DbQuotation to QuotationProject and open in editor
-        const quotationProject =
-          convertDbQuotationToQuotationProject(quotation);
-        setCurrentQuotation(quotationProject);
-      }
+  // Bulk delete handler with partial failure support
+  const handleBulkDelete = useCallback(
+    async (selectedIds: string[], selectedData: DbQuotation[]) => {
+      setDeleteConfirm({
+        open: true,
+        count: selectedIds.length,
+        items: selectedData,
+      });
     },
-    [onQuotationEdit, setCurrentQuotation]
+    []
   );
 
-  // Handle delete
-  const handleDelete = useCallback((quotation: DbQuotation) => {
-    setDeleteDialog({ open: true, quotation });
-  }, []);
+  // Confirm bulk delete
+  const confirmBulkDelete = useCallback(async () => {
+    const { items } = deleteConfirm;
+    const failures: Array<{ id: string; reason: string; itemName: string }> =
+      [];
+    let successCount = 0;
 
-  // Handle duplicate
-  const handleDuplicate = useCallback(
-    async (quotation: DbQuotation) => {
+    // Close dialog first
+    setDeleteConfirm({ open: false, count: 0, items: [] });
+
+    // Perform actual deletion
+    for (const quotation of items) {
       try {
-        const newQuotationNumber = `${quotation.quotation_number}-COPY-${Date.now()}`;
-        const newQuotation = await duplicateQuotation(
-          quotation.id,
-          newQuotationNumber
-        );
+        await deleteQuotation(quotation.id);
+        successCount++;
+      } catch (error: any) {
+        failures.push({
+          id: quotation.id,
+          itemName: quotation.project_name || quotation.quotation_number,
+          reason: error.message || 'שגיאה לא ידועה',
+        });
+      }
+    }
 
-        if (newQuotation) {
+    // Show results AFTER deletion completes
+    if (failures.length === 0) {
+      toast.success(`${successCount} הצעות מחיר נמחקו בהצלחה`);
+    } else if (successCount === 0) {
+      toast.error(`מחיקה נכשלה עבור כל ${failures.length} ההצעות`);
+      // Show detailed failure messages
+      failures.forEach(f => {
+        toast.error(
+          <div className="space-y-1">
+            <div className="font-semibold">{f.itemName}</div>
+            <div className="text-sm whitespace-pre-line">{f.reason}</div>
+          </div>,
+          { duration: 10000 }
+        );
+      });
+    } else {
+      toast.warning(
+        `${successCount} הצעות מחיר נמחקו בהצלחה, ${failures.length} נכשלו`
+      );
+      // Show detailed failure messages
+      failures.forEach(f => {
+        toast.error(
+          <div className="space-y-1">
+            <div className="font-semibold">{f.itemName}</div>
+            <div className="text-sm whitespace-pre-line">{f.reason}</div>
+          </div>,
+          { duration: 10000 }
+        );
+      });
+    }
+
+    // Clear selection AFTER successful deletion
+    selection.clearSelection();
+  }, [deleteConfirm, deleteQuotation, selection]);
+
+  // Define grid actions for floating toolbar
+  const gridActions = useMemo<GridAction[]>(() => {
+    const actions: GridAction[] = [];
+
+    // Edit action (single-row only)
+    actions.push({
+      type: 'edit',
+      label: 'ערוך',
+      icon: Edit,
+      variant: 'outline',
+      singleOnly: true,
+      handler: async (__ids, data) => {
+        if (data.length === 1) {
           if (onQuotationEdit) {
-            onQuotationEdit(newQuotation);
+            onQuotationEdit(data[0]);
           } else {
-            const quotationProject =
-              convertDbQuotationToQuotationProject(newQuotation);
+            const quotationProject = convertDbQuotationToQuotationProject(
+              data[0]
+            );
             setCurrentQuotation(quotationProject);
           }
         }
-      } catch (error) {
-        logger.error('Failed to duplicate quotation:', error);
-        alert('שגיאה בשכפול הצעת מחיר. נסה שוב.');
-      }
-    },
-    [duplicateQuotation, onQuotationEdit, setCurrentQuotation]
-  );
+      },
+    });
 
-  // Handle new version
-  const handleNewVersion = useCallback(
-    async (quotation: DbQuotation) => {
-      try {
-        const currentVersion = quotation.version || 1;
-        const newVersion = currentVersion + 1;
-        const newQuotationNumber = `${quotation.quotation_number}-V${newVersion}`;
-        const newQuotation = await duplicateQuotation(
-          quotation.id,
-          newQuotationNumber,
-          newVersion
-        );
+    // Duplicate action (works for single or multiple)
+    actions.push({
+      type: 'duplicate',
+      label: 'שכפל',
+      icon: Copy,
+      variant: 'outline',
+      handler: async (__ids, data) => {
+        for (const quotation of data) {
+          try {
+            const newQuotationNumber = `${quotation.quotation_number}-COPY-${Date.now()}`;
+            const newQuotation = await duplicateQuotation(
+              quotation.id,
+              newQuotationNumber
+            );
 
-        if (newQuotation) {
-          if (onQuotationEdit) {
-            onQuotationEdit(newQuotation);
-          } else {
-            const quotationProject =
-              convertDbQuotationToQuotationProject(newQuotation);
-            setCurrentQuotation(quotationProject);
+            if (newQuotation && data.length === 1) {
+              // Only open the duplicated quotation if it's a single item
+              if (onQuotationEdit) {
+                onQuotationEdit(newQuotation);
+              } else {
+                const quotationProject =
+                  convertDbQuotationToQuotationProject(newQuotation);
+                setCurrentQuotation(quotationProject);
+              }
+            }
+          } catch (error) {
+            logger.error('Failed to duplicate quotation:', error);
           }
         }
-      } catch (error) {
-        logger.error('Failed to create new version:', error);
-        alert('שגיאה ביצירת גרסה חדשה. נסה שוב.');
-      }
-    },
-    [duplicateQuotation, onQuotationEdit, setCurrentQuotation]
-  );
+        if (data.length > 1) {
+          toast.success(`${data.length} הצעות מחיר שוכפלו בהצלחה`);
+        }
+      },
+    });
 
-  // Create context for AG Grid cell renderers
+    // New Version action (single-row only)
+    actions.push({
+      type: 'newVersion' as any, // Custom action type
+      label: 'גרסה חדשה',
+      icon: FileText,
+      variant: 'outline',
+      singleOnly: true,
+      handler: async (__ids, data) => {
+        if (data.length === 1) {
+          try {
+            const quotation = data[0];
+            const currentVersion = quotation.version || 1;
+            const newVersion = currentVersion + 1;
+            const newQuotationNumber = `${quotation.quotation_number}-V${newVersion}`;
+            const newQuotation = await duplicateQuotation(
+              quotation.id,
+              newQuotationNumber,
+              newVersion
+            );
+
+            if (newQuotation) {
+              if (onQuotationEdit) {
+                onQuotationEdit(newQuotation);
+              } else {
+                const quotationProject =
+                  convertDbQuotationToQuotationProject(newQuotation);
+                setCurrentQuotation(quotationProject);
+              }
+            }
+          } catch (error) {
+            logger.error('Failed to create new version:', error);
+            toast.error('שגיאה ביצירת גרסה חדשה');
+          }
+        }
+      },
+    });
+
+    // Delete action (works for single or multiple)
+    actions.push({
+      type: 'delete',
+      label: 'מחק',
+      icon: Trash2,
+      variant: 'destructive',
+      confirmRequired: true,
+      handler: handleBulkDelete,
+    });
+
+    return actions;
+  }, [
+    onQuotationEdit,
+    setCurrentQuotation,
+    duplicateQuotation,
+    handleBulkDelete,
+  ]);
+
+  // Grid context for selection
   const gridContext = useMemo(
     () => ({
-      onEdit: handleEdit,
-      onDelete: handleDelete,
-      onDuplicate: handleDuplicate,
-      onNewVersion: handleNewVersion,
+      onSelectionToggle: selection.toggleSelection,
+      isSelected: selection.isSelected,
     }),
-    [handleEdit, handleDelete, handleDuplicate, handleNewVersion]
+    [selection.toggleSelection, selection.isSelected]
   );
 
   // Convert DbQuotation to grid data format
@@ -221,22 +346,41 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
   }, [quotations]);
 
   // Column definitions with RTL support - order will be reversed by AG Grid
-  const columnDefs = useMemo(
-    () =>
-      createQuotationColumnDefs({
-        getUniqueValues,
-        handleColumnMenuClick,
-        handleFilterClick,
-        updateQuotation,
-      }),
-    [getUniqueValues, handleColumnMenuClick, handleFilterClick, updateQuotation]
-  );
+  const columnDefs = useMemo(() => {
+    const baseCols = createQuotationColumnDefs({
+      getUniqueValues,
+      handleColumnMenuClick,
+      handleFilterClick,
+      updateQuotation,
+    });
+
+    // Add cellRendererParams to selection column
+    return baseCols.map(col => {
+      if (col.field === 'selection') {
+        return {
+          ...col,
+          cellRendererParams: {
+            onSelectionToggle: selection.toggleSelection,
+            isSelected: selection.isSelected,
+          },
+        };
+      }
+      return col;
+    });
+  }, [
+    getUniqueValues,
+    handleColumnMenuClick,
+    handleFilterClick,
+    updateQuotation,
+    selection.toggleSelection,
+    selection.isSelected,
+  ]);
 
   // Filter and reorder columns based on config
   const visibleColumnDefs = useMemo(() => {
     // Default column order if not configured
     const defaultOrder = [
-      'actions',
+      'selection',
       'customer_name',
       'project_name',
       'version',
@@ -258,13 +402,19 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
       config.visibleColumns
     );
 
+    // Ensure 'selection' is always in visible columns
+    const visibleColumnsWithSelection =
+      config.visibleColumns && config.visibleColumns.includes('selection')
+        ? config.visibleColumns
+        : ['selection', ...(config.visibleColumns || [])];
+
     // If no visible columns configured, show all columns
     if (!config.visibleColumns || config.visibleColumns.length === 0) {
       return columnDefs;
     }
 
     const visible = columnDefs.filter(col =>
-      config.visibleColumns.includes(col.field!)
+      visibleColumnsWithSelection.includes(col.field!)
     );
 
     // If filtering results in no columns, fall back to all columns
@@ -373,18 +523,6 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
     [updateQuotation]
   );
 
-  // Confirm delete
-  const confirmDelete = useCallback(async () => {
-    if (!deleteDialog.quotation) return;
-
-    try {
-      await deleteQuotation(deleteDialog.quotation.id);
-      setDeleteDialog({ open: false });
-    } catch (error) {
-      logger.error('Failed to delete quotation:', error);
-    }
-  }, [deleteDialog.quotation, deleteQuotation]);
-
   // Handle row double click
   const handleRowDoubleClicked = useCallback(
     (params: any) => {
@@ -401,10 +539,12 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
     [onQuotationSelect, setCurrentQuotation]
   );
 
-  // Handle selection change
-  const handleSelectionChanged = useCallback(() => {
-    const selectedNodes = gridRef.current?.api.getSelectedNodes() || [];
-    setSelectedQuotations(selectedNodes.map((node: any) => node.data.id));
+  // Handle cell click to prevent selection column from opening editor
+  const onCellClicked = useCallback((params: any) => {
+    // Don't open form if clicking on the selection checkbox column
+    if (params.colDef.field === 'selection') return;
+
+    // For other cells, the double-click handler will open the quotation
   }, []);
 
   // Grid ready handler
@@ -698,8 +838,8 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
             <div>
               <CardTitle>רשימת הצעות מחיר</CardTitle>
               <div className="text-sm text-gray-600">
-                {selectedQuotations.length > 0 &&
-                  `נבחרו ${selectedQuotations.length} הצעות`}
+                {selection.selectionCount > 0 &&
+                  `נבחרו ${selection.selectionCount} הצעות`}
               </div>
             </div>
 
@@ -779,7 +919,7 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
                         await saveSetting('tableColumns', {
                           ...currentSettings,
                           quotation_data_grid: [
-                            'actions',
+                            'selection',
                             'customer_name',
                             'status',
                           ],
@@ -799,9 +939,67 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
         </CardHeader>
         <CardContent>
           <div
-            className="ag-theme-alpine"
+            className="ag-theme-alpine cpq-selection-grid"
             style={{ height: '600px', width: '100%', direction: 'rtl' }}
           >
+            <style>{`
+              /* ClickUp-style: Checkbox OUTSIDE table - completely transparent */
+              .cpq-selection-grid .ag-pinned-right-cols-container {
+                background: transparent !important;
+                border: none !important;
+                margin-left: 0 !important;
+                padding-left: 0 !important;
+              }
+
+              .cpq-selection-grid .ag-pinned-right-header {
+                background: transparent !important;
+                border: none !important;
+                margin-left: 0 !important;
+              }
+
+              .cpq-selection-grid .ag-cell[col-id="selection"] {
+                background: transparent !important;
+                border: none !important;
+                padding: 0 !important;
+              }
+
+              /* Show checkbox on row hover - overrides inline style */
+              .cpq-selection-grid .ag-row:hover .checkbox-hover-target,
+              .cpq-selection-grid .ag-row-hover .checkbox-hover-target {
+                opacity: 1 !important;
+              }
+
+              /* CRITICAL: Show checkbox for selected rows even when not hovering */
+              .cpq-selection-grid .ag-row.row-selected .checkbox-hover-target {
+                opacity: 1 !important;
+              }
+
+              /* Row highlighting when selected - light blue */
+              .cpq-selection-grid .ag-row.row-selected {
+                background-color: #eff6ff !important;
+              }
+
+              /* Remove focus ring from checkbox (but keep border for visibility) */
+              .cpq-selection-grid .ag-cell[col-id="selection"] button {
+                outline: none !important;
+                box-shadow: none !important;
+              }
+
+              .cpq-selection-grid .ag-cell[col-id="selection"] button:focus {
+                outline: none !important;
+                box-shadow: none !important;
+                ring: 0 !important;
+              }
+
+              /* Remove blue border from AG Grid cell focus */
+              .cpq-selection-grid .ag-cell[col-id="selection"]:focus,
+              .cpq-selection-grid .ag-cell[col-id="selection"].ag-cell-focus,
+              .cpq-selection-grid .ag-cell[col-id="selection"]:focus-within {
+                outline: none !important;
+                border: none !important;
+                box-shadow: none !important;
+              }
+            `}</style>
             <AgGridReact
               ref={gridRef}
               rowData={gridData}
@@ -809,10 +1007,16 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
               context={gridContext}
               enableRtl={true}
               suppressMovableColumns={false}
+              suppressRowClickSelection={true}
               defaultColDef={{
                 sortable: true,
                 filter: true,
                 resizable: true,
+              }}
+              rowSelection="multiple"
+              getRowClass={params => {
+                const isSelected = selection.isSelected(params.data?.id);
+                return isSelected ? 'row-selected' : '';
               }}
               onGridReady={onGridReady}
               onFirstDataRendered={onFirstDataRendered}
@@ -820,9 +1024,8 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
               onColumnMoved={onColumnMoved}
               onFilterChanged={onFilterChanged}
               onCellValueChanged={handleCellValueChanged}
+              onCellClicked={onCellClicked}
               onRowDoubleClicked={handleRowDoubleClicked}
-              onSelectionChanged={handleSelectionChanged}
-              rowSelection="multiple"
               enableRangeSelection={false}
               animateRows={true}
               stopEditingWhenCellsLoseFocus={true}
@@ -835,15 +1038,27 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
         </CardContent>
       </Card>
 
+      {/* Floating Action Toolbar */}
+      <FloatingActionToolbar
+        selectedCount={selection.selectionCount}
+        actions={gridActions}
+        onClear={selection.clearSelection}
+        onAction={selection.handleAction}
+      />
+
       {/* Delete Confirmation Dialog */}
       <ConfirmDialog
-        isOpen={deleteDialog.open}
-        title="מחיקת הצעת מחיר"
-        message={`האם אתה בטוח שברצונך למחוק את הצעת המחיר "${deleteDialog.quotation?.project_name || deleteDialog.quotation?.quotation_number}"?`}
+        isOpen={deleteConfirm.open}
+        title="מחיקת הצעות מחיר"
+        message={
+          deleteConfirm.count === 1
+            ? `האם אתה בטוח שברצונך למחוק את הצעת המחיר "${deleteConfirm.items[0]?.project_name || deleteConfirm.items[0]?.quotation_number}"?`
+            : `האם אתה בטוח שברצונך למחוק ${deleteConfirm.count} הצעות מחיר?\n\nהצעות המחיר שיימחקו:\n${deleteConfirm.items.map(q => `• ${q.project_name || q.quotation_number}`).join('\n')}`
+        }
         confirmText="מחק"
         cancelText="ביטול"
-        onConfirm={confirmDelete}
-        onCancel={() => setDeleteDialog({ open: false })}
+        onConfirm={confirmBulkDelete}
+        onCancel={() => setDeleteConfirm({ open: false, count: 0, items: [] })}
         type="danger"
       />
 

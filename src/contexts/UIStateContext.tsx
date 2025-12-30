@@ -4,11 +4,12 @@ import React, {
   useReducer,
   useCallback,
 } from 'react';
-import { UIState, ModalState } from '../types';
+import { UIState, ModalState, ViewParams } from '../types';
 
 // ============ State Shape ============
 interface UIContextState {
   activeView: UIState['activeView'];
+  viewParams?: ViewParams;
   sidebarCollapsed: boolean;
   theme: UIState['theme'];
   modalState: ModalState;
@@ -17,7 +18,11 @@ interface UIContextState {
 
 // ============ Actions ============
 type UIAction =
-  | { type: 'SET_ACTIVE_VIEW'; payload: UIState['activeView'] }
+  | {
+      type: 'SET_ACTIVE_VIEW';
+      payload: { view: UIState['activeView']; params?: ViewParams };
+    }
+  | { type: 'CLEAR_VIEW_PARAMS' }
   | { type: 'TOGGLE_SIDEBAR' }
   | { type: 'SET_THEME'; payload: UIState['theme'] }
   | { type: 'SET_MODAL'; payload: ModalState }
@@ -28,6 +33,7 @@ type UIAction =
 // ============ Reducer ============
 const initialState: UIContextState = {
   activeView: 'dashboard',
+  viewParams: undefined,
   sidebarCollapsed: false,
   theme: 'system',
   modalState: {
@@ -40,7 +46,13 @@ const initialState: UIContextState = {
 function uiReducer(state: UIContextState, action: UIAction): UIContextState {
   switch (action.type) {
     case 'SET_ACTIVE_VIEW':
-      return { ...state, activeView: action.payload };
+      return {
+        ...state,
+        activeView: action.payload.view,
+        viewParams: action.payload.params,
+      };
+    case 'CLEAR_VIEW_PARAMS':
+      return { ...state, viewParams: undefined };
     case 'TOGGLE_SIDEBAR':
       return { ...state, sidebarCollapsed: !state.sidebarCollapsed };
     case 'SET_THEME':
@@ -60,7 +72,8 @@ function uiReducer(state: UIContextState, action: UIAction): UIContextState {
 
 // ============ Context ============
 interface UIContextType extends UIContextState {
-  setActiveView: (view: UIState['activeView']) => void;
+  setActiveView: (view: UIState['activeView'], params?: ViewParams) => void;
+  clearViewParams: () => void;
   toggleSidebar: () => void;
   setTheme: (theme: UIState['theme']) => void;
   setModal: (modal: ModalState) => void;
@@ -75,8 +88,15 @@ const UIContext = createContext<UIContextType | undefined>(undefined);
 export function UIProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(uiReducer, initialState);
 
-  const setActiveView = useCallback((view: UIState['activeView']) => {
-    dispatch({ type: 'SET_ACTIVE_VIEW', payload: view });
+  const setActiveView = useCallback(
+    (view: UIState['activeView'], params?: ViewParams) => {
+      dispatch({ type: 'SET_ACTIVE_VIEW', payload: { view, params } });
+    },
+    []
+  );
+
+  const clearViewParams = useCallback(() => {
+    dispatch({ type: 'CLEAR_VIEW_PARAMS' });
   }, []);
 
   const toggleSidebar = useCallback(() => {
@@ -106,6 +126,7 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
   const value = {
     ...state,
     setActiveView,
+    clearViewParams,
     toggleSidebar,
     setTheme,
     setModal,

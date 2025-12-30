@@ -17,6 +17,8 @@ interface CustomHeaderProps {
   isFilterActive?: boolean;
   uniqueValues?: string[];
   filterType?: 'text' | 'number' | 'date';
+  // Custom callback for external filter handling (e.g., source-level filtering)
+  onCustomFilterChange?: (selectedValues: string[]) => void;
 }
 
 export function CustomHeader(props: CustomHeaderProps) {
@@ -25,7 +27,9 @@ export function CustomHeader(props: CustomHeaderProps) {
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
   const [filterPosition, setFilterPosition] = useState({ top: 0, left: 0 });
   const [currentFilterValues, setCurrentFilterValues] = useState<string[]>([]);
-  const [isFilterActive, setIsFilterActive] = useState(false);
+  const [internalFilterActive, setInternalFilterActive] = useState(false);
+  // Use prop if provided, otherwise use internal state
+  const isFilterActive = props.isFilterActive ?? internalFilterActive;
   const menuRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const filterRef = useRef<HTMLButtonElement>(null);
@@ -55,7 +59,7 @@ export function CustomHeader(props: CustomHeaderProps) {
             const model = filterInstance.getModel();
             const active = filterInstance.isFilterActive();
 
-            setIsFilterActive(active);
+            setInternalFilterActive(active);
 
             if (model && model.values && Array.isArray(model.values)) {
               setCurrentFilterValues(model.values);
@@ -105,6 +109,22 @@ export function CustomHeader(props: CustomHeaderProps) {
   };
 
   const handleFilterChange = (filterModel: any) => {
+    // If custom filter handler is provided, use it instead of AG Grid's filter
+    if (props.onCustomFilterChange) {
+      if (
+        filterModel === null ||
+        (Array.isArray(filterModel) && filterModel.length === 0)
+      ) {
+        props.onCustomFilterChange([]);
+        setCurrentFilterValues([]);
+      } else if (Array.isArray(filterModel)) {
+        props.onCustomFilterChange(filterModel);
+        setCurrentFilterValues(filterModel);
+      }
+      setShowFilter(false);
+      return;
+    }
+
     // Apply filter to the column using AG-Grid's filter API
     if (props.api) {
       const colId = props.column.getColId();
@@ -120,7 +140,7 @@ export function CustomHeader(props: CustomHeaderProps) {
             if (filterInstance) {
               await filterInstance.setModel(null);
               props.api.onFilterChanged();
-              setIsFilterActive(false);
+              setInternalFilterActive(false);
             }
           });
         setCurrentFilterValues([]);
@@ -225,7 +245,7 @@ export function CustomHeader(props: CustomHeaderProps) {
               props.api.onFilterChanged();
 
               // Update filter active state
-              setIsFilterActive(true);
+              setInternalFilterActive(true);
 
               // Verify the filter was actually set
               const verifyModel = filterInstance.getModel();

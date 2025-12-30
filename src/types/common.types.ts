@@ -32,15 +32,23 @@ export interface PaginatedResponse<T> {
 }
 
 // ============ UI State ============
+export type ViewType =
+  | 'dashboard'
+  | 'quotes'
+  | 'quotations'
+  | 'components'
+  | 'projects'
+  | 'analytics'
+  | 'settings';
+
+export interface ViewParams {
+  // Quotation filters
+  statusFilter?: 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired';
+}
+
 export interface UIState {
-  activeView:
-    | 'dashboard'
-    | 'quotes'
-    | 'quotations'
-    | 'components'
-    | 'projects'
-    | 'analytics'
-    | 'settings';
+  activeView: ViewType;
+  viewParams?: ViewParams;
   sidebarCollapsed: boolean;
   theme: 'light' | 'dark' | 'system';
   loading: {

@@ -25,6 +25,8 @@ import {
   Trash2,
   Copy,
   FileText,
+  X,
+  Filter,
 } from 'lucide-react';
 import { useClickOutside } from '../../hooks/useClickOutside';
 import { useTableConfig } from '../../hooks/useTableConfig';
@@ -34,12 +36,16 @@ import { ProjectPicker } from './ProjectPicker';
 import { supabase } from '../../supabaseClient';
 import { logger } from '@/lib/logger';
 import { createQuotationColumnDefs } from './quotationGridColumns';
-import { generateQuotationNumber } from '../../services/numberingService';
+import {
+  generateProjectNumber,
+  generateQuotationNumber,
+} from '../../services/numberingService';
 import { useTeam } from '../../contexts/TeamContext';
 import { useGridSelection } from '../../hooks/useGridSelection';
 import { FloatingActionToolbar } from '../grid/FloatingActionToolbar';
 import { GridAction } from '../../types/grid.types';
 import { toast } from 'sonner';
+import { useUI } from '../../contexts/UIStateContext';
 
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
@@ -68,6 +74,7 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
   const { setCurrentQuotation } = useCPQ();
   const { currentTeam } = useTeam();
   const { preferences } = useAppearancePreferences();
+  const { viewParams, clearViewParams } = useUI();
 
   const gridRef = useRef<AgGridReact>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{
@@ -80,15 +87,68 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
   const [showProjectPicker, setShowProjectPicker] = useState(false);
   const isInitialMount = useRef(true);
 
+  // Active status filter (from dashboard pipeline click)
+  const [activeStatusFilter, setActiveStatusFilter] = useState<string | null>(
+    viewParams?.statusFilter || null
+  );
+
   // Initialize grid selection hook
   const selection = useGridSelection<DbQuotation>({
     gridApi: gridRef.current?.api,
     getRowId: quotation => quotation.id,
   });
 
-  // Refetch quotations when component mounts to ensure fresh data after navigation
+  // Refetch quotations when component mounts
   useEffect(() => {
     fetchQuotations();
+  }, []);
+
+  // Capture viewParams filter when it arrives (from dashboard pipeline click)
+  useEffect(() => {
+    if (viewParams?.statusFilter) {
+      setActiveStatusFilter(viewParams.statusFilter);
+      clearViewParams();
+    }
+  }, [viewParams, clearViewParams]);
+
+  // Filter quotations based on active status filter (bypasses AG Grid filter API for free tier)
+  const filteredQuotations = useMemo(() => {
+    if (!activeStatusFilter) {
+      return quotations;
+    }
+    return quotations.filter(q => q.status === activeStatusFilter);
+  }, [quotations, activeStatusFilter]);
+
+  // Clear the active filter
+  const clearStatusFilter = useCallback(() => {
+    setActiveStatusFilter(null);
+  }, []);
+
+  // Hebrew to English status mapping
+  const statusHebrewToEnglish: Record<string, string> = {
+    טיוטה: 'draft',
+    נשלח: 'sent',
+    התקבל: 'accepted',
+    נדחה: 'rejected',
+    'פג תוקף': 'expired',
+  };
+
+  // Handle status filter change from column dropdown (Hebrew values)
+  const handleStatusFilterChange = useCallback((selectedValues: string[]) => {
+    if (selectedValues.length === 0) {
+      setActiveStatusFilter(null);
+    } else if (selectedValues.length === 1) {
+      // Map Hebrew to English
+      const englishValue =
+        statusHebrewToEnglish[selectedValues[0]] || selectedValues[0];
+      setActiveStatusFilter(englishValue);
+    } else {
+      // Multiple values selected - for now just use the first one
+      // Could enhance to support multiple values later
+      const englishValue =
+        statusHebrewToEnglish[selectedValues[0]] || selectedValues[0];
+      setActiveStatusFilter(englishValue);
+    }
   }, []);
 
   // Use table configuration hook - RTL order (stored order matches desired display order)
@@ -329,9 +389,9 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
     [selection.toggleSelection, selection.isSelected]
   );
 
-  // Convert DbQuotation to grid data format
+  // Convert DbQuotation to grid data format (uses filtered data)
   const gridData = useMemo(() => {
-    return quotations.map(quotation => ({
+    return filteredQuotations.map(quotation => ({
       ...quotation,
       // Add computed fields for display
       displayTotalPrice: quotation.total_price || 0,
@@ -343,7 +403,7 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
             100
           : 0,
     }));
-  }, [quotations]);
+  }, [filteredQuotations]);
 
   // Column definitions with RTL support - order will be reversed by AG Grid
   const columnDefs = useMemo(() => {
@@ -354,7 +414,7 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
       updateQuotation,
     });
 
-    // Add cellRendererParams to selection column
+    // Add cellRendererParams to selection column and filter indicator to status column
     return baseCols.map(col => {
       if (col.field === 'selection') {
         return {
@@ -363,6 +423,22 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
             onSelectionToggle: selection.toggleSelection,
             isSelected: selection.isSelected,
           },
+        };
+      }
+      // Add filter indicator and custom handler to status column
+      if (col.field === 'status') {
+        const existingParams =
+          typeof col.headerComponentParams === 'function'
+            ? col.headerComponentParams
+            : () => col.headerComponentParams || {};
+
+        return {
+          ...col,
+          headerComponentParams: (params: any) => ({
+            ...existingParams(params),
+            isFilterActive: !!activeStatusFilter,
+            onCustomFilterChange: handleStatusFilterChange,
+          }),
         };
       }
       return col;
@@ -374,6 +450,8 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
     updateQuotation,
     selection.toggleSelection,
     selection.isSelected,
+    activeStatusFilter,
+    handleStatusFilterChange,
   ]);
 
   // Filter and reorder columns based on config
@@ -449,36 +527,21 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
     config.columnWidths,
   ]);
 
-  // Toggle column visibility - Note: This updates settings, not table config
+  // Toggle column visibility - Uses table config for persistence
   const toggleColumn = useCallback(
-    async (field: string) => {
-      // Import settingsService dynamically
-      const { saveSetting, loadSetting } = await import(
-        '../../services/settingsService'
-      );
-
-      // Load current table column settings
-      const result =
-        await loadSetting<Record<string, string[]>>('tableColumns');
-      const currentSettings = result.data || {};
-
-      // Toggle the column for this table
-      const currentVisible =
-        currentSettings['quotation_data_grid'] || config.visibleColumns;
+    (field: string) => {
+      // Toggle the column in current visible columns
+      const currentVisible = config.visibleColumns;
       const newVisibleColumns = currentVisible.includes(field)
         ? currentVisible.filter(col => col !== field)
         : [...currentVisible, field];
 
-      // Save to settings
-      await saveSetting('tableColumns', {
-        ...currentSettings,
-        quotation_data_grid: newVisibleColumns,
-      });
+      // Save via useTableConfig hook - this persists to user_table_configs
+      saveConfig({ visibleColumns: newVisibleColumns });
 
-      // Dispatch event to notify settings updated
-      window.dispatchEvent(new CustomEvent('cpq-settings-updated'));
+      logger.debug('Column visibility toggled:', { field, newVisibleColumns });
     },
-    [config.visibleColumns]
+    [config.visibleColumns, saveConfig]
   );
 
   // Get all available columns for management
@@ -500,6 +563,13 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
         newValue,
         data,
       });
+
+      // Skip status and priority fields - they are handled directly by StatusCellEditor
+      // via onStatusChange to avoid double-updates
+      if (colDef.field === 'status' || colDef.field === 'priority') {
+        logger.debug('Skipping status/priority - handled by StatusCellEditor');
+        return;
+      }
 
       if (newValue === oldValue) {
         logger.debug('No change detected, skipping update');
@@ -553,8 +623,12 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
       // Widths are already applied via columnDefs in visibleColumnDefs
       // No need to re-apply them here as it causes a flash
 
-      // Apply saved filter state
-      if (Object.keys(config.filterState).length > 0 && params.api) {
+      // Apply saved filter state (AG Grid's own filters, not our status filter)
+      if (
+        Object.keys(config.filterState).length > 0 &&
+        params.api &&
+        !activeStatusFilter
+      ) {
         params.api.setFilterModel(config.filterState);
       }
 
@@ -565,11 +639,11 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
         isInitialMount.current = false;
       }, 500);
     },
-    [config.filterState]
+    [config.filterState, activeStatusFilter]
   );
 
   const onFirstDataRendered = useCallback((__params: any) => {
-    // DON'T call sizeColumnsToFit - let AG Grid use the saved column widths from columnDefs
+    // Grid is ready with data - no special handling needed since we filter at data source level
   }, []);
 
   // Handle column resize
@@ -624,7 +698,7 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
     [saveConfig]
   );
 
-  // Handle filter change
+  // Handle filter change (from AG Grid column filters)
   const onFilterChanged = useCallback(
     (params: any) => {
       if (!isInitialMount.current) {
@@ -664,17 +738,33 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
           currentTeam?.id
         );
 
-        // Generate quotation number (optional feature)
+        // Generate quotation number
         if (!currentTeam) throw new Error('No active team');
 
         let quotationNumber = `Q-${Date.now()}`; // Fallback number
 
-        // Try to generate smart quotation number if project has number
-        if (project.project_number) {
+        // Determine project number (use existing or generate new)
+        let projectNumber = project.project_number;
+
+        if (!projectNumber) {
+          // Project doesn't have a number, generate one
+          try {
+            projectNumber = await generateProjectNumber(currentTeam.id);
+            logger.debug(
+              'Generated project number for quotation:',
+              projectNumber
+            );
+          } catch (err) {
+            logger.warn('Could not generate project number:', err);
+          }
+        }
+
+        // Generate quotation number if we have a project number
+        if (projectNumber) {
           try {
             quotationNumber = await generateQuotationNumber(
               currentTeam.id,
-              project.project_number
+              projectNumber
             );
             logger.debug('Generated quotation number:', quotationNumber);
           } catch (numberError) {
@@ -682,11 +772,10 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
               'Could not generate quotation number, using fallback:',
               numberError
             );
-            // Use fallback number already set above
           }
         } else {
           logger.debug(
-            'Project has no project_number, using timestamp-based quotation number'
+            'No project number available, using timestamp-based quotation number'
           );
         }
 
@@ -780,7 +869,8 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
         <div>
           <h1 className="text-3xl font-bold text-foreground">הצעות מחיר</h1>
           <p className="text-muted-foreground">
-            ניהול ועריכה של הצעות מחיר ({quotations.length} הצעות)
+            ניהול ועריכה של הצעות מחיר ({filteredQuotations.length} הצעות
+            {activeStatusFilter ? ` מסוננות` : ''})
           </p>
         </div>
         <Button onClick={handleAddNew} disabled={creatingNew}>
@@ -788,6 +878,35 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
           {creatingNew ? 'יוצר...' : 'הצעת מחיר חדשה'}
         </Button>
       </div>
+
+      {/* Active Filter Indicator */}
+      {activeStatusFilter && (
+        <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <Filter className="h-4 w-4 text-blue-600" />
+          <span className="text-sm text-blue-800">
+            מסנן לפי סטטוס:{' '}
+            <strong>
+              {activeStatusFilter === 'draft' && 'טיוטה'}
+              {activeStatusFilter === 'sent' && 'נשלח'}
+              {activeStatusFilter === 'accepted' && 'התקבל'}
+              {activeStatusFilter === 'rejected' && 'נדחה'}
+              {activeStatusFilter === 'expired' && 'פג תוקף'}
+            </strong>
+          </span>
+          <span className="text-sm text-blue-600">
+            ({filteredQuotations.length} מתוך {quotations.length} הצעות)
+          </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={clearStatusFilter}
+            className="mr-auto h-7 px-2 text-blue-600 hover:text-blue-800 hover:bg-blue-100"
+          >
+            <X className="h-4 w-4 ml-1" />
+            נקה מסנן
+          </Button>
+        </div>
+      )}
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -884,22 +1003,11 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={async () => {
-                        const { saveSetting, loadSetting } = await import(
-                          '../../services/settingsService'
-                        );
-                        const result =
-                          await loadSetting<Record<string, string[]>>(
-                            'tableColumns'
-                          );
-                        const currentSettings = result.data || {};
-                        await saveSetting('tableColumns', {
-                          ...currentSettings,
-                          quotation_data_grid: allColumns.map(col => col.field),
+                      onClick={() => {
+                        // Show all columns
+                        saveConfig({
+                          visibleColumns: allColumns.map(col => col.field),
                         });
-                        window.dispatchEvent(
-                          new CustomEvent('cpq-settings-updated')
-                        );
                       }}
                     >
                       הצג הכל
@@ -907,26 +1015,15 @@ export const QuotationDataGrid: React.FC<QuotationDataGridProps> = ({
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={async () => {
-                        const { saveSetting, loadSetting } = await import(
-                          '../../services/settingsService'
-                        );
-                        const result =
-                          await loadSetting<Record<string, string[]>>(
-                            'tableColumns'
-                          );
-                        const currentSettings = result.data || {};
-                        await saveSetting('tableColumns', {
-                          ...currentSettings,
-                          quotation_data_grid: [
+                      onClick={() => {
+                        // Minimal columns
+                        saveConfig({
+                          visibleColumns: [
                             'selection',
                             'customer_name',
                             'status',
                           ],
                         });
-                        window.dispatchEvent(
-                          new CustomEvent('cpq-settings-updated')
-                        );
                       }}
                     >
                       מינימלי

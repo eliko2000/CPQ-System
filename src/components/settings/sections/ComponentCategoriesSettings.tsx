@@ -78,6 +78,12 @@ export function ComponentCategoriesSettings() {
 
   const updateCategoriesInStorage = async (updatedCategories: string[]) => {
     try {
+      console.log(
+        '[ComponentCategoriesSettings] Saving categories, teamId:',
+        currentTeam?.id,
+        'categories:',
+        updatedCategories
+      );
       // Save to Supabase (also caches in localStorage) with team scope
       await saveSetting(
         'componentCategories',
@@ -85,6 +91,9 @@ export function ComponentCategoriesSettings() {
           categories: updatedCategories,
         },
         currentTeam?.id
+      );
+      console.log(
+        '[ComponentCategoriesSettings] Save complete, notifying listeners'
       );
       notifyCategoriesUpdated();
     } catch (error) {

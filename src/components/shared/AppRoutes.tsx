@@ -6,6 +6,11 @@ import { useQuotations } from '../../hooks/useQuotations';
 import { useProjects } from '../../hooks/useProjects';
 import { convertDbQuotationToQuotationProject } from '../../lib/utils';
 import { loadDefaultQuotationParameters } from '../../utils/quotationCalculations';
+import {
+  generateProjectNumber,
+  generateQuotationNumber,
+} from '../../services/numberingService';
+import { logger } from '../../lib/logger';
 import { toast } from 'sonner';
 import { SectionErrorBoundary } from '../error/ErrorBoundary';
 import { useErrorHandler } from '../../hooks/useErrorHandler';
@@ -110,14 +115,54 @@ function AuthenticatedApp() {
         return;
       }
 
+      if (!currentTeam) {
+        toast.error('לא נמצא צוות פעיל');
+        return;
+      }
+
       // Load default parameters with team ID for team-scoped settings
       const defaultParams = await loadDefaultQuotationParameters(
-        currentTeam?.id
+        currentTeam.id
       );
+
+      // Generate quotation number using the numbering service
+      let quotationNumber = `Q-${Date.now()}`; // Fallback
+
+      // Determine project number (use existing or generate new)
+      let projectNumber = project.project_number;
+
+      if (!projectNumber) {
+        // Project doesn't have a number, generate one
+        try {
+          projectNumber = await generateProjectNumber(currentTeam.id);
+          logger.debug(
+            'Generated project number for quotation:',
+            projectNumber
+          );
+        } catch (err) {
+          logger.warn('Could not generate project number:', err);
+        }
+      }
+
+      // Generate quotation number if we have a project number
+      if (projectNumber) {
+        try {
+          quotationNumber = await generateQuotationNumber(
+            currentTeam.id,
+            projectNumber
+          );
+          logger.debug('Generated quotation number:', quotationNumber);
+        } catch (err) {
+          logger.warn(
+            'Could not generate quotation number, using fallback:',
+            err
+          );
+        }
+      }
 
       // Use the hook's addQuotation function (includes team_id automatically)
       const newQuotation = await addQuotation({
-        quotation_number: `Q-${Date.now()}`,
+        quotation_number: quotationNumber,
         customer_name: project.company_name,
         project_name: project.project_name,
         project_id: projectId,
@@ -125,7 +170,7 @@ function AuthenticatedApp() {
         exchange_rate: defaultParams.usdToIlsRate,
         eur_to_ils_rate: defaultParams.eurToIlsRate,
         margin_percentage: defaultParams.markupPercent,
-        day_work_cost: defaultParams.dayWorkCost, // ✅ Save global dayWorkCost to database
+        day_work_cost: defaultParams.dayWorkCost,
         risk_percentage: defaultParams.riskPercent,
         status: 'draft',
         total_cost: 0,

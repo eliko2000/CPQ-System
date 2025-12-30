@@ -4,7 +4,13 @@ import {
   StatusCellEditor,
   QUOTATION_STATUS_OPTIONS,
 } from '../grid/StatusCellEditor';
-import { StatusRenderer, CurrencyRenderer } from './quotationGridRenderers';
+import {
+  StatusRenderer,
+  CurrencyRenderer,
+  PriorityRenderer,
+  FollowUpDateRenderer,
+  QUOTATION_PRIORITY_OPTIONS,
+} from './quotationGridRenderers';
 import { SelectionCheckboxRenderer } from '../grid/SelectionCheckboxRenderer';
 import { logger } from '@/lib/logger';
 
@@ -103,10 +109,7 @@ export const createQuotationColumnDefs = ({
       },
     },
     cellRenderer: StatusRenderer,
-    filter: 'agSetColumnFilter',
-    filterParams: {
-      values: ['draft', 'sent', 'accepted', 'rejected', 'expired'],
-    },
+    filter: 'agTextColumnFilter',
     headerComponent: CustomHeader,
     headerComponentParams: (params: any) => ({
       displayName: 'סטטוס',
@@ -115,7 +118,71 @@ export const createQuotationColumnDefs = ({
       api: params.api,
       columnApi: params.columnApi,
       column: params.column,
-      uniqueValues: ['draft', 'sent', 'accepted', 'rejected', 'expired'],
+      uniqueValues: ['טיוטה', 'נשלח', 'התקבל', 'נדחה', 'פג תוקף'],
+    }),
+  },
+  {
+    headerName: 'עדיפות',
+    field: 'priority',
+    width: 110,
+    editable: true,
+    cellEditor: StatusCellEditor,
+    cellEditorParams: {
+      options: QUOTATION_PRIORITY_OPTIONS,
+      onStatusChange: async (id: string, newPriority: string) => {
+        logger.debug('QuotationDataGrid - onPriorityChange called:', {
+          id,
+          newPriority,
+        });
+        await updateQuotation(id, { priority: newPriority as any });
+      },
+    },
+    cellRenderer: PriorityRenderer,
+    filter: 'agTextColumnFilter',
+    filterParams: {
+      filterOptions: ['equals', 'notEqual'],
+      suppressAndOrCondition: true,
+    },
+    headerComponent: CustomHeader,
+    headerComponentParams: (params: any) => ({
+      displayName: 'עדיפות',
+      onMenuClick: handleColumnMenuClick,
+      onFilterClick: handleFilterClick,
+      api: params.api,
+      columnApi: params.columnApi,
+      column: params.column,
+    }),
+  },
+  {
+    headerName: 'מעקב',
+    field: 'follow_up_date',
+    width: 110,
+    editable: true,
+    cellEditor: 'agDateCellEditor',
+    cellEditorParams: {
+      useFormatter: true,
+    },
+    cellRenderer: FollowUpDateRenderer,
+    valueFormatter: (params: ValueFormatterParams) => {
+      if (!params.value) return '';
+      return new Date(params.value).toLocaleDateString('he-IL');
+    },
+    filter: 'agDateColumnFilter',
+    comparator: (dateA: string, dateB: string) => {
+      if (!dateA && !dateB) return 0;
+      if (!dateA) return 1;
+      if (!dateB) return -1;
+      return new Date(dateA).getTime() - new Date(dateB).getTime();
+    },
+    headerComponent: CustomHeader,
+    headerComponentParams: (params: any) => ({
+      displayName: 'מעקב',
+      onMenuClick: handleColumnMenuClick,
+      onFilterClick: handleFilterClick,
+      api: params.api,
+      columnApi: params.columnApi,
+      column: params.column,
+      filterType: 'date',
     }),
   },
   {

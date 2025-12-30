@@ -24,9 +24,14 @@ export async function getNumberingConfig(
       .eq('team_id', teamId)
       .eq('setting_key', 'numbering_config')
       .limit(1)
-      .single();
+      .maybeSingle();
 
-    if (error || !data) {
+    if (error) {
+      logger.debug('Error fetching numbering config, using defaults:', error);
+      return DEFAULT_NUMBERING_CONFIG;
+    }
+
+    if (!data) {
       logger.debug('No numbering config found, using defaults');
       return DEFAULT_NUMBERING_CONFIG;
     }
@@ -216,9 +221,8 @@ export function validateNumberingConfig(config: NumberingConfig): string[] {
     errors.push('Padding must be between 1 and 10 digits');
   }
 
-  if (!config.separator || config.separator.length === 0) {
-    errors.push('Separator cannot be empty');
-  }
+  // Separator can be empty (for formats like "PRJ0001" instead of "PRJ-0001")
+  // No validation needed for separator
 
   // Check for invalid characters
   const validPattern = /^[A-Za-z0-9]+$/;

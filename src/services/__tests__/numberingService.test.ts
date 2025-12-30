@@ -52,13 +52,13 @@ describe('numberingService', () => {
       expect(errors).toContain('Padding must be between 1 and 10 digits');
     });
 
-    it('should reject empty separator', () => {
+    it('should allow empty separator', () => {
       const config: NumberingConfig = {
         ...DEFAULT_NUMBERING_CONFIG,
         separator: '',
       };
       const errors = validateNumberingConfig(config);
-      expect(errors).toContain('Separator cannot be empty');
+      expect(errors).not.toContain('Separator cannot be empty');
     });
 
     it('should reject invalid characters in project prefix', () => {

@@ -263,9 +263,11 @@ export class SystemNameEditor {
   private boundKeyDown!: (event: KeyboardEvent) => void;
   private boundBlur!: () => void;
   private boundInput!: () => void;
+  private isReady: boolean = false; // Flag to prevent immediate blur
 
   // gets called once before renderer is used
   init(params: ICellEditorParams): void {
+    console.log('[SystemNameEditor] init called with value:', params.value);
     this.params = params;
     this.value = params.value || '';
 
@@ -276,6 +278,12 @@ export class SystemNameEditor {
     this.eInput.placeholder = 'שם מערכת...';
     this.eInput.className =
       'w-full px-2 py-1 border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500';
+    // Make the input more visible
+    this.eInput.style.width = '100%';
+    this.eInput.style.height = '100%';
+    this.eInput.style.boxSizing = 'border-box';
+    this.eInput.style.direction = 'rtl';
+    this.eInput.style.textAlign = 'right';
 
     // Create bound references once to avoid memory leaks
     this.boundKeyDown = this.onKeyDown.bind(this);
@@ -296,9 +304,17 @@ export class SystemNameEditor {
   // Called by AG Grid after editor is attached to DOM
   // This ensures focus happens after render is complete
   afterGuiAttached(): void {
+    console.log('[SystemNameEditor] afterGuiAttached called');
     if (this.eInput) {
-      this.eInput.focus();
-      this.eInput.select();
+      // Use setTimeout to ensure the DOM is fully ready
+      setTimeout(() => {
+        this.eInput.focus();
+        this.eInput.select();
+        this.isReady = true; // Now ready to accept blur events
+        console.log(
+          '[SystemNameEditor] Input focused and selected, isReady=true'
+        );
+      }, 50);
     }
   }
 
@@ -326,7 +342,11 @@ export class SystemNameEditor {
 
   // when user clicks outside
   private onBlur(): void {
-    this.params.api.stopEditing();
+    console.log('[SystemNameEditor] onBlur called, isReady:', this.isReady);
+    // Only stop editing if the editor is ready (prevents immediate close)
+    if (this.isReady) {
+      this.params.api.stopEditing();
+    }
   }
 
   // update value on input
@@ -615,20 +635,12 @@ export const createQuotationItemColumnDefs = (
       cellStyle: { textAlign: 'right', direction: 'rtl' },
       cellRenderer: (cellParams: ICellRendererParams) => {
         if (cellParams.data?.isSystemGroup) {
+          // System group row - render as bold text
+          // Click handling is done via onCellClicked in QuotationItemsGrid
           return (
             <span
-              className="font-bold w-full block text-right cursor-pointer hover:text-blue-600"
+              className="font-bold w-full block text-right cursor-text hover:text-blue-600 hover:underline"
               style={{ direction: 'rtl' }}
-              onClick={e => {
-                e.stopPropagation();
-                const rowIndex = cellParams.node.rowIndex;
-                if (rowIndex !== null && rowIndex !== undefined) {
-                  cellParams.api.startEditingCell({
-                    rowIndex,
-                    colKey: 'componentName',
-                  });
-                }
-              }}
               title="לחץ לעריכת שם המערכת"
             >
               {cellParams.value}
@@ -668,7 +680,34 @@ export const createQuotationItemColumnDefs = (
         const hasMSRP =
           cellParams.data?.msrpPrice && cellParams.data?.msrpCurrency;
 
-        // For component items: double-click opens component card
+        // Check if this item should be editable (custom items or labor items)
+        const isEditable =
+          cellParams.data?.isCustomItem ||
+          cellParams.data?.itemType === 'labor';
+
+        // For editable items (custom/labor): display with edit cursor
+        // Click handling is done via onCellClicked in QuotationItemsGrid
+        if (isEditable) {
+          return (
+            <div
+              className="cursor-text hover:text-blue-600 w-full text-right flex items-center gap-2"
+              style={{ direction: 'rtl' }}
+              title="לחץ לעריכת שם הפריט"
+            >
+              {hasMSRP && (
+                <span
+                  className="inline-flex items-center gap-1 text-purple-600"
+                  title="רכיב מופץ - יש מחיר MSRP"
+                >
+                  🏷️
+                </span>
+              )}
+              <span>{cellParams.value}</span>
+            </div>
+          );
+        }
+
+        // For regular component items: double-click opens component card (NOT editable inline)
         return (
           <div
             onDoubleClick={e => {

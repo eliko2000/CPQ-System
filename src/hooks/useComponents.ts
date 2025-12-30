@@ -86,6 +86,7 @@ export function useComponents() {
             `
           id,
           name,
+          description,
           manufacturer,
           manufacturer_part_number,
           category,
@@ -100,6 +101,7 @@ export function useComponents() {
           msrp_currency,
           partner_discount_percent,
           supplier,
+          notes,
           created_at,
           updated_at
         `

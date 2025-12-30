@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, useRef } from 'react';
 import { AgGridReact } from 'ag-grid-react';
 import { ColDef } from 'ag-grid-community';
 import { Button } from '../ui/button';
@@ -236,6 +236,86 @@ export function QuotationItemsGrid({
     [saveConfig]
   );
 
+  // Store grid API reference for use in mouse down handler
+  const gridApiRef = useRef<any>(null);
+
+  // Check if a cell should be editable (system names, custom items, labor)
+  const isCellEditable = useCallback((data: any) => {
+    return (
+      data?.isSystemGroup || data?.isCustomItem || data?.itemType === 'labor'
+    );
+  }, []);
+
+  // Handle cell mouse down to start editing for editable cells
+  // Using mousedown instead of click because it fires earlier and is more reliable
+  // when AG Grid is re-rendering frequently
+  const handleCellMouseDown = useCallback(
+    (params: any) => {
+      const { colDef, data, node, api } = params;
+
+      // Store the API reference
+      gridApiRef.current = api;
+
+      // Only handle clicks on the componentName column
+      if (colDef?.field !== 'componentName') {
+        return;
+      }
+
+      // Debug: Log data flags for troubleshooting
+      console.log('[QuotationItemsGrid] Cell clicked:', {
+        componentName: data?.componentName,
+        isSystemGroup: data?.isSystemGroup,
+        isCustomItem: data?.isCustomItem,
+        itemType: data?.itemType,
+        isEditable: isCellEditable(data),
+      });
+
+      // Check if this cell should be editable
+      if (
+        isCellEditable(data) &&
+        node?.rowIndex !== null &&
+        node?.rowIndex !== undefined
+      ) {
+        console.log(
+          '[QuotationItemsGrid] Mouse down on editable cell, will start edit for:',
+          data?.componentName
+        );
+        // Use setTimeout to start editing after AG Grid processes the mousedown
+        setTimeout(() => {
+          if (gridApiRef.current) {
+            console.log(
+              '[QuotationItemsGrid] Starting edit for row:',
+              node.rowIndex
+            );
+            gridApiRef.current.startEditingCell({
+              rowIndex: node.rowIndex,
+              colKey: 'componentName',
+            });
+          }
+        }, 0);
+      }
+    },
+    [isCellEditable]
+  );
+
+  // Intercept double-click to prevent editing on non-editable cells
+  const handleCellDoubleClick = useCallback(
+    (params: any) => {
+      const { colDef, data } = params;
+
+      // For componentName column, only allow double-click editing for editable rows
+      if (colDef?.field === 'componentName' && !isCellEditable(data)) {
+        // Stop the editing from happening
+        params.api?.stopEditing(true);
+        return;
+      }
+
+      // For other columns or editable rows, call the parent handler
+      onCellDoubleClicked?.(params);
+    },
+    [isCellEditable, onCellDoubleClicked]
+  );
+
   // Only wait for config to load - don't block on columnWidths
   // This allows the grid to render immediately and users can resize columns
   if (loading) {
@@ -448,11 +528,13 @@ export function QuotationItemsGrid({
           onColumnMoved={handleColumnMoved}
           onFilterChanged={handleFilterChanged}
           onCellValueChanged={onCellValueChanged}
-          onCellDoubleClicked={onCellDoubleClicked}
+          onCellDoubleClicked={handleCellDoubleClick}
+          onCellMouseDown={handleCellMouseDown}
           onSelectionChanged={onSelectionChanged}
           animateRows={true}
-          singleClickEdit={true}
+          singleClickEdit={false}
           enableCellTextSelection={true}
+          stopEditingWhenCellsLoseFocus={true}
         />
       </div>
     </div>

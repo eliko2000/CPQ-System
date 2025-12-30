@@ -149,6 +149,9 @@ export interface QuotationCalculations {
 }
 
 // ============ Database Schema Types ============
+// Priority levels for quotation urgency tracking
+export type QuotationPriority = 'low' | 'medium' | 'high' | 'urgent';
+
 export interface DbQuotation {
   id: string;
   team_id?: string; // Multi-tenant team association
@@ -174,6 +177,11 @@ export interface DbQuotation {
   total_price?: number;
   created_at: string;
   updated_at: string;
+
+  // ⭐ Action tracking fields (for action-oriented dashboard)
+  follow_up_date?: string; // Date for follow-up reminder
+  priority?: QuotationPriority; // Urgency level: low, medium, high, urgent
+  status_changed_at?: string; // Timestamp of last status change
 
   // Related data from joins
   quotation_systems?: DbQuotationSystem[];

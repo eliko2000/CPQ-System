@@ -78,12 +78,20 @@ export function ComponentForm({
   );
   const modalRef = useClickOutside<HTMLDivElement>(() => handleClose());
 
-  // Reload categories when team changes
+  // Reload categories when team changes OR when form opens
+  // This ensures fresh categories are loaded each time the form is shown
   useEffect(() => {
-    if (currentTeam?.id) {
-      setCategories(getComponentCategories(currentTeam.id));
+    if (isOpen) {
+      const loadedCategories = getComponentCategories(currentTeam?.id);
+      console.log(
+        '[ComponentForm] Loading categories on open, teamId:',
+        currentTeam?.id,
+        'categories:',
+        loadedCategories
+      );
+      setCategories(loadedCategories);
     }
-  }, [currentTeam?.id]);
+  }, [currentTeam?.id, isOpen]);
 
   // Listen for category updates from settings
   useEffect(() => {

@@ -296,16 +296,55 @@ export function notifyCategoriesUpdated(): void {
  */
 export function getComponentCategories(teamId?: string): string[] {
   try {
-    // Try team-specific or default cache
+    // Try team-specific cache first
     const cacheKey = getCacheKey(teamId);
+    logger.debug(
+      '[getComponentCategories] Looking for cache with key:',
+      cacheKey,
+      'teamId:',
+      teamId
+    );
     const cache = localStorage.getItem(cacheKey);
     if (cache) {
       const parsed = JSON.parse(cache);
+      logger.debug(
+        '[getComponentCategories] Found cache, parsed keys:',
+        Object.keys(parsed)
+      );
       if (
         parsed.componentCategories?.categories &&
         Array.isArray(parsed.componentCategories.categories)
       ) {
+        logger.debug(
+          '[getComponentCategories] Returning categories from cache:',
+          parsed.componentCategories.categories.length,
+          'items'
+        );
         return parsed.componentCategories.categories;
+      }
+    }
+
+    // If teamId was provided but no team cache found, also try the default cache
+    if (teamId) {
+      const defaultCacheKey = getCacheKey(undefined);
+      logger.debug(
+        '[getComponentCategories] Team cache empty, trying default cache:',
+        defaultCacheKey
+      );
+      const defaultCache = localStorage.getItem(defaultCacheKey);
+      if (defaultCache) {
+        const parsed = JSON.parse(defaultCache);
+        if (
+          parsed.componentCategories?.categories &&
+          Array.isArray(parsed.componentCategories.categories)
+        ) {
+          logger.debug(
+            '[getComponentCategories] Returning categories from default cache:',
+            parsed.componentCategories.categories.length,
+            'items'
+          );
+          return parsed.componentCategories.categories;
+        }
       }
     }
 
@@ -317,12 +356,18 @@ export function getComponentCategories(teamId?: string): string[] {
         parsed.componentCategories?.categories &&
         Array.isArray(parsed.componentCategories.categories)
       ) {
+        logger.debug(
+          '[getComponentCategories] Returning categories from old cpq-settings:',
+          parsed.componentCategories.categories.length,
+          'items'
+        );
         return parsed.componentCategories.categories;
       }
     }
   } catch (error) {
     logger.error('Error loading component categories from cache:', error);
   }
+  logger.debug('[getComponentCategories] Returning default categories');
   return [...DEFAULT_COMPONENT_CATEGORIES];
 }
 

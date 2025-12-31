@@ -213,12 +213,8 @@ export function ComponentForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (
-      !formData.name.trim() ||
-      !formData.manufacturer.trim() ||
-      !formData.supplier.trim()
-    ) {
-      handleWarning('שדות חסרים', 'נא למלא שדות חובה: שם, יצרן וספק');
+    if (!formData.name.trim() || !formData.supplier.trim()) {
+      handleWarning('שדות חסרים', 'נא למלא שדות חובה: שם וספק');
       return;
     }
 
@@ -490,16 +486,13 @@ export function ComponentForm({
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium mb-1">
-                    יצרן *
-                  </label>
+                  <label className="block text-sm font-medium mb-1">יצרן</label>
                   <Input
                     value={formData.manufacturer}
                     onChange={e =>
                       handleInputChange('manufacturer', e.target.value)
                     }
                     placeholder="לדוגמה: Siemens"
-                    required
                   />
                 </div>
 

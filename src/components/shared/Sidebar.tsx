@@ -11,6 +11,7 @@ import {
   BarChart3,
   Menu,
   X,
+  Settings,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Button } from '../ui/button';
@@ -186,10 +187,30 @@ export function Sidebar() {
           })}
         </nav>
 
-        {/* Footer - Company Logo */}
+        {/* Footer - Settings Link & Company Logo */}
         <div className="border-t border-l border-border">
+          {/* Settings Link */}
+          <div className="p-4">
+            <button
+              onClick={() => navigate('/settings')}
+              className={cn(
+                'w-full flex items-center space-x-reverse space-x-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
+                location.pathname === '/settings'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+              )}
+              title={uiState.sidebarCollapsed ? 'הגדרות' : undefined}
+            >
+              <Settings className="h-5 w-5 flex-shrink-0" />
+              {!uiState.sidebarCollapsed && (
+                <span className="truncate">הגדרות</span>
+              )}
+            </button>
+          </div>
+
+          {/* Company Logo */}
           {!uiState.sidebarCollapsed && logoUrl && (
-            <div className="px-6 py-6">
+            <div className="px-6 py-6 border-t border-border">
               <div className="w-full flex items-center justify-center">
                 <img
                   src={logoUrl}

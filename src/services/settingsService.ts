@@ -32,16 +32,22 @@ export async function loadSetting<T>(
   teamId?: string
 ): Promise<SettingsServiceResult<T>> {
   try {
-    // Build query with optional team filter
+    // Build query based on scope
     let query = supabase
       .from('user_settings')
       .select('setting_value')
       .eq('setting_key', settingKey);
 
     if (teamId) {
+      // Team-scoped settings: shared across all team members
       query = query.eq('team_id', teamId);
     } else {
-      query = query.eq('user_id', DEFAULT_USER_ID);
+      // Personal settings: per-user
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      const userId = user?.id || DEFAULT_USER_ID;
+      query = query.eq('user_id', userId).is('team_id', null);
     }
 
     const { data, error } = await query.maybeSingle();
@@ -78,40 +84,65 @@ export async function saveSetting<T>(
   teamId?: string
 ): Promise<SettingsServiceResult<T>> {
   try {
-    // Get current user ID for team-scoped settings
     const {
       data: { user },
     } = await supabase.auth.getUser();
     const userId = user?.id || DEFAULT_USER_ID;
 
-    // Build upsert data with optional team_id
-    const upsertData: any = {
-      setting_key: settingKey,
-      setting_value: settingValue as any,
-      updated_at: new Date().toISOString(),
-      user_id: userId, // Always include user_id
-    };
-
-    let conflictColumns = 'user_id,setting_key';
-
     if (teamId) {
-      upsertData.team_id = teamId;
-      conflictColumns = 'team_id,user_id,setting_key'; // All three columns!
-    }
+      // Team-scoped settings: check if row exists, then update or insert
+      const { data: existing } = await supabase
+        .from('user_settings')
+        .select('id')
+        .eq('team_id', teamId)
+        .eq('setting_key', settingKey)
+        .maybeSingle();
 
-    // Save to Supabase (upsert)
-    const { error } = await supabase.from('user_settings').upsert(upsertData, {
-      onConflict: conflictColumns,
-    });
+      let error;
+      if (existing) {
+        // Update existing team setting
+        const result = await supabase
+          .from('user_settings')
+          .update({
+            setting_value: settingValue as any,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', existing.id);
+        error = result.error;
+      } else {
+        // Insert new team setting
+        const result = await supabase.from('user_settings').insert({
+          setting_key: settingKey,
+          setting_value: settingValue as any,
+          team_id: teamId,
+          user_id: userId,
+          updated_at: new Date().toISOString(),
+        });
+        error = result.error;
+      }
 
-    if (error) {
-      logger.error(
-        `Failed to save setting "${settingKey}" to Supabase:`,
-        error
+      if (error) {
+        logger.error(`Failed to save team setting "${settingKey}":`, error);
+        cacheToLocalStorage(settingKey, settingValue, teamId);
+        return { success: false, error: error.message };
+      }
+    } else {
+      // Personal settings: use upsert
+      const { error } = await supabase.from('user_settings').upsert(
+        {
+          setting_key: settingKey,
+          setting_value: settingValue as any,
+          user_id: userId,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id,setting_key' }
       );
-      // Still save to localStorage as fallback
-      cacheToLocalStorage(settingKey, settingValue, teamId);
-      return { success: false, error: error.message };
+
+      if (error) {
+        logger.error(`Failed to save personal setting "${settingKey}":`, error);
+        cacheToLocalStorage(settingKey, settingValue, teamId);
+        return { success: false, error: error.message };
+      }
     }
 
     // Also cache in localStorage
@@ -134,15 +165,21 @@ export async function loadAllSettings(
   teamId?: string
 ): Promise<SettingsServiceResult<Record<string, any>>> {
   try {
-    // Build query with optional team filter
+    // Build query based on scope
     let query = supabase
       .from('user_settings')
       .select('setting_key, setting_value');
 
     if (teamId) {
+      // Team-scoped settings: shared across all team members
       query = query.eq('team_id', teamId);
     } else {
-      query = query.eq('user_id', DEFAULT_USER_ID);
+      // Personal settings: per-user
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      const userId = user?.id || DEFAULT_USER_ID;
+      query = query.eq('user_id', userId).is('team_id', null);
     }
 
     const { data, error } = await query;
@@ -225,16 +262,22 @@ export async function deleteSetting(
   teamId?: string
 ): Promise<SettingsServiceResult<void>> {
   try {
-    // Build query with optional team filter
+    // Build query based on scope
     let query = supabase
       .from('user_settings')
       .delete()
       .eq('setting_key', settingKey);
 
     if (teamId) {
+      // Team-scoped settings: shared across all team members
       query = query.eq('team_id', teamId);
     } else {
-      query = query.eq('user_id', DEFAULT_USER_ID);
+      // Personal settings: per-user
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      const userId = user?.id || DEFAULT_USER_ID;
+      query = query.eq('user_id', userId).is('team_id', null);
     }
 
     const { error } = await query;

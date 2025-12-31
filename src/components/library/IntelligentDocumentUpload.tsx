@@ -25,6 +25,7 @@ import {
   getEstimatedProcessingTime,
   type ExtractionMethod,
 } from '../../services/documentParser';
+import { useTeam } from '../../contexts/TeamContext';
 
 export interface MSRPImportOptions {
   mode: 'none' | 'column' | 'discount';
@@ -52,6 +53,8 @@ type UploadStatus =
 export const IntelligentDocumentUpload: React.FC<
   IntelligentDocumentUploadProps
 > = ({ onExtractionComplete, onCancel }) => {
+  // Get current team for team-scoped settings (categories)
+  const { currentTeam } = useTeam();
   const [file, setFile] = useState<File | null>(null);
   const [status, setStatus] = useState<UploadStatus>('idle');
   const [progress, setProgress] = useState(0);
@@ -214,8 +217,12 @@ export const IntelligentDocumentUpload: React.FC<
             }
           : undefined;
 
-      // Extract components with column selection
-      const result = await extractComponentsFromDocument(file, columnOptions);
+      // Extract components with column selection (using team-scoped categories)
+      const result = await extractComponentsFromDocument(
+        file,
+        columnOptions,
+        currentTeam?.id
+      );
 
       clearInterval(progressInterval);
       setProgress(100);
@@ -270,8 +277,12 @@ export const IntelligentDocumentUpload: React.FC<
         });
       }, progressSpeed);
 
-      // Extract components without column selection
-      const result = await extractComponentsFromDocument(file);
+      // Extract components without column selection (using team-scoped categories)
+      const result = await extractComponentsFromDocument(
+        file,
+        undefined,
+        currentTeam?.id
+      );
 
       clearInterval(progressInterval);
       setProgress(100);

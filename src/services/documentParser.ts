@@ -9,7 +9,10 @@
  * All files are processed through Claude AI for maximum accuracy and consistency.
  */
 
-import { extractComponentsFromDocument, type AIExtractionResult } from './claudeAI';
+import {
+  extractComponentsFromDocument,
+  type AIExtractionResult,
+} from './claudeAI';
 import { logger } from '../lib/logger';
 
 /**
@@ -66,12 +69,15 @@ export function getExtractionMethod(file: File): ExtractionMethod {
  * @param language - Language code ('en' or 'he')
  * @returns User-friendly name
  */
-export function getExtractionMethodName(method: ExtractionMethod, language: 'en' | 'he' = 'he'): string {
+export function getExtractionMethodName(
+  method: ExtractionMethod,
+  language: 'en' | 'he' = 'he'
+): string {
   const names = {
     excel: { en: 'Claude AI (Excel)', he: 'Claude AI (Excel)' },
     pdf: { en: 'Claude AI (PDF)', he: 'Claude AI (PDF)' },
     ai: { en: 'Claude AI Vision', he: 'Claude AI Vision' },
-    unknown: { en: 'Unknown', he: 'לא ידוע' }
+    unknown: { en: 'Unknown', he: 'לא ידוע' },
   };
 
   return names[method][language];
@@ -102,7 +108,10 @@ export function getExtractionMethodName(method: ExtractionMethod, language: 'en'
  * }
  * ```
  */
-export async function parseDocument(file: File): Promise<AIExtractionResult> {
+export async function parseDocument(
+  file: File,
+  teamId?: string
+): Promise<AIExtractionResult> {
   const method = getExtractionMethod(file);
 
   try {
@@ -111,14 +120,22 @@ export async function parseDocument(file: File): Promise<AIExtractionResult> {
       case 'pdf':
       case 'ai': {
         // All files now use Claude AI for best accuracy
-        const result = await extractComponentsFromDocument(file);
+        const result = await extractComponentsFromDocument(
+          file,
+          undefined,
+          teamId
+        );
 
         // Add document type to metadata if not already set
         if (result.metadata && !result.metadata.documentType) {
           const fileName = file.name.toLowerCase();
           let documentType: string;
 
-          if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls') || fileName.endsWith('.csv')) {
+          if (
+            fileName.endsWith('.xlsx') ||
+            fileName.endsWith('.xls') ||
+            fileName.endsWith('.csv')
+          ) {
             documentType = 'excel';
           } else if (fileName.endsWith('.pdf')) {
             documentType = 'pdf';
@@ -143,7 +160,7 @@ export async function parseDocument(file: File): Promise<AIExtractionResult> {
             totalItems: 0,
           },
           confidence: 0,
-          error: `Unsupported file type: ${file.type}\n\nSupported formats:\n• Excel: .xlsx, .xls, .csv\n• PDF: .pdf\n• Images: .jpg, .png, .gif, .webp`
+          error: `Unsupported file type: ${file.type}\n\nSupported formats:\n• Excel: .xlsx, .xls, .csv\n• PDF: .pdf\n• Images: .jpg, .png, .gif, .webp`,
         };
       }
     }
@@ -158,9 +175,10 @@ export async function parseDocument(file: File): Promise<AIExtractionResult> {
         totalItems: 0,
       },
       confidence: 0,
-      error: error instanceof Error
-        ? `Failed to parse document: ${error.message}`
-        : 'Unknown error occurred while parsing document'
+      error:
+        error instanceof Error
+          ? `Failed to parse document: ${error.message}`
+          : 'Unknown error occurred while parsing document',
     };
   }
 }
@@ -213,7 +231,7 @@ export function getSupportedExtensions(): string[] {
     '.jpeg',
     '.png',
     '.gif',
-    '.webp'
+    '.webp',
   ];
 }
 
@@ -232,6 +250,6 @@ export function getSupportedMimeTypes(): string[] {
     'image/jpeg', // .jpg, .jpeg
     'image/png', // .png
     'image/gif', // .gif
-    'image/webp' // .webp
+    'image/webp', // .webp
   ];
 }

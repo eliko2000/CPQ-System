@@ -32,6 +32,7 @@ import {
   CATEGORIES_UPDATED_EVENT,
 } from '../../constants/settings';
 import { logger } from '@/lib/logger';
+import { useTeam } from '../../contexts/TeamContext';
 
 // Type guards for metadata
 interface ExcelMetadata {
@@ -103,9 +104,12 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
   onConfirm,
   onCancel,
 }) => {
+  // Get current team for team-scoped settings
+  const { currentTeam } = useTeam();
+
   // Load team-specific categories dynamically
   const [categories, setCategories] = useState<string[]>(() =>
-    getComponentCategories()
+    getComponentCategories(currentTeam?.id)
   );
 
   // Global margin % state (for discount mode)
@@ -204,10 +208,15 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
     })
   );
 
-  // Listen for category updates
+  // Reload categories when team context becomes available or changes
+  useEffect(() => {
+    setCategories(getComponentCategories(currentTeam?.id));
+  }, [currentTeam?.id]);
+
+  // Listen for category updates from settings
   useEffect(() => {
     const handleCategoriesUpdated = () => {
-      setCategories(getComponentCategories());
+      setCategories(getComponentCategories(currentTeam?.id));
     };
 
     window.addEventListener(CATEGORIES_UPDATED_EVENT, handleCategoriesUpdated);
@@ -217,7 +226,7 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
         handleCategoriesUpdated
       );
     };
-  }, []);
+  }, [currentTeam?.id]);
 
   const [localMatchDecisions, setLocalMatchDecisions] =
     useState<ComponentMatchDecision[]>(matchDecisions);
@@ -979,6 +988,23 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
 
             {component.isEditing && (
               <div className="grid grid-cols-2 gap-3 mb-3">
+                {/* Description - Full width */}
+                <div className="col-span-2">
+                  <label className="text-xs text-muted-foreground">תיאור</label>
+                  <textarea
+                    value={component.description || ''}
+                    onChange={e =>
+                      handleFieldChange(
+                        component.id,
+                        'description',
+                        e.target.value
+                      )
+                    }
+                    placeholder="תיאור הרכיב"
+                    className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-y"
+                    rows={2}
+                  />
+                </div>
                 <div>
                   <label className="text-xs text-muted-foreground">יצרן</label>
                   <Input
@@ -1112,6 +1138,19 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
                       }
                     }}
                     placeholder="0.00"
+                  />
+                </div>
+                {/* Notes - Full width */}
+                <div className="col-span-2">
+                  <label className="text-xs text-muted-foreground">הערות</label>
+                  <textarea
+                    value={component.notes || ''}
+                    onChange={e =>
+                      handleFieldChange(component.id, 'notes', e.target.value)
+                    }
+                    placeholder="הערות נוספות"
+                    className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-y"
+                    rows={2}
                   />
                 </div>
               </div>

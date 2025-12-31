@@ -300,11 +300,14 @@ Respond ONLY with valid JSON. No markdown, no explanations, just the JSON object
 
 /**
  * Create the extraction prompt for Claude
+ * @param columnOptions - Optional column selection options
+ * @param teamId - Optional team ID for team-scoped categories
  */
 function createExtractionPrompt(
-  columnOptions?: ColumnExtractionOptions
+  columnOptions?: ColumnExtractionOptions,
+  teamId?: string
 ): string {
-  const categories = getComponentCategories();
+  const categories = getComponentCategories(teamId);
   const categoryList = categories.map(cat => `   - "${cat}"`).join('\n');
 
   // Build column-specific instructions if options are provided
@@ -660,10 +663,14 @@ export async function extractColumnHeaders(
 
 /**
  * Extract component data from Excel file using Claude AI text analysis
+ * @param file - Excel file to extract from
+ * @param columnOptions - Optional column selection options
+ * @param teamId - Optional team ID for team-scoped categories
  */
 async function extractFromExcelFile(
   file: File,
-  columnOptions?: ColumnExtractionOptions
+  columnOptions?: ColumnExtractionOptions,
+  teamId?: string
 ): Promise<AIExtractionResult> {
   try {
     if (!anthropic) {
@@ -683,7 +690,7 @@ async function extractFromExcelFile(
           content: [
             {
               type: 'text',
-              text: `${createExtractionPrompt(columnOptions)}\n\n=== EXCEL DATA ===\n\n${excelText}`,
+              text: `${createExtractionPrompt(columnOptions, teamId)}\n\n=== EXCEL DATA ===\n\n${excelText}`,
             },
           ],
         },
@@ -745,10 +752,12 @@ async function extractFromExcelFile(
  *
  * @param file - File to extract from
  * @param columnOptions - Optional column selection (partner price column, MSRP column)
+ * @param teamId - Optional team ID for team-scoped categories
  */
 export async function extractComponentsFromDocument(
   file: File,
-  columnOptions?: ColumnExtractionOptions
+  columnOptions?: ColumnExtractionOptions,
+  teamId?: string
 ): Promise<AIExtractionResult> {
   try {
     // Check if API key is configured
@@ -765,7 +774,7 @@ export async function extractComponentsFromDocument(
 
     // Check if it's an Excel file - handle with text-based extraction
     if (isExcelFile(file)) {
-      return await extractFromExcelFile(file, columnOptions);
+      return await extractFromExcelFile(file, columnOptions, teamId);
     }
 
     // Validate file - for vision-based extraction (images and PDFs)
@@ -825,7 +834,7 @@ export async function extractComponentsFromDocument(
                 },
             {
               type: 'text',
-              text: createExtractionPrompt(columnOptions),
+              text: createExtractionPrompt(columnOptions, teamId),
             },
           ],
         },

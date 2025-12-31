@@ -35,46 +35,102 @@ interface ColumnMapping {
  */
 const COLUMN_PATTERNS: ColumnMapping = {
   name: [
-    'name', 'שם', 'product', 'item', 'description', 'תיאור', 'פריט', 'מוצר',
-    'component', 'part name', 'item name', 'product name', 'שם פריט', 'שם מוצר'
+    'name',
+    'שם',
+    'product',
+    'item',
+    'description',
+    'תיאור',
+    'פריט',
+    'מוצר',
+    'component',
+    'part name',
+    'item name',
+    'product name',
+    'שם פריט',
+    'שם מוצר',
   ],
   manufacturer: [
-    'manufacturer', 'יצרן', 'brand', 'supplier', 'ספק', 'יצרן/ספק',
-    'make', 'mfr', 'mfg', 'vendor'
+    'manufacturer',
+    'יצרן',
+    'brand',
+    'supplier',
+    'ספק',
+    'יצרן/ספק',
+    'make',
+    'mfr',
+    'mfg',
+    'vendor',
   ],
   partNumber: [
-    'part number', 'קטלוגי', 'p/n', 'pn', 'part#', 'catalog', 'מק"ט', 'מקט',
-    'catalog number', 'cat no', 'catno', 'מספר קטלוגי', 'part no', 'partnumber',
-    'manufacturer part number', 'mfr part', 'mpn', 'manufacturer pn'
+    'part number',
+    'קטלוגי',
+    'p/n',
+    'pn',
+    'part#',
+    'catalog',
+    'מק"ט',
+    'מקט',
+    'catalog number',
+    'cat no',
+    'catno',
+    'מספר קטלוגי',
+    'part no',
+    'partnumber',
+    'manufacturer part number',
+    'mfr part',
+    'mpn',
+    'manufacturer pn',
   ],
   price: [
-    'price', 'מחיר', 'unit price', 'cost', 'מחיר יחידה', 'unit cost',
-    'list price', 'מחיר ליחידה', 'מחיר יח', 'מחיר יח\'', 'unit', 'סכום'
+    'price',
+    'מחיר',
+    'unit price',
+    'cost',
+    'מחיר יחידה',
+    'unit cost',
+    'list price',
+    'מחיר ליחידה',
+    'מחיר יח',
+    "מחיר יח'",
+    'unit',
+    'סכום',
   ],
   category: [
-    'category', 'קטגוריה', 'type', 'סוג', 'classification', 'סיווג',
-    'group', 'קבוצה', 'family', 'משפחה'
+    'category',
+    'קטגוריה',
+    'type',
+    'סוג',
+    'classification',
+    'סיווג',
+    'group',
+    'קבוצה',
+    'family',
+    'משפחה',
   ],
-  quantity: [
-    'quantity', 'כמות', 'qty', 'כמ', 'amount', 'q', 'קמות'
-  ],
+  quantity: ['quantity', 'כמות', 'qty', 'כמ', 'amount', 'q', 'קמות'],
   description: [
-    'description', 'תיאור', 'desc', 'remarks', 'הערות', 'notes',
-    'details', 'פרטים', 'specification', 'מפרט'
+    'description',
+    'תיאור',
+    'desc',
+    'remarks',
+    'הערות',
+    'notes',
+    'details',
+    'פרטים',
+    'specification',
+    'מפרט',
   ],
-  supplier: [
-    'supplier', 'ספק', 'vendor', 'distributor', 'מפיץ', 'source'
-  ],
-  currency: [
-    'currency', 'מטבע', 'curr', 'מט', 'מטבע תשלום'
-  ]
+  supplier: ['supplier', 'ספק', 'vendor', 'distributor', 'מפיץ', 'source'],
+  currency: ['currency', 'מטבע', 'curr', 'מט', 'מטבע תשלום'],
 };
 
 /**
  * Get valid categories from settings
  * Falls back to hardcoded defaults if settings are not available
+ * @param teamId - Optional team ID for team-scoped categories
  */
-const getValidCategories = () => getComponentCategories();
+const getValidCategories = (teamId?: string) => getComponentCategories(teamId);
 
 /**
  * Detect column indices based on header row using pattern matching
@@ -103,7 +159,9 @@ function detectColumns(headers: string[]): Record<string, number> {
 
   // Normalize headers for comparison (lowercase, trim)
   const normalizedHeaders = headers.map(h =>
-    String(h || '').toLowerCase().trim()
+    String(h || '')
+      .toLowerCase()
+      .trim()
   );
 
   // Check each field type
@@ -112,9 +170,13 @@ function detectColumns(headers: string[]): Record<string, number> {
       const header = normalizedHeaders[i];
 
       // Check if any pattern matches this header
-      if (patterns.some((pattern: string) =>
-        header.includes(pattern.toLowerCase()) || pattern.toLowerCase().includes(header)
-      )) {
+      if (
+        patterns.some(
+          (pattern: string) =>
+            header.includes(pattern.toLowerCase()) ||
+            pattern.toLowerCase().includes(header)
+        )
+      ) {
         detected[fieldName] = i;
         break; // Found the column, move to next field
       }
@@ -134,9 +196,14 @@ function extractCurrency(value: string): 'NIS' | 'USD' | 'EUR' | null {
 
   if (normalized.includes('USD') || normalized.includes('$')) return 'USD';
   if (normalized.includes('EUR') || normalized.includes('€')) return 'EUR';
-  if (normalized.includes('NIS') || normalized.includes('ILS') ||
-      normalized.includes('₪') || normalized.includes('שקל') ||
-      normalized.includes('ש"ח')) return 'NIS';
+  if (
+    normalized.includes('NIS') ||
+    normalized.includes('ILS') ||
+    normalized.includes('₪') ||
+    normalized.includes('שקל') ||
+    normalized.includes('ש"ח')
+  )
+    return 'NIS';
 
   return null;
 }
@@ -203,14 +270,18 @@ function parsePrice(value: unknown): number | null {
 
 /**
  * Normalize category to match valid categories
+ * @param category - Raw category string from the file
+ * @param validCategories - Array of valid category names
  */
-function normalizeCategory(category: string | null | undefined): string {
+function normalizeCategory(
+  category: string | null | undefined,
+  validCategories: string[]
+): string {
   if (!category) return 'אחר';
 
   const normalized = category.trim();
 
   // Check if it's already a valid category
-  const validCategories = getValidCategories();
   if (validCategories.includes(normalized)) {
     return normalized;
   }
@@ -218,15 +289,43 @@ function normalizeCategory(category: string | null | undefined): string {
   // Try to match based on keywords (case-insensitive)
   const lower = normalized.toLowerCase();
 
-  if (lower.includes('plc') || lower.includes('controller') || lower.includes('בקר')) return 'בקרים';
+  if (
+    lower.includes('plc') ||
+    lower.includes('controller') ||
+    lower.includes('בקר')
+  )
+    return 'בקרים';
   if (lower.includes('sensor') || lower.includes('חיישן')) return 'חיישנים';
-  if (lower.includes('actuator') || lower.includes('אקטואטור') || lower.includes('valve') || lower.includes('שסתום')) return 'אקטואטורים';
+  if (
+    lower.includes('actuator') ||
+    lower.includes('אקטואטור') ||
+    lower.includes('valve') ||
+    lower.includes('שסתום')
+  )
+    return 'אקטואטורים';
   if (lower.includes('motor') || lower.includes('מנוע')) return 'מנועים';
-  if (lower.includes('power') || lower.includes('supply') || lower.includes('ספק') || lower.includes('כוח')) return 'ספקי כוח';
-  if (lower.includes('communication') || lower.includes('network') || lower.includes('תקשורת')) return 'תקשורת';
+  if (
+    lower.includes('power') ||
+    lower.includes('supply') ||
+    lower.includes('ספק') ||
+    lower.includes('כוח')
+  )
+    return 'ספקי כוח';
+  if (
+    lower.includes('communication') ||
+    lower.includes('network') ||
+    lower.includes('תקשורת')
+  )
+    return 'תקשורת';
   if (lower.includes('safety') || lower.includes('בטיחות')) return 'בטיחות';
   if (lower.includes('mechanical') || lower.includes('מכני')) return 'מכני';
-  if (lower.includes('cable') || lower.includes('connector') || lower.includes('כבל') || lower.includes('מחבר')) return 'כבלים ומחברים';
+  if (
+    lower.includes('cable') ||
+    lower.includes('connector') ||
+    lower.includes('כבל') ||
+    lower.includes('מחבר')
+  )
+    return 'כבלים ומחברים';
 
   return 'אחר';
 }
@@ -272,30 +371,46 @@ function calculateConfidence(component: Partial<AIExtractedComponent>): number {
   let maxScore = 0;
 
   // Required fields
-  if (component.name) { score += 30; }
+  if (component.name) {
+    score += 30;
+  }
   maxScore += 30;
 
   // Important fields
-  if (component.manufacturerPN) { score += 20; }
+  if (component.manufacturerPN) {
+    score += 20;
+  }
   maxScore += 20;
 
-  if (component.manufacturer) { score += 15; }
+  if (component.manufacturer) {
+    score += 15;
+  }
   maxScore += 15;
 
   // Price is critical
-  if (component.unitPriceNIS || component.unitPriceUSD || component.unitPriceEUR) {
+  if (
+    component.unitPriceNIS ||
+    component.unitPriceUSD ||
+    component.unitPriceEUR
+  ) {
     score += 25;
   }
   maxScore += 25;
 
   // Nice to have
-  if (component.category) { score += 5; }
+  if (component.category) {
+    score += 5;
+  }
   maxScore += 5;
 
-  if (component.quantity) { score += 3; }
+  if (component.quantity) {
+    score += 3;
+  }
   maxScore += 3;
 
-  if (component.description) { score += 2; }
+  if (component.description) {
+    score += 2;
+  }
   maxScore += 2;
 
   return maxScore > 0 ? score / maxScore : 0;
@@ -339,13 +454,14 @@ function calculateConfidence(component: Partial<AIExtractedComponent>): number {
  */
 function processWorksheet(
   worksheet: XLSX.WorkSheet,
-  sheetName: string
+  sheetName: string,
+  validCategories: string[]
 ): { components: AIExtractedComponent[]; metadata: ExcelParseMetadata } {
   // Convert sheet to JSON (array of arrays preserves structure)
   const jsonData: unknown[][] = XLSX.utils.sheet_to_json(worksheet, {
     header: 1,
     defval: null,
-    blankrows: false
+    blankrows: false,
   });
 
   if (jsonData.length === 0) {
@@ -356,8 +472,8 @@ function processWorksheet(
         rowCount: 0,
         columnHeaders: [],
         detectedColumns: {},
-        sheetsProcessed: 1
-      }
+        sheetsProcessed: 1,
+      },
     };
   }
 
@@ -372,7 +488,10 @@ function processWorksheet(
     const row = jsonData[i];
 
     // Skip empty rows
-    if (!row || row.every(cell => cell === null || cell === undefined || cell === '')) {
+    if (
+      !row ||
+      row.every(cell => cell === null || cell === undefined || cell === '')
+    ) {
       continue;
     }
 
@@ -387,7 +506,9 @@ function processWorksheet(
     // Skip if no name found
     if (!component.name) {
       // Try to use first non-empty cell as name
-      const firstNonEmpty = row.find(cell => cell !== null && cell !== undefined && cell !== '');
+      const firstNonEmpty = row.find(
+        cell => cell !== null && cell !== undefined && cell !== ''
+      );
       if (firstNonEmpty) {
         component.name = String(firstNonEmpty).trim();
       } else {
@@ -397,30 +518,34 @@ function processWorksheet(
 
     // Manufacturer
     if (detectedColumns.manufacturer !== undefined) {
-      component.manufacturer = String(row[detectedColumns.manufacturer] || '').trim() || undefined;
+      component.manufacturer =
+        String(row[detectedColumns.manufacturer] || '').trim() || undefined;
     }
 
     // Part Number
     if (detectedColumns.partNumber !== undefined) {
-      component.manufacturerPN = String(row[detectedColumns.partNumber] || '').trim() || undefined;
+      component.manufacturerPN =
+        String(row[detectedColumns.partNumber] || '').trim() || undefined;
     }
 
     // Description
     if (detectedColumns.description !== undefined) {
-      component.description = String(row[detectedColumns.description] || '').trim() || undefined;
+      component.description =
+        String(row[detectedColumns.description] || '').trim() || undefined;
     }
 
     // Category
     if (detectedColumns.category !== undefined) {
       const rawCategory = String(row[detectedColumns.category] || '').trim();
-      component.category = normalizeCategory(rawCategory);
+      component.category = normalizeCategory(rawCategory, validCategories);
     } else {
       component.category = 'אחר';
     }
 
     // Supplier
     if (detectedColumns.supplier !== undefined) {
-      component.supplier = String(row[detectedColumns.supplier] || '').trim() || undefined;
+      component.supplier =
+        String(row[detectedColumns.supplier] || '').trim() || undefined;
     }
 
     // Quantity
@@ -440,7 +565,9 @@ function processWorksheet(
 
         // If currency column exists, use that
         if (!currency && detectedColumns.currency !== undefined) {
-          currency = extractCurrency(String(row[detectedColumns.currency] || ''));
+          currency = extractCurrency(
+            String(row[detectedColumns.currency] || '')
+          );
         }
 
         // Default to USD if no currency detected
@@ -472,8 +599,8 @@ function processWorksheet(
       rowCount: jsonData.length - 1, // Excluding header
       columnHeaders: headers,
       detectedColumns,
-      sheetsProcessed: 1
-    }
+      sheetsProcessed: 1,
+    },
   };
 }
 
@@ -533,21 +660,28 @@ function processWorksheet(
  * - Category: "Type", "קטגוריה", etc.
  *
  * @throws Never throws - all errors returned in result.error
+ * @param teamId - Optional team ID for team-scoped categories
  */
-export async function parseExcelFile(file: File): Promise<AIExtractionResult> {
+export async function parseExcelFile(
+  file: File,
+  teamId?: string
+): Promise<AIExtractionResult> {
   try {
     // Validate file type
     const validTypes = [
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
       'application/vnd.ms-excel', // .xls
       'text/csv', // .csv
-      'application/csv'
+      'application/csv',
     ];
 
     const fileExtension = file.name.toLowerCase().split('.').pop();
     const validExtensions = ['xlsx', 'xls', 'csv'];
 
-    if (!validTypes.includes(file.type) && !validExtensions.includes(fileExtension || '')) {
+    if (
+      !validTypes.includes(file.type) &&
+      !validExtensions.includes(fileExtension || '')
+    ) {
       return {
         success: false,
         components: [],
@@ -568,7 +702,7 @@ export async function parseExcelFile(file: File): Promise<AIExtractionResult> {
       type: 'array',
       cellDates: true,
       cellNF: false,
-      cellText: false
+      cellText: false,
     });
 
     if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
@@ -590,23 +724,31 @@ export async function parseExcelFile(file: File): Promise<AIExtractionResult> {
     let detectedColumns: Record<string, number> = {};
     const processedSheets: string[] = [];
 
+    // Get valid categories for this team (once, before processing)
+    const validCategories = getValidCategories(teamId);
+
     // Process first sheet (can be extended to process all sheets)
     for (let i = 0; i < Math.min(1, workbook.SheetNames.length); i++) {
       const sheetName = workbook.SheetNames[i];
       const worksheet = workbook.Sheets[sheetName];
 
-      const result = processWorksheet(worksheet, sheetName);
+      const result = processWorksheet(worksheet, sheetName, validCategories);
 
       allComponents.push(...result.components);
       totalRows += result.metadata.rowCount;
-      detectedColumns = { ...detectedColumns, ...result.metadata.detectedColumns };
+      detectedColumns = {
+        ...detectedColumns,
+        ...result.metadata.detectedColumns,
+      };
       processedSheets.push(sheetName);
     }
 
     // Calculate overall confidence
-    const avgConfidence = allComponents.length > 0
-      ? allComponents.reduce((sum, c) => sum + (c.confidence || 0), 0) / allComponents.length
-      : 0;
+    const avgConfidence =
+      allComponents.length > 0
+        ? allComponents.reduce((sum, c) => sum + (c.confidence || 0), 0) /
+          allComponents.length
+        : 0;
 
     return {
       success: true,
@@ -618,11 +760,10 @@ export async function parseExcelFile(file: File): Promise<AIExtractionResult> {
         rowCount: totalRows,
         columnHeaders: Object.keys(detectedColumns),
         detectedColumns,
-        sheetsProcessed: processedSheets.length
+        sheetsProcessed: processedSheets.length,
       },
       confidence: avgConfidence,
     };
-
   } catch (error) {
     logger.error('Excel parsing error:', error);
 
@@ -634,9 +775,10 @@ export async function parseExcelFile(file: File): Promise<AIExtractionResult> {
         totalItems: 0,
       },
       confidence: 0,
-      error: error instanceof Error
-        ? `Failed to parse Excel file: ${error.message}`
-        : 'Unknown error occurred while parsing Excel file',
+      error:
+        error instanceof Error
+          ? `Failed to parse Excel file: ${error.message}`
+          : 'Unknown error occurred while parsing Excel file',
     };
   }
 }

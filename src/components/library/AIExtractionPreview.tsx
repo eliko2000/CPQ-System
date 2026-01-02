@@ -1441,12 +1441,12 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
     isFullscreen && sourceFile
       ? createPortal(
           <div
-            className="fixed inset-0 z-[9999] bg-background flex flex-col"
+            className="fixed inset-0 z-[9999] bg-background flex flex-col pointer-events-auto"
             onMouseDown={e => e.stopPropagation()}
             onClick={e => e.stopPropagation()}
           >
             {/* Fullscreen Header */}
-            <div className="flex items-center justify-between p-3 border-b bg-muted/50 flex-shrink-0">
+            <div className="flex items-center justify-between p-3 border-b bg-muted/50 flex-shrink-0 pointer-events-auto">
               <div className="flex items-center gap-2">
                 <FileText className="w-5 h-5 text-muted-foreground" />
                 <span className="text-sm font-medium">{sourceFile.name}</span>
@@ -1456,7 +1456,7 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
                 variant="outline"
                 size="sm"
                 onClick={exitFullscreen}
-                className="gap-2"
+                className="gap-2 pointer-events-auto"
               >
                 <PanelLeftClose className="w-4 h-4" />
                 חזור לייבוא

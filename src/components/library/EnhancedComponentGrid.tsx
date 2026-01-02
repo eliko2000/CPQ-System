@@ -27,6 +27,11 @@ import {
 import { logger } from '@/lib/logger';
 import { SelectionCheckboxRenderer } from '../grid/SelectionCheckboxRenderer';
 import { FloatingActionToolbar } from '../grid/FloatingActionToolbar';
+import {
+  BulkFieldEditor,
+  BulkFieldConfig,
+  BulkFieldUpdate,
+} from '../grid/BulkFieldEditor';
 import { useGridSelection } from '../../hooks/useGridSelection';
 import { GridAction } from '../../types/grid.types';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
@@ -325,10 +330,91 @@ export function EnhancedComponentGrid({
     return actions;
   }, [onView, onEdit, onDuplicate, handleBulkDelete]);
 
+  // Bulk field edit configuration
+  const bulkFieldConfig = useMemo<BulkFieldConfig[]>(
+    () => [
+      { key: 'supplier', label: 'ספק', type: 'text', clearable: false },
+      { key: 'manufacturer', label: 'יצרן', type: 'text' },
+      {
+        key: 'category',
+        label: 'קטגוריה',
+        type: 'select',
+        options: categories,
+        clearable: false,
+      },
+      { key: 'description', label: 'תיאור', type: 'text' },
+      { key: 'notes', label: 'הערות', type: 'text' },
+    ],
+    [categories]
+  );
+
+  // Handle bulk field update
+  const handleBulkFieldUpdate = useCallback(
+    async (update: BulkFieldUpdate) => {
+      if (!onComponentUpdate) {
+        toast.error('עדכון רכיבים לא זמין');
+        return;
+      }
+
+      const selectedComponents = selection.selectedData;
+      if (selectedComponents.length === 0) {
+        toast.error('לא נבחרו רכיבים');
+        return;
+      }
+
+      const newValue = update.clear ? '' : update.value;
+      let successCount = 0;
+      let failCount = 0;
+
+      for (const component of selectedComponents) {
+        try {
+          onComponentUpdate(component.id, update.field, newValue);
+          successCount++;
+        } catch (error) {
+          failCount++;
+          logger.error(
+            'Bulk field update failed for component:',
+            component.id,
+            error
+          );
+        }
+      }
+
+      // Show result toast
+      const fieldLabel =
+        bulkFieldConfig.find(f => f.key === update.field)?.label ||
+        update.field;
+
+      if (failCount === 0) {
+        toast.success(
+          update.clear
+            ? `השדה "${fieldLabel}" נוקה ב-${successCount} רכיבים`
+            : `השדה "${fieldLabel}" עודכן ב-${successCount} רכיבים`
+        );
+      } else if (successCount === 0) {
+        toast.error(
+          `עדכון השדה "${fieldLabel}" נכשל עבור כל ${failCount} הרכיבים`
+        );
+      } else {
+        toast.warning(
+          `השדה "${fieldLabel}" עודכן ב-${successCount} רכיבים, ${failCount} נכשלו`
+        );
+      }
+
+      // Clear selection after bulk update
+      selection.clearSelection();
+    },
+    [onComponentUpdate, selection, bulkFieldConfig]
+  );
+
   // Grid context for selection (updated to include selection handlers)
   const gridContext = useMemo(
     () => ({
-      onSelectionToggle: selection.toggleSelection,
+      onSelectionToggle: selection.toggleSelection as (
+        id: string,
+        data: any,
+        event: React.MouseEvent | React.PointerEvent
+      ) => void,
       isSelected: selection.isSelected,
     }),
     [selection.toggleSelection, selection.isSelected]
@@ -1275,6 +1361,7 @@ export function EnhancedComponentGrid({
           context={gridContext}
           defaultColDef={defaultColDef}
           enableRtl={true}
+          getRowId={params => params.data.id}
           onGridReady={onGridReady}
           onFirstDataRendered={onFirstDataRendered}
           onColumnResized={onColumnResized}
@@ -1337,7 +1424,12 @@ export function EnhancedComponentGrid({
         actions={gridActions}
         onClear={selection.clearSelection}
         onAction={selection.handleAction}
-      />
+      >
+        <BulkFieldEditor
+          fields={bulkFieldConfig}
+          onSave={handleBulkFieldUpdate}
+        />
+      </FloatingActionToolbar>
 
       {/* Delete Confirmation Dialog */}
       <ConfirmDialog

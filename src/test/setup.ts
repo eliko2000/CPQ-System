@@ -135,6 +135,8 @@ vi.mock('lucide-react', () => ({
   Copy: () => 'Copy',
   Trash2: () => 'Trash2',
   ChevronDown: () => 'ChevronDown',
+  ChevronUp: () => 'ChevronUp',
+  Check: () => 'Check',
   LogOut: () => 'LogOut',
 }));
 

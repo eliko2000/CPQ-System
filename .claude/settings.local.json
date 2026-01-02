@@ -41,7 +41,12 @@
       "Bash(grep:*)",
       "mcp__context7__resolve-library-id",
       "mcp__context7__get-library-docs",
-      "mcp__playwright__browser_hover"
+      "mcp__playwright__browser_hover",
+      "mcp__playwright__browser_select_option",
+      "Bash(cd:*)",
+      "mcp__playwright__browser_press_key",
+      "WebFetch(domain:nikiforovall.blog)",
+      "WebFetch(domain:claudelog.com)"
     ],
     "deny": [],
     "ask": []

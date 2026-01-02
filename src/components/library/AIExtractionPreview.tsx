@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import {
   CheckCircle,
   Edit2,
@@ -9,6 +10,10 @@ import {
   Sparkles,
   GitMerge,
   Plus,
+  FileText,
+  PanelLeftClose,
+  PanelLeft,
+  Maximize2,
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -33,6 +38,7 @@ import {
 } from '../../constants/settings';
 import { logger } from '@/lib/logger';
 import { useTeam } from '../../contexts/TeamContext';
+import { SourceFileViewer } from './viewers';
 
 // Type guards for metadata
 interface ExcelMetadata {
@@ -66,6 +72,9 @@ interface AIExtractionPreviewProps {
   extractionResult: AIExtractionResult;
   msrpOptions?: MSRPImportOptions; // Optional - not all callers provide it
   matchDecisions?: ComponentMatchDecision[];
+  sourceFile?: File | null; // Original file for side-by-side preview
+  onSourcePanelChange?: (isOpen: boolean) => void; // Callback when source panel toggles
+  onFullscreenChange?: (isFullscreen: boolean) => void; // Callback when fullscreen state changes
   onConfirm: (
     components: Partial<Component>[],
     decisions: ComponentMatchDecision[]
@@ -101,9 +110,38 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
   extractionResult,
   msrpOptions,
   matchDecisions = [],
+  sourceFile,
+  onSourcePanelChange,
+  onFullscreenChange,
   onConfirm,
   onCancel,
 }) => {
+  // State for showing/hiding source file panel
+  const [showSourcePanel, setShowSourcePanel] = useState(false);
+  // State for fullscreen mode
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Toggle source panel and notify parent
+  const toggleSourcePanel = (show: boolean) => {
+    setShowSourcePanel(show);
+    onSourcePanelChange?.(show);
+  };
+
+  // Notify parent when fullscreen state changes
+  useEffect(() => {
+    onFullscreenChange?.(isFullscreen);
+  }, [isFullscreen, onFullscreenChange]);
+
+  // Handle entering fullscreen
+  const enterFullscreen = useCallback(() => {
+    setIsFullscreen(true);
+  }, []);
+
+  // Handle exiting fullscreen
+  const exitFullscreen = useCallback(() => {
+    setIsFullscreen(false);
+  }, []);
+
   // Get current team for team-scoped settings
   const { currentTeam } = useTeam();
 
@@ -491,13 +529,37 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
     return 'Low';
   };
 
-  return (
-    <div className="space-y-6">
+  // Main content JSX (extracted for reuse in split panel)
+  const mainContent = (
+    <div className="space-y-6 h-full overflow-y-auto">
       {/* Header */}
       <div className="space-y-4">
-        <div className="flex items-center gap-2">
-          <Sparkles className="w-6 h-6 text-purple-500" />
-          <h2 className="text-xl font-semibold">סקירת רכיבים שחולצו</h2>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-6 h-6 text-purple-500" />
+            <h2 className="text-xl font-semibold">סקירת רכיבים שחולצו</h2>
+          </div>
+          {/* View Source Button */}
+          {sourceFile && (
+            <Button
+              variant={showSourcePanel ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => toggleSourcePanel(!showSourcePanel)}
+              className="gap-2"
+            >
+              {showSourcePanel ? (
+                <>
+                  <PanelLeftClose className="w-4 h-4" />
+                  הסתר מקור
+                </>
+              ) : (
+                <>
+                  <PanelLeft className="w-4 h-4" />
+                  הצג מקור
+                </>
+              )}
+            </Button>
+          )}
         </div>
 
         {/* Summary Cards */}
@@ -1372,5 +1434,104 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
         </div>
       </div>
     </div>
+  );
+
+  // Fullscreen overlay for file viewer - rendered via Portal to escape dialog
+  const fullscreenOverlay =
+    isFullscreen && sourceFile
+      ? createPortal(
+          <div
+            className="fixed inset-0 z-[9999] bg-background flex flex-col"
+            onMouseDown={e => e.stopPropagation()}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Fullscreen Header */}
+            <div className="flex items-center justify-between p-3 border-b bg-muted/50 flex-shrink-0">
+              <div className="flex items-center gap-2">
+                <FileText className="w-5 h-5 text-muted-foreground" />
+                <span className="text-sm font-medium">{sourceFile.name}</span>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={exitFullscreen}
+                className="gap-2"
+              >
+                <PanelLeftClose className="w-4 h-4" />
+                חזור לייבוא
+              </Button>
+            </div>
+            {/* Fullscreen Content - use key to force fresh state */}
+            <div className="flex-1 min-h-0 overflow-hidden">
+              <SourceFileViewer
+                key={`fullscreen-${sourceFile.name}`}
+                file={sourceFile}
+                isFullscreen
+              />
+            </div>
+          </div>,
+          document.body
+        )
+      : null;
+
+  // If source panel is shown and we have a source file, render with split layout
+  if (showSourcePanel && sourceFile) {
+    return (
+      <>
+        {fullscreenOverlay}
+        <div className="flex min-h-[700px] gap-4">
+          {/* Main Content - Left Side (keeps original width ~900px) */}
+          <div className="w-[900px] flex-shrink-0 overflow-y-auto overflow-x-hidden">
+            {mainContent}
+          </div>
+
+          {/* Source File Panel - Right Side (fixed width to avoid horizontal scroll) */}
+          <div className="w-[450px] flex-shrink-0 border rounded-lg bg-background flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between p-3 border-b bg-muted/50">
+              <div className="flex items-center gap-2">
+                <FileText className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm font-medium truncate max-w-[250px]">
+                  {sourceFile.name}
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={enterFullscreen}
+                  className="h-7 w-7 p-0"
+                  title="מסך מלא"
+                >
+                  <Maximize2 className="w-4 h-4" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => toggleSourcePanel(false)}
+                  className="h-7 w-7 p-0"
+                >
+                  <PanelLeftClose className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+            {/* File viewer - no scroll here, handled inside viewer */}
+            <div className="flex-1 min-h-0">
+              <SourceFileViewer key="panel" file={sourceFile} />
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // Default: render without split panel
+  return (
+    <>
+      {fullscreenOverlay}
+      {mainContent}
+    </>
   );
 };

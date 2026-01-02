@@ -57,7 +57,7 @@ export function useGridSelection<T = any>(
    * Toggle selection for a single row with Ctrl/Shift support
    */
   const toggleSelection = useCallback(
-    (id: string, data: T, event?: React.MouseEvent) => {
+    (id: string, data: T, event?: React.MouseEvent | React.PointerEvent) => {
       const rowNode = gridApi?.getRowNode(id);
       const rowIndex = rowNode?.rowIndex ?? -1;
 

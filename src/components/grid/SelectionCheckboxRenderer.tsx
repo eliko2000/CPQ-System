@@ -9,7 +9,11 @@ import { ICellRendererParams } from 'ag-grid-community';
 import { Checkbox } from '../ui/checkbox';
 
 interface SelectionCheckboxRendererProps extends ICellRendererParams {
-  onSelectionToggle?: (id: string, data: any, event: React.MouseEvent) => void;
+  onSelectionToggle?: (
+    id: string,
+    data: any,
+    event: React.MouseEvent | React.PointerEvent
+  ) => void;
   isSelected?: (id: string) => boolean;
 }
 
@@ -20,7 +24,7 @@ export const SelectionCheckboxRenderer = (
 
   if (!data) return null;
 
-  const handleClick = (event: React.MouseEvent) => {
+  const handleClick = (event: React.PointerEvent) => {
     // CRITICAL: Stop propagation to prevent cell click from opening component
     event.stopPropagation();
 
@@ -34,15 +38,16 @@ export const SelectionCheckboxRenderer = (
   return (
     <div
       className={`flex items-center justify-center h-full selection-checkbox-cell ${checked ? 'checkbox-selected' : ''}`}
-      onClick={handleClick}
+      onPointerDown={handleClick}
     >
       <Checkbox
         checked={checked}
-        onCheckedChange={() => {}} // Handled by onClick above
+        onCheckedChange={() => {}} // Handled by onPointerDown above
         className="cursor-pointer checkbox-hover-target focus:outline-none focus:ring-0 focus:ring-offset-0 focus-visible:outline-none focus-visible:ring-0 !border !border-zinc-900"
         style={{
           opacity: checked ? 1 : 0,
           transition: 'opacity 0.15s ease',
+          pointerEvents: 'none', // Let the parent div handle all pointer events
         }}
       />
     </div>

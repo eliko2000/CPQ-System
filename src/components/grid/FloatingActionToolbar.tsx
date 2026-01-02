@@ -18,6 +18,7 @@ interface FloatingActionToolbarProps {
   onClear: () => void;
   onAction: (action: GridAction) => void;
   className?: string;
+  children?: React.ReactNode; // Custom elements (e.g., BulkFieldEditor)
 }
 
 export const FloatingActionToolbar: React.FC<FloatingActionToolbarProps> = ({
@@ -26,6 +27,7 @@ export const FloatingActionToolbar: React.FC<FloatingActionToolbarProps> = ({
   onClear,
   onAction,
   className,
+  children,
 }) => {
   const [isVisible, setIsVisible] = useState(false);
 
@@ -99,6 +101,14 @@ export const FloatingActionToolbar: React.FC<FloatingActionToolbarProps> = ({
             );
           })}
         </div>
+
+        {/* Custom Elements (e.g., BulkFieldEditor) */}
+        {children && (
+          <>
+            <div className="h-6 w-px bg-gray-300 dark:bg-gray-600" />
+            {children}
+          </>
+        )}
 
         {/* Divider */}
         <div className="h-6 w-px bg-gray-300 dark:bg-gray-600" />

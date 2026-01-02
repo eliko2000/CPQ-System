@@ -41,7 +41,9 @@ export const ComponentAIImport: React.FC<ComponentAIImportProps> = ({
     current: 0,
     total: 0,
   });
+
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [fileSelected, setFileSelected] = useState(false);
 
   // Hooks for file storage and history
   const { createQuote, addComponentHistory } = useSupplierQuotes();
@@ -266,6 +268,8 @@ export const ComponentAIImport: React.FC<ComponentAIImportProps> = ({
     if (step === 'preview') return true;
     // If importing, definitely has unsaved work
     if (step === 'importing') return true;
+    // If file is selected but not yet processed
+    if (fileSelected) return true;
     // Upload and complete states have no unsaved changes
     return false;
   };
@@ -290,7 +294,10 @@ export const ComponentAIImport: React.FC<ComponentAIImportProps> = ({
     setSourceFile(null);
     setShowSourcePanel(false);
     setIsFullscreen(false);
+    setShowSourcePanel(false);
+    setIsFullscreen(false);
     setImportProgress({ current: 0, total: 0 });
+    setFileSelected(false);
     onClose();
   };
 
@@ -322,6 +329,7 @@ export const ComponentAIImport: React.FC<ComponentAIImportProps> = ({
             <IntelligentDocumentUpload
               onExtractionComplete={handleExtractionComplete}
               onCancel={handleClose}
+              onFileSelected={file => setFileSelected(!!file)}
             />
           )}
 

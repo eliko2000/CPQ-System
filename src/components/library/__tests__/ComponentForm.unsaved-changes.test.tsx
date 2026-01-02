@@ -1,8 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ComponentForm } from '../ComponentForm';
-import { CPQProvider } from '../../../contexts/CPQContext';
-import { TeamProvider } from '../../../contexts/TeamContext';
 
 // Mock lucide-react icons
 vi.mock('lucide-react', () => ({

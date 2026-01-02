@@ -40,6 +40,7 @@ interface IntelligentDocumentUploadProps {
     msrpOptions: MSRPImportOptions
   ) => void;
   onCancel: () => void;
+  onFileSelected?: (file: File | null) => void;
 }
 
 type UploadStatus =
@@ -52,7 +53,7 @@ type UploadStatus =
 
 export const IntelligentDocumentUpload: React.FC<
   IntelligentDocumentUploadProps
-> = ({ onExtractionComplete, onCancel }) => {
+> = ({ onExtractionComplete, onCancel, onFileSelected }) => {
   // Get current team for team-scoped settings (categories)
   const { currentTeam } = useTeam();
   const [file, setFile] = useState<File | null>(null);
@@ -119,6 +120,7 @@ export const IntelligentDocumentUpload: React.FC<
       const method = getExtractionMethod(droppedFile);
       if (method !== 'unknown') {
         setFile(droppedFile);
+        onFileSelected?.(droppedFile);
         setExtractionMethod(method);
         setError('');
       } else {
@@ -135,6 +137,7 @@ export const IntelligentDocumentUpload: React.FC<
       if (selectedFile) {
         const method = getExtractionMethod(selectedFile);
         setFile(selectedFile);
+        onFileSelected?.(selectedFile);
         setExtractionMethod(method);
         setError('');
       }
@@ -648,7 +651,13 @@ export const IntelligentDocumentUpload: React.FC<
                     ? 'המשך לבחירת עמודות'
                     : 'נתח ועבור לתצוגה מקדימה'}
                 </Button>
-                <Button variant="outline" onClick={() => setFile(null)}>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setFile(null);
+                    onFileSelected?.(null);
+                  }}
+                >
                   הסר
                 </Button>
               </div>

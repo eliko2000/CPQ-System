@@ -13,6 +13,7 @@
 
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { IntelligentDocumentUpload } from '../library/IntelligentDocumentUpload';
 import { AIExtractionPreview } from '../library/AIExtractionPreview';
 import { useSupplierQuotes } from '../../hooks/useSupplierQuotes';
@@ -42,6 +43,8 @@ export const SupplierQuoteImport: React.FC<SupplierQuoteImportProps> = ({
   onSuccess,
 }) => {
   const [step, setStep] = useState<ImportStep>('upload');
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const [fileSelected, setFileSelected] = useState(false);
   const [extractionResult, setExtractionResult] =
     useState<AIExtractionResult | null>(null);
   const [_uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -418,90 +421,137 @@ export const SupplierQuoteImport: React.FC<SupplierQuoteImportProps> = ({
     setCreatedQuote(null);
     setMatchDecisions([]);
     setImportProgress({ current: 0, total: 0 });
+    setFileSelected(false);
+    setShowExitConfirm(false);
     onClose();
   };
 
+  const hasUnsavedWork = () => {
+    return (
+      fileSelected ||
+      step !== 'upload' ||
+      _uploadedFile !== null ||
+      extractionResult !== null
+    );
+  };
+
+  const handleInteractOutside = (e: any) => {
+    if (hasUnsavedWork()) {
+      e.preventDefault();
+      setShowExitConfirm(true);
+    }
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>
-            {step === 'upload' && 'העלאת הצעת ספק'}
-            {step === 'matching' && 'מזהה רכיבים קיימים...'}
-            {step === 'preview' && 'בדיקת רכיבים שחולצו'}
-            {step === 'importing' && 'מייבא רכיבים...'}
-            {step === 'complete' && 'הייבוא הושלם!'}
-          </DialogTitle>
-        </DialogHeader>
+    <>
+      <Dialog
+        open={isOpen}
+        onOpenChange={open => {
+          if (!open) {
+            if (hasUnsavedWork()) {
+              setShowExitConfirm(true);
+            } else {
+              handleClose();
+            }
+          }
+        }}
+      >
+        <DialogContent
+          className="max-w-4xl max-h-[90vh] overflow-y-auto"
+          onInteractOutside={handleInteractOutside}
+          onEscapeKeyDown={handleInteractOutside}
+        >
+          <DialogHeader>
+            <DialogTitle>
+              {step === 'upload' && 'העלאת הצעת ספק'}
+              {step === 'matching' && 'מזהה רכיבים קיימים...'}
+              {step === 'preview' && 'בדיקת רכיבים שחולצו'}
+              {step === 'importing' && 'מייבא רכיבים...'}
+              {step === 'complete' && 'הייבוא הושלם!'}
+            </DialogTitle>
+          </DialogHeader>
 
-        {step === 'upload' && (
-          <IntelligentDocumentUpload
-            onExtractionComplete={handleExtractionComplete}
-            onCancel={handleClose}
-          />
-        )}
+          {step === 'upload' && (
+            <IntelligentDocumentUpload
+              onExtractionComplete={handleExtractionComplete}
+              onCancel={handleClose}
+              onFileSelected={file => setFileSelected(!!file)}
+            />
+          )}
 
-        {step === 'matching' && (
-          <div className="py-12 text-center" dir="rtl">
-            <Loader2 className="h-12 w-12 mx-auto mb-4 animate-spin text-primary" />
-            <p className="text-lg font-medium">מריץ זיהוי חכם של רכיבים...</p>
-            <p className="text-sm text-muted-foreground mt-2">
-              בודק אם הרכיבים כבר קיימים בספרייה
-            </p>
-            <div className="text-xs text-muted-foreground mt-4 space-y-1">
-              <p>🔍 שלב 1: חיפוש התאמה מדויקת</p>
-              <p>📊 שלב 2: ניתוח התאמה מטושטשת</p>
-              <p>🤖 שלב 3: בדיקה סמנטית באמצעות AI</p>
+          {step === 'matching' && (
+            <div className="py-12 text-center" dir="rtl">
+              <Loader2 className="h-12 w-12 mx-auto mb-4 animate-spin text-primary" />
+              <p className="text-lg font-medium">מריץ זיהוי חכם של רכיבים...</p>
+              <p className="text-sm text-muted-foreground mt-2">
+                בודק אם הרכיבים כבר קיימים בספרייה
+              </p>
+              <div className="text-xs text-muted-foreground mt-4 space-y-1">
+                <p>🔍 שלב 1: חיפוש התאמה מדויקת</p>
+                <p>📊 שלב 2: ניתוח התאמה מטושטשת</p>
+                <p>🤖 שלב 3: בדיקה סמנטית באמצעות AI</p>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {step === 'preview' && extractionResult && (
-          <AIExtractionPreview
-            extractionResult={extractionResult}
-            matchDecisions={matchDecisions}
-            onConfirm={handleConfirm}
-            onCancel={() => setStep('upload')}
-          />
-        )}
+          {step === 'preview' && extractionResult && (
+            <AIExtractionPreview
+              extractionResult={extractionResult}
+              matchDecisions={matchDecisions}
+              onConfirm={handleConfirm}
+              onCancel={() => setStep('upload')}
+            />
+          )}
 
-        {step === 'importing' && (
-          <div className="py-12 text-center" dir="rtl">
-            <Loader2 className="h-12 w-12 mx-auto mb-4 animate-spin text-primary" />
-            <p className="text-lg font-medium">מייבא רכיבים...</p>
-            <p className="text-sm text-muted-foreground mt-2">
-              {importProgress.current} מתוך {importProgress.total} יובאו
-            </p>
-            <p className="text-xs text-muted-foreground mt-4">
-              🤖 מריץ זיהוי חכם של רכיבים קיימים...
-            </p>
-          </div>
-        )}
-
-        {step === 'complete' && (
-          <div className="py-12 text-center" dir="rtl">
-            <div className="text-green-600 mb-4">
-              <svg
-                className="w-16 h-16 mx-auto"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M5 13l4 4L19 7"
-                />
-              </svg>
+          {step === 'importing' && (
+            <div className="py-12 text-center" dir="rtl">
+              <Loader2 className="h-12 w-12 mx-auto mb-4 animate-spin text-primary" />
+              <p className="text-lg font-medium">מייבא רכיבים...</p>
+              <p className="text-sm text-muted-foreground mt-2">
+                {importProgress.current} מתוך {importProgress.total} יובאו
+              </p>
+              <p className="text-xs text-muted-foreground mt-4">
+                🤖 מריץ זיהוי חכם של רכיבים קיימים...
+              </p>
             </div>
-            <p className="text-lg font-medium">הייבוא הושלם בהצלחה!</p>
-            <p className="text-sm text-muted-foreground mt-2">
-              {importProgress.total} רכיבים עובדו
-            </p>
-          </div>
-        )}
-      </DialogContent>
-    </Dialog>
+          )}
+
+          {step === 'complete' && (
+            <div className="py-12 text-center" dir="rtl">
+              <div className="text-green-600 mb-4">
+                <svg
+                  className="w-16 h-16 mx-auto"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+              </div>
+              <p className="text-lg font-medium">הייבוא הושלם בהצלחה!</p>
+              <p className="text-sm text-muted-foreground mt-2">
+                {importProgress.total} רכיבים עובדו
+              </p>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmDialog
+        isOpen={showExitConfirm}
+        title="ביטול ייבוא"
+        message="הייבוא יבוטל והשינויים לא יישמרו. האם אתה בטוח?"
+        confirmText="כן, בטל ייבוא"
+        cancelText="המשך בייבוא"
+        type="warning"
+        onConfirm={handleClose}
+        onCancel={() => setShowExitConfirm(false)}
+      />
+    </>
   );
 };

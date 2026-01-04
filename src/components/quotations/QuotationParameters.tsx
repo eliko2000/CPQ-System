@@ -12,6 +12,7 @@ export const QuotationParameters = memo(function QuotationParameters({
   onChange,
   disabled = false,
 }: QuotationParametersProps) {
+  // Simple onChange handler - call immediately (no debouncing)
   const handleChange = useCallback(
     (field: keyof QuotationParametersType, value: any) => {
       onChange({

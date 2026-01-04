@@ -109,7 +109,11 @@ export function useQuotations() {
 
     try {
       setError(null);
-      logger.debug('useQuotations - updateQuotation called:', { id, updates });
+      logger.info('🔵 useQuotations - updateQuotation called:', {
+        id,
+        updates: JSON.stringify(updates),
+        teamId: currentTeam.id,
+      });
 
       const { data, error } = await supabase
         .from('quotations')
@@ -119,9 +123,16 @@ export function useQuotations() {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        logger.error('🔴 useQuotations - Database update FAILED:', error);
+        throw error;
+      }
 
-      logger.debug('useQuotations - Database updated, returned data:', data);
+      logger.info('🟢 useQuotations - Database updated successfully:', {
+        returnedData: JSON.stringify(data),
+        exchange_rate: data?.exchange_rate,
+        eur_to_ils_rate: data?.eur_to_ils_rate,
+      });
 
       // Only update the changed fields, preserve nested quotation_systems
       setQuotations(prev => {

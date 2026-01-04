@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import {
   QuotationProject,
   QuotationSystem,
@@ -17,6 +17,16 @@ import { renumberItems } from '../../utils/quotationCalculations';
 import { useQuotations } from '../useQuotations';
 import { logger } from '@/lib/logger';
 import { CustomItemData } from '../../components/quotations/CustomItemForm';
+import { useTeam } from '../../contexts/TeamContext';
+import {
+  logQuotationItemsAdded,
+  logQuotationItemsRemoved,
+  logQuotationParametersChanged,
+} from '../../services/activityLogService';
+import {
+  useItemAdditionBatching,
+  useParameterChangeBatching,
+} from '../useActivityBatching';
 
 export interface QuotationActionsProps {
   currentQuotation: QuotationProject | null;
@@ -34,6 +44,24 @@ export function useQuotationActions({
   setShowComponentSelector,
 }: QuotationActionsProps) {
   const quotationsHook = useQuotations();
+  const { currentTeam } = useTeam();
+
+  // Batching hook for consolidating rapid item additions into one log
+  const { addToBatch, flushBatch } = useItemAdditionBatching(
+    logQuotationItemsAdded
+  );
+
+  // Batching hook for consolidating parameter changes into one log
+  const { addToBatch: addParameterToBatch, flushBatch: flushParameterBatch } =
+    useParameterChangeBatching(logQuotationParametersChanged);
+
+  // Flush batches when quotation closes or changes
+  useEffect(() => {
+    return () => {
+      flushBatch();
+      flushParameterBatch();
+    };
+  }, [currentQuotation?.id, flushBatch, flushParameterBatch]);
 
   // Add a new system
   const addSystem = useCallback(async () => {
@@ -207,6 +235,17 @@ export function useQuotationActions({
         setCurrentQuotation(updatedQuotation);
         updateQuotation(currentQuotation.id, { items: renumberedItems });
         setShowComponentSelector(false);
+
+        // Log activity (batched - will consolidate rapid additions)
+        if (currentTeam) {
+          addToBatch(
+            currentTeam.id,
+            currentQuotation.id,
+            currentQuotation.name,
+            { name: component.name, quantity: 1 },
+            system.name
+          );
+        }
       } catch (error) {
         logger.error('Failed to save item:', error);
         alert('שגיאה בהוספת פריט. נסה שוב.');
@@ -219,6 +258,7 @@ export function useQuotationActions({
       updateQuotation,
       quotationsHook,
       setShowComponentSelector,
+      currentTeam,
     ]
   );
 
@@ -309,6 +349,17 @@ export function useQuotationActions({
         setCurrentQuotation(updatedQuotation);
         updateQuotation(currentQuotation.id, { items: renumberedItems });
         setShowComponentSelector(false);
+
+        // Log activity (batched - will consolidate rapid additions)
+        if (currentTeam) {
+          addToBatch(
+            currentTeam.id,
+            currentQuotation.id,
+            currentQuotation.name,
+            { name: assembly.name, quantity: 1 },
+            system.name
+          );
+        }
       } catch (error) {
         logger.error('Failed to add assembly:', error);
         alert('שגיאה בהוספת הרכבה. נסה שוב.');
@@ -321,6 +372,7 @@ export function useQuotationActions({
       updateQuotation,
       quotationsHook,
       setShowComponentSelector,
+      currentTeam,
     ]
   );
 
@@ -427,6 +479,17 @@ export function useQuotationActions({
         setCurrentQuotation(updatedQuotation);
         updateQuotation(currentQuotation.id, { items: renumberedItems });
         setShowComponentSelector(false);
+
+        // Log activity (batched - will consolidate rapid additions)
+        if (currentTeam) {
+          addToBatch(
+            currentTeam.id,
+            currentQuotation.id,
+            currentQuotation.name,
+            { name: customItemData.name, quantity: customItemData.quantity },
+            system.name
+          );
+        }
       } catch (error) {
         logger.error('Failed to add custom item:', error);
         alert('שגיאה בהוספת פריט מותאם אישית. נסה שוב.');
@@ -439,6 +502,7 @@ export function useQuotationActions({
       updateQuotation,
       quotationsHook,
       setShowComponentSelector,
+      currentTeam,
     ]
   );
 
@@ -566,6 +630,17 @@ export function useQuotationActions({
         setCurrentQuotation(updatedQuotation);
         updateQuotation(currentQuotation.id, { items: renumberedItems });
         logger.info('Successfully added labor type to quotation');
+
+        // Log activity (batched - will consolidate rapid additions)
+        if (currentTeam) {
+          addToBatch(
+            currentTeam.id,
+            currentQuotation.id,
+            currentQuotation.name,
+            { name: laborType.name, quantity: 1 },
+            system.name
+          );
+        }
         // Don't close dialog - allows adding multiple labor types
       } catch (error) {
         logger.error('Failed to add labor type:', error);
@@ -580,6 +655,7 @@ export function useQuotationActions({
       setCurrentQuotation,
       updateQuotation,
       quotationsHook,
+      currentTeam,
     ]
   );
 
@@ -587,6 +663,12 @@ export function useQuotationActions({
   const deleteItem = useCallback(
     async (itemId: string) => {
       if (!currentQuotation) return;
+
+      // Find item before deletion for logging
+      const itemToDelete = currentQuotation.items.find(i => i.id === itemId);
+      const systemForItem = currentQuotation.systems.find(
+        s => s.id === itemToDelete?.systemId
+      );
 
       // Delete from Supabase first
       try {
@@ -610,8 +692,30 @@ export function useQuotationActions({
 
       setCurrentQuotation(updatedQuotation);
       updateQuotation(currentQuotation.id, { items: renumberedItems });
+
+      // Log activity
+      if (currentTeam && itemToDelete) {
+        await logQuotationItemsRemoved(
+          currentTeam.id,
+          currentQuotation.id,
+          currentQuotation.name,
+          [
+            {
+              name: itemToDelete.componentName,
+              quantity: itemToDelete.quantity,
+            },
+          ],
+          systemForItem?.name
+        );
+      }
     },
-    [currentQuotation, quotationsHook, setCurrentQuotation, updateQuotation]
+    [
+      currentQuotation,
+      quotationsHook,
+      setCurrentQuotation,
+      updateQuotation,
+      currentTeam,
+    ]
   );
 
   // Update item
@@ -654,7 +758,7 @@ export function useQuotationActions({
 
   // Update parameters and recalculate item prices if exchange rates changed
   const updateParameters = useCallback(
-    (parameters: any) => {
+    async (parameters: any) => {
       if (!currentQuotation) return;
 
       logger.debug('🔄 updateParameters called:', {
@@ -665,14 +769,64 @@ export function useQuotationActions({
           currentQuotation.parameters.useMsrpPricing,
       });
 
+      // Track changes for logging
+      const paramChanges: Array<{
+        field: string;
+        label: string;
+        oldValue: any;
+        newValue: any;
+      }> = [];
+
       // Check if exchange rates changed
       const ratesChanged =
         parameters.usdToIlsRate !== currentQuotation.parameters.usdToIlsRate ||
         parameters.eurToIlsRate !== currentQuotation.parameters.eurToIlsRate;
 
+      if (
+        parameters.usdToIlsRate !== currentQuotation.parameters.usdToIlsRate
+      ) {
+        paramChanges.push({
+          field: 'usdToIlsRate',
+          label: 'USD/ILS Rate',
+          oldValue: currentQuotation.parameters.usdToIlsRate,
+          newValue: parameters.usdToIlsRate,
+        });
+      }
+
+      if (
+        parameters.eurToIlsRate !== currentQuotation.parameters.eurToIlsRate
+      ) {
+        paramChanges.push({
+          field: 'eurToIlsRate',
+          label: 'EUR/ILS Rate',
+          oldValue: currentQuotation.parameters.eurToIlsRate,
+          newValue: parameters.eurToIlsRate,
+        });
+      }
+
+      if (
+        parameters.markupPercent !== currentQuotation.parameters.markupPercent
+      ) {
+        paramChanges.push({
+          field: 'markupPercent',
+          label: 'Markup',
+          oldValue: currentQuotation.parameters.markupPercent,
+          newValue: parameters.markupPercent,
+        });
+      }
+
       // Check if dayWorkCost changed (for internal labor recalculation)
       const dayWorkCostChanged =
         parameters.dayWorkCost !== currentQuotation.parameters.dayWorkCost;
+
+      if (dayWorkCostChanged) {
+        paramChanges.push({
+          field: 'dayWorkCost',
+          label: 'Day Work Cost',
+          oldValue: currentQuotation.parameters.dayWorkCost,
+          newValue: parameters.dayWorkCost,
+        });
+      }
 
       // If rates changed, recalculate all item prices
       let updatedItems = currentQuotation.items;
@@ -780,18 +934,54 @@ export function useQuotationActions({
         eur_to_ils_rate: parameters.eurToIlsRate,
         margin_percentage: parameters.markupPercent,
         risk_percentage: parameters.riskPercent,
-        day_work_cost: parameters.dayWorkCost, // ✅ Save dayWorkCost to database
-        use_msrp_pricing: parameters.useMsrpPricing || false, // Save MSRP toggle state
+        day_work_cost: parameters.dayWorkCost,
+        use_msrp_pricing: parameters.useMsrpPricing || false,
       };
 
-      logger.debug('💾 Saving parameters to database:', {
-        parameters,
-        dbUpdates,
+      logger.info('💾 Saving parameters to database:', {
+        quotationId: currentQuotation.id,
+        'parameters.usdToIlsRate': parameters.usdToIlsRate,
+        'parameters.eurToIlsRate': parameters.eurToIlsRate,
+        'parameters.markupPercent': parameters.markupPercent,
+        'dbUpdates.exchange_rate': dbUpdates.exchange_rate,
+        'dbUpdates.eur_to_ils_rate': dbUpdates.eur_to_ils_rate,
+        'dbUpdates.margin_percentage': dbUpdates.margin_percentage,
+        fullDbUpdates: JSON.stringify(dbUpdates),
       });
 
-      updateQuotation(currentQuotation.id, dbUpdates);
+      try {
+        const result = await quotationsHook.updateQuotation(
+          currentQuotation.id,
+          dbUpdates
+        );
+        logger.info('✅ Parameters saved successfully to database', {
+          result,
+          savedValues: dbUpdates,
+        });
+      } catch (error) {
+        logger.error('❌ Failed to save parameters:', error);
+        throw error;
+      }
+
+      // Batch parameter changes (will log when quotation closes)
+      if (currentTeam && paramChanges.length > 0) {
+        paramChanges.forEach(change => {
+          addParameterToBatch(
+            currentTeam.id,
+            currentQuotation.id,
+            currentQuotation.name,
+            change
+          );
+        });
+      }
     },
-    [currentQuotation, setCurrentQuotation, updateQuotation]
+    [
+      currentQuotation,
+      setCurrentQuotation,
+      quotationsHook.updateQuotation,
+      currentTeam,
+      addParameterToBatch,
+    ]
   );
 
   // Handle close - just navigate back to list

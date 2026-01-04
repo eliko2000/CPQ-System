@@ -46,7 +46,9 @@
       "Bash(cd:*)",
       "mcp__playwright__browser_press_key",
       "WebFetch(domain:nikiforovall.blog)",
-      "WebFetch(domain:claudelog.com)"
+      "WebFetch(domain:claudelog.com)",
+      "Skill(migrate)",
+      "Bash(timeout 30 npx tsc:*)"
     ],
     "deny": [],
     "ask": []

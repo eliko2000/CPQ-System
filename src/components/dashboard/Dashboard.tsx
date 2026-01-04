@@ -16,7 +16,7 @@ import { NeedsAttention } from './NeedsAttention';
 import { ContinueWorking } from './ContinueWorking';
 import { PerformanceMetrics } from './PerformanceMetrics';
 import { QuickActions } from './QuickActions';
-import { RecentActivity } from './RecentActivity';
+import { EnhancedRecentActivity } from './EnhancedRecentActivity';
 import { DASHBOARD_CONFIG } from './dashboardConfig';
 
 // Dialogs
@@ -460,7 +460,7 @@ export function Dashboard() {
 
       {/* Recent Activity */}
       <section>
-        <RecentActivity maxItems={5} />
+        <EnhancedRecentActivity initialLimit={50} showFilters={true} />
       </section>
 
       {/* Project Picker Dialog for New Quotation */}

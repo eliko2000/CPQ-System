@@ -13,6 +13,8 @@ import { useSupplierQuotes } from '../../hooks/useSupplierQuotes';
 import { useComponents } from '../../hooks/useComponents';
 import { toast } from 'sonner';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
+import { useTeam } from '../../contexts/TeamContext';
+import { logComponentBulkImport } from '../../services/activityLogService';
 
 interface ComponentAIImportProps {
   isOpen: boolean;
@@ -48,6 +50,7 @@ export const ComponentAIImport: React.FC<ComponentAIImportProps> = ({
   // Hooks for file storage and history
   const { createQuote, addComponentHistory } = useSupplierQuotes();
   const { addComponent } = useComponents();
+  const { currentTeam } = useTeam();
 
   /**
    * Upload file to Supabase Storage
@@ -180,6 +183,23 @@ export const ComponentAIImport: React.FC<ComponentAIImportProps> = ({
       let successCount = 0;
       let failCount = 0;
 
+      // Generate unique operation ID for this bulk import
+      const operationId = `bulk-import-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+      // Start bulk operation tracking (suppress individual trigger logs)
+      if (components.length > 1 && currentTeam) {
+        try {
+          await supabase.rpc('start_bulk_operation', {
+            p_operation_id: operationId,
+            p_team_id: currentTeam.id,
+            p_operation_type: 'import',
+          });
+          logger.debug('Started bulk import operation:', operationId);
+        } catch (error) {
+          logger.warn('Failed to start bulk operation tracking:', error);
+        }
+      }
+
       for (let i = 0; i < components.length; i++) {
         const comp = components[i];
         try {
@@ -235,6 +255,32 @@ export const ComponentAIImport: React.FC<ComponentAIImportProps> = ({
           logger.error('❌ Failed to add component:', comp.name, error);
           failCount++;
         }
+      }
+
+      // End bulk operation tracking
+      if (components.length > 1) {
+        try {
+          await supabase.rpc('end_bulk_operation', {
+            p_operation_id: operationId,
+          });
+          logger.debug('Ended bulk import operation:', operationId);
+        } catch (error) {
+          logger.warn('Failed to end bulk operation tracking:', error);
+        }
+      }
+
+      // Log bulk import activity (only if >1 component to avoid individual logs)
+      if (currentTeam && successCount > 1 && sourceFile && extractionResult) {
+        await logComponentBulkImport(
+          currentTeam.id,
+          successCount,
+          sourceFile.name,
+          extractionResult.metadata.documentType as 'excel' | 'pdf' | 'csv',
+          {
+            parser: getExtractionMethod(extractionResult.metadata),
+            confidence: extractionResult.confidence,
+          }
+        );
       }
 
       // Show success/error toast

@@ -18,6 +18,8 @@ import { useClickOutside } from '../../hooks/useClickOutside';
 import { useTableConfig } from '../../hooks/useTableConfig';
 import { useTeam } from '../../contexts/TeamContext';
 import { useAppearancePreferences } from '../../hooks/useAppearancePreferences';
+import { logComponentBulkDelete } from '../../services/activityLogService';
+import { supabase } from '../../supabaseClient';
 import { CustomHeader } from '../grid/CustomHeader';
 import {
   getComponentCategories,
@@ -218,6 +220,23 @@ export function EnhancedComponentGrid({
     // Close dialog first
     setDeleteConfirm({ open: false, count: 0, items: [] });
 
+    // Generate unique operation ID for this bulk operation
+    const operationId = `bulk-delete-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+    // Start bulk operation tracking (suppress individual trigger logs)
+    if (items.length > 1 && currentTeam) {
+      try {
+        await supabase.rpc('start_bulk_operation', {
+          p_operation_id: operationId,
+          p_team_id: currentTeam.id,
+          p_operation_type: 'delete',
+        });
+        logger.debug('Started bulk operation:', operationId);
+      } catch (error) {
+        logger.warn('Failed to start bulk operation tracking:', error);
+      }
+    }
+
     // Perform actual deletion
     for (const component of items) {
       try {
@@ -230,6 +249,27 @@ export function EnhancedComponentGrid({
           reason: error.message || 'שגיאה לא ידועה',
         });
       }
+    }
+
+    // End bulk operation tracking
+    if (items.length > 1) {
+      try {
+        await supabase.rpc('end_bulk_operation', {
+          p_operation_id: operationId,
+        });
+        logger.debug('Ended bulk operation:', operationId);
+      } catch (error) {
+        logger.warn('Failed to end bulk operation tracking:', error);
+      }
+    }
+
+    // Log bulk delete activity AFTER successful deletions
+    if (currentTeam && successCount > 0) {
+      const deletedNames = items
+        .filter((__, idx) => !failures.some(f => f.id === items[idx].id))
+        .map(item => item.name);
+
+      await logComponentBulkDelete(currentTeam.id, successCount, deletedNames);
     }
 
     // Show results AFTER deletion completes
@@ -265,7 +305,7 @@ export function EnhancedComponentGrid({
 
     // Clear selection AFTER successful deletion
     selection.clearSelection();
-  }, [deleteConfirm, onDelete, selection]);
+  }, [deleteConfirm, onDelete, selection, currentTeam]);
 
   // Define grid actions for floating toolbar
   const gridActions = useMemo<GridAction[]>(() => {

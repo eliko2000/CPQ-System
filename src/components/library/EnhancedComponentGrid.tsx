@@ -1210,7 +1210,7 @@ export function EnhancedComponentGrid({
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        Loading table configuration...
+        טוען הגדרות טבלה...
       </div>
     );
   }

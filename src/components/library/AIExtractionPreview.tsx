@@ -290,17 +290,45 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
     field: keyof AIExtractedComponent,
     value: any
   ) => {
+    // Log description field changes for debugging
+    if (field === 'description') {
+      logger.debug('[AIExtractionPreview] Description field changed', {
+        componentId: id,
+        newValue: value,
+      });
+    }
+
     setComponents(prev =>
-      prev.map(c =>
-        c.id === id
-          ? { ...c, [field]: value, status: 'modified' as ComponentStatus }
-          : c
-      )
+      prev.map(c => {
+        if (c.id !== id) return c;
+
+        // Create updated component with field change
+        // Explicitly spread all properties to ensure nothing is lost
+        const updated: PreviewComponent = {
+          ...c,
+          [field]: value,
+          status: 'modified' as ComponentStatus,
+        };
+
+        return updated;
+      })
     );
   };
 
   const handleDelete = (id: string) => {
+    // Find the component index before deleting
+    const componentIndex = components.findIndex(c => c.id === id);
+
+    // Remove the component
     setComponents(prev => prev.filter(c => c.id !== id));
+
+    // Also remove the match decision for this component
+    // Deletion is considered a final decision - user chose not to import this component
+    if (componentIndex !== -1) {
+      setLocalMatchDecisions(prev =>
+        prev.filter(d => d.componentIndex !== componentIndex)
+      );
+    }
   };
 
   /**
@@ -487,6 +515,7 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
 
         logger.debug('[AIExtractionPreview] Passing component to onConfirm', {
           componentName: c.name,
+          description: c.description,
           msrpPrice: component.msrpPrice,
           msrpCurrency: component.msrpCurrency,
           partnerDiscountPercent: component.partnerDiscountPercent,
@@ -524,9 +553,9 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
   };
 
   const getConfidenceLabel = (confidence: number) => {
-    if (confidence >= 0.8) return 'High';
-    if (confidence >= 0.6) return 'Medium';
-    return 'Low';
+    if (confidence >= 0.8) return 'גבוהה';
+    if (confidence >= 0.6) return 'בינונית';
+    return 'נמוכה';
   };
 
   // Main content JSX (extracted for reuse in split panel)
@@ -756,11 +785,11 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
               <span className="text-muted-foreground">שיטת חילוץ:</span>
               <p className="font-medium capitalize">
                 {extractionResult.metadata.documentType === 'excel' &&
-                  '⚡ Excel Parser'}
+                  '⚡ מנתח אקסל'}
                 {extractionResult.metadata.documentType === 'pdf' &&
-                  '📄 PDF Parser'}
+                  '📄 מנתח PDF'}
                 {extractionResult.metadata.documentType === 'image' &&
-                  '🤖 AI Vision'}
+                  '🤖 ראיית מכונה AI'}
                 {!['excel', 'pdf', 'image'].includes(
                   extractionResult.metadata.documentType
                 ) && extractionResult.metadata.documentType}
@@ -919,23 +948,26 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
               </div>
 
               <div className="flex gap-1">
+                {/* Toggle button: Edit when not editing, Confirm when editing */}
                 <Button
                   size="sm"
-                  variant={
-                    component.status === 'approved' ? 'default' : 'outline'
-                  }
-                  onClick={() => handleStatusChange(component.id, 'approved')}
-                  title="אשר"
+                  variant={component.isEditing ? 'default' : 'outline'}
+                  onClick={() => {
+                    if (component.isEditing) {
+                      // When editing, clicking confirms and exits edit mode
+                      handleStatusChange(component.id, 'approved');
+                    } else {
+                      // When not editing, clicking enters edit mode
+                      handleEdit(component.id);
+                    }
+                  }}
+                  title={component.isEditing ? 'אשר' : 'ערוך'}
                 >
-                  <CheckCircle className="w-4 h-4" />
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleEdit(component.id)}
-                  title="ערוך"
-                >
-                  <Edit2 className="w-4 h-4" />
+                  {component.isEditing ? (
+                    <CheckCircle className="w-4 h-4" />
+                  ) : (
+                    <Edit2 className="w-4 h-4" />
+                  )}
                 </Button>
                 <Button
                   size="sm"

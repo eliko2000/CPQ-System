@@ -352,32 +352,52 @@ Extract the following information for each component:
      * "SMC Pneumatic Cylinder CDQ2B32-50DCZ" → "צילינדר פנאומטי CDQ2B32"
    - Keep manufacturer in the manufacturer field, NOT in name
    - Focus on WHAT it is, not ALL the specs
-2. **manufacturer** - Manufacturer name (e.g., Siemens, Festo, SMC, Dobot)
-3. **manufacturerPN** - Manufacturer part number (may appear as: P/N, PN, Part#, קטלוגי, מק"ט, Catalog#)
-4. **category** - Component category - MUST be one of these EXACT Hebrew values:
+2. **description** - A brief, informative description of the component (1-3 sentences)
+   - Extract from any description, product details, or specifications column in the document
+   - Include key features, capabilities, or technical specifications
+   - More detailed than name, but more concise than notes
+   - Example: 'רובוט שיתופי עם טווח זרוע 900 מ"מ, מטען עד 20 ק"ג, 6 צירים, מתאים לעבודה בסביבה משותפת עם בני אדם'
+   - If no description column exists, create a brief description from available data
+   - Leave empty (null) if no meaningful description can be created
+3. **manufacturer** - Manufacturer name (e.g., Siemens, Festo, SMC, Dobot)
+4. **manufacturerPN** - Manufacturer part number
+   - **CRITICAL FOR HEBREW DOCUMENTS**: If you see BOTH **"מק"ט"** column AND **"שם פריט"** column:
+     * **מק"ט** column → Use for manufacturerPN (this contains the actual catalog/part number, often numeric like "1234308", "3003023")
+     * **שם פריט** column → Use for name (this contains the item name/description like "PS-EE-2G/1", "UK-D 20 4/10-NS 35")
+     * **DO NOT confuse these two columns!** They serve different purposes.
+     * Example from table:
+       - Row with מק"ט="1234308" and שם פריט="PS-EE-2G/1 AC/24DC/48" should extract:
+         * manufacturerPN: "1234308" (from מק"ט column)
+         * name: Create short Hebrew name from שם פריט + description
+   - Look for column labels: P/N, PN, Part#, Part Number, קטלוגי, מק"ט, מקט, Catalog#, מספר קטלוגי, Cat No
+   - **IGNORE "מקט ללקוח" (customer part number) - this is NOT the manufacturerPN**
+   - Part numbers can be numeric (e.g., "1234308") or alphanumeric (e.g., "PS-EE-2G/1")
+   - If only one column exists, use that value appropriately
+   - **Never use the item name/description as the manufacturerPN if a separate מק"ט column exists**
+5. **category** - Component category - MUST be one of these EXACT Hebrew values:
 ${categoryList}
    Use the most appropriate category, or use "${categories[categories.length - 1]}" if none fit
-5. **componentType** - MUST be one of: "hardware", "software", or "labor"
+6. **componentType** - MUST be one of: "hardware", "software", or "labor"
    - "hardware": Physical components (PLCs, sensors, motors, robots, etc.)
    - "software": Software licenses, applications, configuration tools
    - "labor": Services like engineering, installation, commissioning, programming
-6. **laborSubtype** - (ONLY if componentType is "labor") MUST be one of:
+7. **laborSubtype** - (ONLY if componentType is "labor") MUST be one of:
    - "engineering": Engineering design, system design (הנדסה, תכנון)
    - "commissioning": System commissioning, testing, startup (הפעלה, בדיקות)
    - "installation": Physical installation work (התקנה)
    - "programming": PLC programming, robot programming (תכנות)
-7. **supplier** - Supplier/vendor name (if mentioned)
-8. **quantity** - Quantity (if specified)
-9. **unitPriceNIS** - Unit price in Israeli Shekels (₪, NIS, ILS, שקלים) - PARTNER/YOUR COST (auto-select first price column if available)
-10. **unitPriceUSD** - Unit price in US Dollars ($, USD) - PARTNER/YOUR COST (auto-select first price column if available)
-11. **unitPriceEUR** - Unit price in Euros (€, EUR) - PARTNER/YOUR COST (auto-select first price column if available)
-12. **currency** - Primary currency (NIS, USD, or EUR)
-13. **msrpPrice** - MSRP/List price if there's a SEPARATE column for it (auto-select second price column if available)
+8. **supplier** - Supplier/vendor name (if mentioned)
+9. **quantity** - Quantity (if specified)
+10. **unitPriceNIS** - Unit price in Israeli Shekels (₪, NIS, ILS, שקלים) - PARTNER/YOUR COST (auto-select first price column if available)
+11. **unitPriceUSD** - Unit price in US Dollars ($, USD) - PARTNER/YOUR COST (auto-select first price column if available)
+12. **unitPriceEUR** - Unit price in Euros (€, EUR) - PARTNER/YOUR COST (auto-select first price column if available)
+13. **currency** - Primary currency (NIS, USD, or EUR)
+14. **msrpPrice** - MSRP/List price if there's a SEPARATE column for it (auto-select second price column if available)
    - Look for column headers like: "MSRP", "List Price", "Retail", "מחיר מחירון", "מחיר קטלוגי"
    - Only populate if there are TWO+ price columns (partner price + MSRP)
    - If only ONE price column exists, leave this null
-14. **msrpCurrency** - Currency of MSRP price (NIS, USD, or EUR) - only if msrpPrice is present
-15. **allPriceColumns** - **CRITICAL**: Extract ALL price columns found in this row (for user column selection UI)
+15. **msrpCurrency** - Currency of MSRP price (NIS, USD, or EUR) - only if msrpPrice is present
+16. **allPriceColumns** - **CRITICAL**: Extract ALL price columns found in this row (for user column selection UI)
    - Array of objects with: { columnName: string, value: number, currency: 'NIS'|'USD'|'EUR' }
    - Example: [
        { columnName: "Unit Price (USD) Camera+SDK", value: 4400, currency: "USD" },
@@ -387,11 +407,20 @@ ${categoryList}
      ]
    - Extract EVERY price column, even if there are 5+ columns
    - This allows user to select which columns to use for partner price and MSRP
-16. **quoteDate** - Date of quotation (if visible)
-17. **notes** - Any important notes, specifications, or remarks (keep technical specs here, NOT in name)
-18. **confidence** - Your confidence level (0.0 to 1.0) in the extraction accuracy for this item
+17. **quoteDate** - Date of quotation (if visible)
+18. **notes** - Any important notes, specifications, or remarks (keep technical specs here, NOT in name)
+19. **confidence** - Your confidence level (0.0 to 1.0) in the extraction accuracy for this item
 
 **Important guidelines:**
+- **HEBREW TABLE COLUMN MAPPING** (Critical for Hebrew quotations/price lists):
+  * **מק"ט** = Manufacturer part number (manufacturerPN) - often numeric codes like "1234308"
+  * **שם פריט** = Item name (name) - descriptive names like "PS-EE-2G/1" or "דופן מהדק"
+  * **מקט ללקוח** = Customer part number - IGNORE this, do not use for manufacturerPN
+  * **תאור בעברית** = Hebrew description (description) - full product description
+  * **מחיר ליחידה** = Unit price (unitPriceNIS/USD/EUR)
+  * **כמות** = Quantity (quantity)
+  * **יצרן** = Manufacturer (manufacturer)
+  * When BOTH מק"ט and שם פריט exist, they are DIFFERENT fields - do not confuse them!
 - **NAME MUST BE SHORT & DESCRIPTIVE IN HEBREW**: Translate product type + model number only
 - Handle merged cells, multi-line descriptions, and complex table layouts
 - Recognize prices in various formats: "$1,234.56", "1234.56 USD", "₪5,000", "5000 ש״ח"
@@ -424,6 +453,7 @@ Return a valid JSON object with this exact structure:
   "components": [
     {
       "name": "Component name",
+      "description": "Brief description of the component or null",
       "manufacturer": "Manufacturer name or null",
       "manufacturerPN": "Part number or null",
       "category": "Category or null",

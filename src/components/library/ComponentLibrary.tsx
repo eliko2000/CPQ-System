@@ -23,7 +23,7 @@ import { AssemblyGrid } from './AssemblyGrid';
 import { LaborTypeForm } from '../labor/LaborTypeForm';
 import { LaborTypeList } from '../labor/LaborTypeList';
 import { EnhancedComponentGrid } from './EnhancedComponentGrid';
-import { ComponentAIImport } from './ComponentAIImport';
+import { SmartImportWizard } from '../shared/SmartImportWizard';
 import { useLaborTypes } from '../../hooks/useLaborTypes';
 import { toast } from 'sonner';
 import { logger } from '@/lib/logger';
@@ -35,7 +35,6 @@ export function ComponentLibrary() {
     updateComponent,
     deleteComponent,
     deleteAssembly,
-    addComponent,
     setModal,
     modalState,
     closeModal,
@@ -196,44 +195,6 @@ export function ComponentLibrary() {
       } catch (error) {
         toast.error('שגיאה במחיקת סוג העבודה');
       }
-    }
-  };
-
-  // Handle batch component import from AI extraction
-  const handleBatchImport = async (components: Partial<Component>[]) => {
-    logger.debug(
-      '📦 ComponentLibrary.handleBatchImport called with',
-      components.length,
-      'components'
-    );
-
-    try {
-      let successCount = 0;
-      let failCount = 0;
-
-      for (const comp of components) {
-        try {
-          logger.debug('➕ Adding component:', comp.name);
-          await addComponent(
-            comp as Omit<Component, 'id' | 'createdAt' | 'updatedAt'>
-          );
-          successCount++;
-        } catch (error) {
-          logger.error('❌ Failed to add component:', comp.name, error);
-          failCount++;
-        }
-      }
-
-      if (successCount > 0) {
-        toast.success(`${successCount} רכיבים יובאו בהצלחה`);
-      }
-      if (failCount > 0) {
-        toast.error(`${failCount} רכיבים נכשלו`);
-      }
-    } catch (error) {
-      logger.error('❌ Batch import failed:', error);
-      toast.error('שגיאה בייבוא רכיבים');
-      throw error;
     }
   };
 
@@ -524,11 +485,10 @@ export function ComponentLibrary() {
         }}
       />
 
-      {/* AI Import Modal */}
-      <ComponentAIImport
+      {/* Smart Import Wizard - Unified import with duplicate detection */}
+      <SmartImportWizard
         isOpen={isAIImportOpen}
         onClose={() => setIsAIImportOpen(false)}
-        onImport={handleBatchImport}
       />
     </div>
   );

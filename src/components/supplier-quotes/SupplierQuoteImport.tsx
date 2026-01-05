@@ -427,6 +427,9 @@ export const SupplierQuoteImport: React.FC<SupplierQuoteImportProps> = ({
   };
 
   const hasUnsavedWork = () => {
+    // Complete state has no unsaved work - import finished successfully
+    if (step === 'complete') return false;
+
     return (
       fileSelected ||
       step !== 'upload' ||

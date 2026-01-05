@@ -15,7 +15,7 @@ import { Badge } from '../ui/badge';
 import { Input } from '../ui/input';
 import { useSupplierQuotes } from '../../hooks/useSupplierQuotes';
 import { SupplierQuote } from '../../types';
-import { SupplierQuoteImport } from './SupplierQuoteImport';
+import { SmartImportWizard } from '../shared/SmartImportWizard';
 import { SupplierQuoteDetailsDrawer } from './SupplierQuoteDetailsDrawer';
 import { downloadFile } from '../../utils/storageHelpers';
 import { toast } from 'sonner';
@@ -31,11 +31,11 @@ import {
   Package,
   TrendingUp,
   Filter,
-  Loader2
+  Loader2,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { he } from 'date-fns/locale';
-import { logger } from '@/lib/logger'
+import { logger } from '@/lib/logger';
 
 export function SupplierQuotesPage() {
   const { quotes, loading, error, deleteQuote } = useSupplierQuotes();
@@ -78,7 +78,7 @@ export function SupplierQuotesPage() {
 
   // File type icon
   const getFileTypeIcon = (fileType?: string) => {
-    const className = "h-4 w-4";
+    const className = 'h-4 w-4';
     switch (fileType) {
       case 'excel':
         return <FileText className={`${className} text-green-600`} />;
@@ -190,7 +190,7 @@ export function SupplierQuotesPage() {
               <Input
                 placeholder="חפש לפי שם קובץ, ספק או מספר הצעה..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={e => setSearchQuery(e.target.value)}
                 className="pr-10"
               />
             </div>
@@ -235,7 +235,7 @@ export function SupplierQuotesPage() {
             </div>
           ) : (
             <div className="space-y-3">
-              {filteredQuotes.map((quote) => (
+              {filteredQuotes.map(quote => (
                 <div
                   key={quote.id}
                   className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors"
@@ -248,7 +248,9 @@ export function SupplierQuotesPage() {
 
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-medium truncate">{quote.fileName}</h3>
+                        <h3 className="font-medium truncate">
+                          {quote.fileName}
+                        </h3>
                         {getStatusBadge(quote.status)}
                       </div>
 
@@ -263,7 +265,11 @@ export function SupplierQuotesPage() {
                         {quote.quoteDate && (
                           <div className="flex items-center gap-1">
                             <Calendar className="h-3 w-3" />
-                            <span>{new Date(quote.quoteDate).toLocaleDateString('he-IL')}</span>
+                            <span>
+                              {new Date(quote.quoteDate).toLocaleDateString(
+                                'he-IL'
+                              )}
+                            </span>
                           </div>
                         )}
 
@@ -274,11 +280,15 @@ export function SupplierQuotesPage() {
 
                         {quote.confidenceScore && (
                           <div className="flex items-center gap-1">
-                            <span className={`font-medium ${
-                              quote.confidenceScore >= 0.8 ? 'text-green-600' :
-                              quote.confidenceScore >= 0.6 ? 'text-yellow-600' :
-                              'text-red-600'
-                            }`}>
+                            <span
+                              className={`font-medium ${
+                                quote.confidenceScore >= 0.8
+                                  ? 'text-green-600'
+                                  : quote.confidenceScore >= 0.6
+                                    ? 'text-yellow-600'
+                                    : 'text-red-600'
+                              }`}
+                            >
                               {(quote.confidenceScore * 100).toFixed(0)}% דיוק
                             </span>
                           </div>
@@ -286,9 +296,10 @@ export function SupplierQuotesPage() {
                       </div>
 
                       <div className="text-xs text-muted-foreground mt-1">
-                        הועלה {formatDistanceToNow(new Date(quote.uploadDate), {
+                        הועלה{' '}
+                        {formatDistanceToNow(new Date(quote.uploadDate), {
                           addSuffix: true,
-                          locale: he
+                          locale: he,
                         })}
                       </div>
                     </div>
@@ -333,11 +344,11 @@ export function SupplierQuotesPage() {
         </CardContent>
       </Card>
 
-      {/* Upload Modal */}
-      <SupplierQuoteImport
+      {/* Smart Import Wizard - Unified import with duplicate detection */}
+      <SmartImportWizard
         isOpen={showUploadModal}
         onClose={() => setShowUploadModal(false)}
-        onSuccess={(quote) => {
+        onSuccess={quote => {
           logger.debug('Quote uploaded successfully:', quote);
           setShowUploadModal(false);
         }}

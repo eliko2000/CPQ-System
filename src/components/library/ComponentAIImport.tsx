@@ -297,8 +297,12 @@ export const ComponentAIImport: React.FC<ComponentAIImportProps> = ({
       setStep('complete');
 
       // Close after showing success briefly
+      // NOTE: We call performClose() directly instead of handleClose() because
+      // the timeout callback captures the OLD state (step='preview') due to React's
+      // asynchronous state updates. Since we know the import is complete and there
+      // are no unsaved changes, we can safely close directly.
       setTimeout(() => {
-        handleClose();
+        performClose();
       }, 1500);
     } catch (error) {
       logger.error('Import failed:', error);
@@ -310,17 +314,22 @@ export const ComponentAIImport: React.FC<ComponentAIImportProps> = ({
 
   // Check if there are unsaved changes based on the current step
   const hasUnsavedChanges = (): boolean => {
+    // Complete state has no unsaved changes - import finished successfully
+    if (step === 'complete') return false;
     // If in preview mode, user has uploaded a file and extracted data
     if (step === 'preview') return true;
     // If importing, definitely has unsaved work
     if (step === 'importing') return true;
     // If file is selected but not yet processed
     if (fileSelected) return true;
-    // Upload and complete states have no unsaved changes
+    // Upload state has no unsaved changes
     return false;
   };
 
-  const handleClose = () => {
+  const handleClose = (open?: boolean) => {
+    // If dialog is being opened, do nothing
+    if (open === true) return;
+
     // Don't close if in fullscreen mode
     if (isFullscreen) return;
 

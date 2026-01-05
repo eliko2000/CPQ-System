@@ -48,7 +48,11 @@
       "WebFetch(domain:nikiforovall.blog)",
       "WebFetch(domain:claudelog.com)",
       "Skill(migrate)",
-      "Bash(timeout 30 npx tsc:*)"
+      "Bash(timeout 30 npx tsc:*)",
+      "Bash(git pull:*)",
+      "Bash(dir:*)",
+      "Bash(findstr:*)",
+      "Bash(node -e:*)"
     ],
     "deny": [],
     "ask": []

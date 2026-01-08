@@ -86,6 +86,7 @@ type ComponentStatus = 'approved' | 'modified' | 'rejected';
 
 interface PreviewComponent extends AIExtractedComponent {
   id: string;
+  originalIndex: number; // Original index from extraction (doesn't change on deletion)
   status: ComponentStatus;
   isEditing: boolean;
   matchDecision?: ComponentMatchDecision;
@@ -239,6 +240,7 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
       return {
         ...processedComponent,
         id: `extracted-${idx}`,
+        originalIndex: idx, // Store original index for match decision tracking
         status: 'approved' as ComponentStatus,
         isEditing: false,
         matchDecision: matchDecisions.find(d => d.componentIndex === idx),
@@ -316,19 +318,19 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
   };
 
   const handleDelete = (id: string) => {
-    // Find the component index before deleting
-    const componentIndex = components.findIndex(c => c.id === id);
+    // Find the component and its original index
+    const component = components.find(c => c.id === id);
+
+    if (!component) return;
 
     // Remove the component
     setComponents(prev => prev.filter(c => c.id !== id));
 
-    // Also remove the match decision for this component
-    // Deletion is considered a final decision - user chose not to import this component
-    if (componentIndex !== -1) {
-      setLocalMatchDecisions(prev =>
-        prev.filter(d => d.componentIndex !== componentIndex)
-      );
-    }
+    // CRITICAL: Remove the match decision using originalIndex
+    // Deletion means the component won't be imported, so no decision is needed
+    setLocalMatchDecisions(prev =>
+      prev.filter(d => d.componentIndex !== component.originalIndex)
+    );
   };
 
   /**
@@ -348,8 +350,8 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
 
     // Also update the component's match decision
     setComponents(prev =>
-      prev.map((c, idx) =>
-        idx === componentIndex && c.matchDecision
+      prev.map(c =>
+        c.originalIndex === componentIndex && c.matchDecision
           ? {
               ...c,
               matchDecision: { ...c.matchDecision, userDecision: decision },
@@ -476,7 +478,25 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
   // It was intended for swapping partner and MSRP columns if Claude AI extracts them in wrong order
   // Can be re-added if needed for 'column' mode in the future
 
+  /**
+   * Get pending match decisions that still need user input
+   * Since we remove decisions when components are deleted, we can simply
+   * check for pending status without verifying component existence
+   */
+  const getPendingDecisions = () => {
+    return localMatchDecisions.filter(d => d.userDecision === 'pending');
+  };
+
   const handleConfirm = () => {
+    // Validate: Check for pending match decisions
+    const pendingDecisions = getPendingDecisions();
+    if (pendingDecisions.length > 0) {
+      // Show error message to user
+      alert(
+        `יש ${pendingDecisions.length} רכיבים דומים שממתינים להחלטה. אנא בחר האם לעדכן מחיר או ליצור רכיב חדש עבור כל רכיב לפני המשך.`
+      );
+      return;
+    }
     const approvedComponents = components
       .filter(c => c.status !== 'rejected')
       .map((c): Partial<Component> => {
@@ -545,6 +565,12 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
     d => d.userDecision === 'accept_match'
   ).length;
   const newComponentCount = components.length - acceptedMatchCount;
+
+  // Calculate pending decisions
+  // Since we remove decisions when deleting components, just count pending status
+  const pendingDecisionsCount = localMatchDecisions.filter(
+    d => d.userDecision === 'pending'
+  ).length;
 
   const getConfidenceColor = (confidence: number) => {
     if (confidence >= 0.8) return 'text-green-600 bg-green-100';
@@ -641,7 +667,7 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
         </div>
 
         {/* Match Summary */}
-        {matchedCount > 0 && (
+        {localMatchDecisions.length > 0 && (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-2">
               <GitMerge className="w-5 h-5 text-blue-600" />
@@ -663,18 +689,12 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
                 <p className="font-bold text-purple-900">{newComponentCount}</p>
               </div>
             </div>
-            {localMatchDecisions.filter(d => d.userDecision === 'pending')
-              .length > 0 && (
-              <div className="mt-2 text-xs text-blue-600 flex items-center gap-1">
-                <AlertTriangle className="w-3 h-3" />
-                <span>
-                  יש{' '}
-                  {
-                    localMatchDecisions.filter(
-                      d => d.userDecision === 'pending'
-                    ).length
-                  }{' '}
-                  רכיבים שממתינים להחלטה
+            {pendingDecisionsCount > 0 && (
+              <div className="mt-2 text-xs text-purple-600 bg-purple-50 px-3 py-2 rounded flex items-center gap-1 border border-purple-200">
+                <AlertTriangle className="w-4 h-4" />
+                <span className="font-medium">
+                  יש {pendingDecisionsCount} רכיבים שממתינים להחלטה - בחר "עדכן
+                  מחיר" או "צור חדש" עבור כל רכיב
                 </span>
               </div>
             )}
@@ -907,528 +927,570 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
 
       {/* Components List */}
       <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2">
-        {components.map(component => (
-          <div
-            key={component.id}
-            className={`border rounded-lg p-4 transition-all ${
-              component.status === 'rejected'
-                ? 'opacity-50 bg-gray-50'
-                : component.status === 'modified'
-                  ? 'border-yellow-300 bg-yellow-50'
-                  : 'border-gray-200'
-            }`}
-          >
-            <div className="flex items-start justify-between mb-3">
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-1">
-                  {component.isEditing ? (
-                    <Input
-                      value={component.name}
-                      onChange={e =>
-                        handleFieldChange(component.id, 'name', e.target.value)
-                      }
-                      className="font-medium"
-                    />
-                  ) : (
-                    <h4 className="font-medium">{component.name}</h4>
+        {components.map(component => {
+          // Check if this component has a pending decision
+          const hasPendingDecision =
+            component.matchDecision &&
+            component.matchDecision.matches.length > 0 &&
+            component.matchDecision.userDecision === 'pending';
+
+          return (
+            <div
+              key={component.id}
+              className={`border rounded-lg p-4 transition-all ${
+                component.status === 'rejected'
+                  ? 'opacity-50 bg-gray-50'
+                  : hasPendingDecision
+                    ? 'border-purple-400 bg-purple-50 shadow-md'
+                    : component.status === 'modified'
+                      ? 'border-yellow-300 bg-yellow-50'
+                      : 'border-gray-200'
+              }`}
+            >
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    {component.isEditing ? (
+                      <Input
+                        value={component.name}
+                        onChange={e =>
+                          handleFieldChange(
+                            component.id,
+                            'name',
+                            e.target.value
+                          )
+                        }
+                        className="font-medium"
+                      />
+                    ) : (
+                      <h4 className="font-medium">{component.name}</h4>
+                    )}
+                    <span
+                      className={`text-xs px-2 py-0.5 rounded-full ${getConfidenceColor(
+                        component.confidence
+                      )}`}
+                    >
+                      {getConfidenceLabel(component.confidence)}
+                    </span>
+                  </div>
+                  {component.description && !component.isEditing && (
+                    <p className="text-sm text-muted-foreground">
+                      {component.description}
+                    </p>
                   )}
-                  <span
-                    className={`text-xs px-2 py-0.5 rounded-full ${getConfidenceColor(
-                      component.confidence
-                    )}`}
-                  >
-                    {getConfidenceLabel(component.confidence)}
-                  </span>
                 </div>
-                {component.description && !component.isEditing && (
-                  <p className="text-sm text-muted-foreground">
-                    {component.description}
-                  </p>
-                )}
+
+                <div className="flex gap-1">
+                  {/* Toggle button: Edit when not editing, Confirm when editing */}
+                  <Button
+                    size="sm"
+                    variant={component.isEditing ? 'default' : 'outline'}
+                    onClick={() => {
+                      if (component.isEditing) {
+                        // When editing, clicking confirms and exits edit mode
+                        handleStatusChange(component.id, 'approved');
+                      } else {
+                        // When not editing, clicking enters edit mode
+                        handleEdit(component.id);
+                      }
+                    }}
+                    title={component.isEditing ? 'אשר' : 'ערוך'}
+                  >
+                    {component.isEditing ? (
+                      <CheckCircle className="w-4 h-4" />
+                    ) : (
+                      <Edit2 className="w-4 h-4" />
+                    )}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleDelete(component.id)}
+                    title="מחק"
+                  >
+                    <Trash2 className="w-4 h-4 text-red-500" />
+                  </Button>
+                </div>
               </div>
 
-              <div className="flex gap-1">
-                {/* Toggle button: Edit when not editing, Confirm when editing */}
-                <Button
-                  size="sm"
-                  variant={component.isEditing ? 'default' : 'outline'}
-                  onClick={() => {
-                    if (component.isEditing) {
-                      // When editing, clicking confirms and exits edit mode
-                      handleStatusChange(component.id, 'approved');
-                    } else {
-                      // When not editing, clicking enters edit mode
-                      handleEdit(component.id);
-                    }
-                  }}
-                  title={component.isEditing ? 'אשר' : 'ערוך'}
-                >
-                  {component.isEditing ? (
-                    <CheckCircle className="w-4 h-4" />
-                  ) : (
-                    <Edit2 className="w-4 h-4" />
-                  )}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleDelete(component.id)}
-                  title="מחק"
-                >
-                  <Trash2 className="w-4 h-4 text-red-500" />
-                </Button>
-              </div>
-            </div>
-
-            {/* Match Information Card */}
-            {component.matchDecision &&
-              component.matchDecision.matches.length > 0 && (
-                <div className="mb-3 p-3 border rounded-lg bg-blue-50 border-blue-200">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <GitMerge className="w-4 h-4 text-blue-600" />
-                        <span className="text-sm font-medium text-blue-900">
-                          זוהה רכיב דומה בספרייה
-                        </span>
-                        <Badge
-                          variant={
-                            component.matchDecision.matchType === 'exact'
-                              ? 'default'
-                              : component.matchDecision.matchType === 'fuzzy'
-                                ? 'secondary'
-                                : 'outline'
-                          }
-                          className="text-xs"
-                        >
-                          {component.matchDecision.matchType === 'exact' &&
-                            '🎯 התאמה מדויקת'}
-                          {component.matchDecision.matchType === 'fuzzy' &&
-                            '📊 התאמה מטושטשת'}
-                          {component.matchDecision.matchType === 'ai' &&
-                            '🤖 התאמה סמנטית'}
-                        </Badge>
-                        <span className="text-xs text-blue-700 font-medium">
-                          {Math.round(
-                            component.matchDecision.matches[0].confidence * 100
-                          )}
-                          % דיוק
-                        </span>
-                      </div>
-
-                      <div className="text-sm space-y-1 text-blue-800">
-                        <div>
-                          <span className="font-medium">רכיב קיים:</span>{' '}
-                          {component.matchDecision.matches[0].component.name}
-                        </div>
-                        {component.matchDecision.matches[0].component
-                          .manufacturerPN && (
-                          <div>
-                            <span className="font-medium">מק"ט:</span>{' '}
-                            {
-                              component.matchDecision.matches[0].component
-                                .manufacturerPN
+              {/* Match Information Card */}
+              {component.matchDecision &&
+                component.matchDecision.matches.length > 0 && (
+                  <div className="mb-3 p-3 border rounded-lg bg-blue-50 border-blue-200">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <GitMerge className="w-4 h-4 text-blue-600" />
+                          <span className="text-sm font-medium text-blue-900">
+                            זוהה רכיב דומה בספרייה
+                          </span>
+                          <Badge
+                            variant={
+                              component.matchDecision.matchType === 'exact'
+                                ? 'default'
+                                : component.matchDecision.matchType === 'fuzzy'
+                                  ? 'secondary'
+                                  : 'outline'
                             }
+                            className="text-xs"
+                          >
+                            {component.matchDecision.matchType === 'exact' &&
+                              '🎯 התאמה מדויקת'}
+                            {component.matchDecision.matchType === 'fuzzy' &&
+                              '📊 התאמה מטושטשת'}
+                            {component.matchDecision.matchType === 'ai' &&
+                              '🤖 התאמה סמנטית'}
+                          </Badge>
+                          <span className="text-xs text-blue-700 font-medium">
+                            {Math.round(
+                              component.matchDecision.matches[0].confidence *
+                                100
+                            )}
+                            % דיוק
+                          </span>
+                        </div>
+
+                        <div className="text-sm space-y-1 text-blue-800">
+                          <div>
+                            <span className="font-medium">רכיב קיים:</span>{' '}
+                            {component.matchDecision.matches[0].component.name}
                           </div>
-                        )}
-                        <div className="text-xs text-blue-600 mt-1">
-                          {component.matchDecision.matches[0].reasoning}
+                          {component.matchDecision.matches[0].component
+                            .manufacturerPN && (
+                            <div>
+                              <span className="font-medium">מק"ט:</span>{' '}
+                              {
+                                component.matchDecision.matches[0].component
+                                  .manufacturerPN
+                              }
+                            </div>
+                          )}
+                          <div className="text-xs text-blue-600 mt-1">
+                            {component.matchDecision.matches[0].reasoning}
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    <div className="flex flex-col gap-2">
-                      <Button
-                        size="sm"
-                        variant={
-                          component.matchDecision.userDecision ===
-                          'accept_match'
-                            ? 'default'
-                            : 'outline'
-                        }
-                        onClick={() => {
-                          const idx = parseInt(
-                            component.id.replace('extracted-', '')
-                          );
-                          handleMatchDecision(idx, 'accept_match');
-                        }}
-                        className="gap-1 whitespace-nowrap"
-                      >
-                        <GitMerge className="w-3 h-3" />
-                        עדכן מחיר
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant={
-                          component.matchDecision.userDecision === 'create_new'
-                            ? 'default'
-                            : 'outline'
-                        }
-                        onClick={() => {
-                          const idx = parseInt(
-                            component.id.replace('extracted-', '')
-                          );
-                          handleMatchDecision(idx, 'create_new');
-                        }}
-                        className="gap-1 whitespace-nowrap"
-                      >
-                        <Plus className="w-3 h-3" />
-                        צור חדש
-                      </Button>
+                      <div className="flex flex-col gap-2">
+                        <Button
+                          size="sm"
+                          variant={
+                            component.matchDecision.userDecision ===
+                            'accept_match'
+                              ? 'default'
+                              : 'outline'
+                          }
+                          onClick={() => {
+                            handleMatchDecision(
+                              component.originalIndex,
+                              'accept_match'
+                            );
+                          }}
+                          className="gap-1 whitespace-nowrap"
+                        >
+                          <GitMerge className="w-3 h-3" />
+                          עדכן מחיר
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={
+                            component.matchDecision.userDecision ===
+                            'create_new'
+                              ? 'default'
+                              : 'outline'
+                          }
+                          onClick={() => {
+                            handleMatchDecision(
+                              component.originalIndex,
+                              'create_new'
+                            );
+                          }}
+                          className="gap-1 whitespace-nowrap"
+                        >
+                          <Plus className="w-3 h-3" />
+                          צור חדש
+                        </Button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
 
-            {component.isEditing && (
-              <div className="grid grid-cols-2 gap-3 mb-3">
-                {/* Description - Full width */}
-                <div className="col-span-2">
-                  <label className="text-xs text-muted-foreground">תיאור</label>
-                  <textarea
-                    value={component.description || ''}
-                    onChange={e =>
-                      handleFieldChange(
-                        component.id,
-                        'description',
-                        e.target.value
-                      )
-                    }
-                    placeholder="תיאור הרכיב"
-                    className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-y"
-                    rows={2}
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground">יצרן</label>
-                  <Input
-                    value={component.manufacturer || ''}
-                    onChange={e =>
-                      handleFieldChange(
-                        component.id,
-                        'manufacturer',
-                        e.target.value
-                      )
-                    }
-                    placeholder="יצרן"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground">מק"ט</label>
-                  <Input
-                    value={component.manufacturerPN || ''}
-                    onChange={e =>
-                      handleFieldChange(
-                        component.id,
-                        'manufacturerPN',
-                        e.target.value
-                      )
-                    }
-                    placeholder='מק"ט'
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground">
-                    קטגוריה
-                  </label>
-                  <Select
-                    value={component.category || 'אחר'}
-                    onValueChange={(value: string) =>
-                      handleFieldChange(component.id, 'category', value)
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="בחר קטגוריה" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.map(cat => (
-                        <SelectItem key={cat} value={cat}>
-                          {cat}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground">
-                    סוג רכיב
-                  </label>
-                  <Select
-                    value={component.componentType || 'hardware'}
-                    onValueChange={(value: 'hardware' | 'software' | 'labor') =>
-                      handleFieldChange(component.id, 'componentType', value)
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="בחר סוג" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {COMPONENT_TYPES.map(type => (
-                        <SelectItem key={type.value} value={type.value}>
-                          {type.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                {component.componentType === 'labor' && (
+              {component.isEditing && (
+                <div className="grid grid-cols-2 gap-3 mb-3">
+                  {/* Description - Full width */}
+                  <div className="col-span-2">
+                    <label className="text-xs text-muted-foreground">
+                      תיאור
+                    </label>
+                    <textarea
+                      value={component.description || ''}
+                      onChange={e =>
+                        handleFieldChange(
+                          component.id,
+                          'description',
+                          e.target.value
+                        )
+                      }
+                      placeholder="תיאור הרכיב"
+                      className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-y"
+                      rows={2}
+                    />
+                  </div>
                   <div>
                     <label className="text-xs text-muted-foreground">
-                      סוג עבודה
+                      יצרן
+                    </label>
+                    <Input
+                      value={component.manufacturer || ''}
+                      onChange={e =>
+                        handleFieldChange(
+                          component.id,
+                          'manufacturer',
+                          e.target.value
+                        )
+                      }
+                      placeholder="יצרן"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground">
+                      מק"ט
+                    </label>
+                    <Input
+                      value={component.manufacturerPN || ''}
+                      onChange={e =>
+                        handleFieldChange(
+                          component.id,
+                          'manufacturerPN',
+                          e.target.value
+                        )
+                      }
+                      placeholder='מק"ט'
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground">
+                      קטגוריה
                     </label>
                     <Select
-                      value={component.laborSubtype || undefined}
-                      onValueChange={(
-                        value:
-                          | 'engineering'
-                          | 'commissioning'
-                          | 'installation'
-                          | 'programming'
-                      ) =>
-                        handleFieldChange(component.id, 'laborSubtype', value)
+                      value={component.category || 'אחר'}
+                      onValueChange={(value: string) =>
+                        handleFieldChange(component.id, 'category', value)
                       }
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="בחר סוג עבודה" />
+                        <SelectValue placeholder="בחר קטגוריה" />
                       </SelectTrigger>
                       <SelectContent>
-                        {LABOR_SUBTYPES.map(subtype => (
-                          <SelectItem key={subtype.value} value={subtype.value}>
-                            {subtype.label}
+                        {categories.map(cat => (
+                          <SelectItem key={cat} value={cat}>
+                            {cat}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
-                )}
-                <div>
-                  <label className="text-xs text-muted-foreground">
-                    מחיר (
-                    {component.currency === 'USD'
-                      ? '$'
-                      : component.currency === 'EUR'
-                        ? '€'
-                        : '₪'}
-                    )
-                  </label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={
-                      component.currency === 'USD'
-                        ? component.unitPriceUSD || ''
-                        : component.currency === 'EUR'
-                          ? component.unitPriceEUR || ''
-                          : component.unitPriceNIS || ''
-                    }
-                    onChange={e => {
-                      const value = parseFloat(e.target.value) || 0;
-                      if (component.currency === 'USD') {
-                        handleFieldChange(component.id, 'unitPriceUSD', value);
-                      } else if (component.currency === 'EUR') {
-                        handleFieldChange(component.id, 'unitPriceEUR', value);
-                      } else {
-                        handleFieldChange(component.id, 'unitPriceNIS', value);
+                  <div>
+                    <label className="text-xs text-muted-foreground">
+                      סוג רכיב
+                    </label>
+                    <Select
+                      value={component.componentType || 'hardware'}
+                      onValueChange={(
+                        value: 'hardware' | 'software' | 'labor'
+                      ) =>
+                        handleFieldChange(component.id, 'componentType', value)
                       }
-                    }}
-                    placeholder="0.00"
-                  />
-                </div>
-                {/* Notes - Full width */}
-                <div className="col-span-2">
-                  <label className="text-xs text-muted-foreground">הערות</label>
-                  <textarea
-                    value={component.notes || ''}
-                    onChange={e =>
-                      handleFieldChange(component.id, 'notes', e.target.value)
-                    }
-                    placeholder="הערות נוספות"
-                    className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-y"
-                    rows={2}
-                  />
-                </div>
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-sm">
-              <div>
-                <span className="text-muted-foreground">יצרן:</span>
-                <p className="font-medium truncate">
-                  {component.manufacturer || '—'}
-                </p>
-              </div>
-              <div>
-                <span className="text-muted-foreground">מק"ט:</span>
-                <p className="font-medium truncate">
-                  {component.manufacturerPN || '—'}
-                </p>
-              </div>
-              <div>
-                <span className="text-muted-foreground">קטגוריה:</span>
-                <p className="font-medium">{component.category || '—'}</p>
-              </div>
-              <div>
-                <span className="text-muted-foreground">סוג:</span>
-                <p className="font-medium">
-                  {component.componentType === 'hardware'
-                    ? 'חומרה'
-                    : component.componentType === 'software'
-                      ? 'תוכנה'
-                      : component.componentType === 'labor'
-                        ? 'עבודה'
-                        : '—'}
-                  {component.componentType === 'labor' &&
-                    component.laborSubtype &&
-                    ` (${
-                      component.laborSubtype === 'engineering'
-                        ? 'הנדסה'
-                        : component.laborSubtype === 'commissioning'
-                          ? 'הפעלה'
-                          : component.laborSubtype === 'installation'
-                            ? 'התקנה'
-                            : component.laborSubtype === 'programming'
-                              ? 'תכנות'
-                              : ''
-                    })`}
-                </p>
-              </div>
-              {/* Price Display - Different layouts based on MSRP mode */}
-              {component.msrpPrice && msrpOptions?.mode === 'discount' ? (
-                <>
-                  {/* Mode: Discount - Show Partner Price | Margin % | MSRP */}
-                  <div>
-                    <span className="text-muted-foreground">מחיר שותף:</span>
-                    <div className="flex gap-2 flex-wrap">
-                      {component.msrpCurrency === 'USD' &&
-                        component.unitPriceUSD && (
-                          <p className="font-medium text-blue-600">
-                            ${component.unitPriceUSD.toFixed(2)}
-                          </p>
-                        )}
-                      {component.msrpCurrency === 'NIS' &&
-                        component.unitPriceNIS && (
-                          <p className="font-medium text-blue-600">
-                            ₪{component.unitPriceNIS.toFixed(2)}
-                          </p>
-                        )}
-                      {component.msrpCurrency === 'EUR' &&
-                        component.unitPriceEUR && (
-                          <p className="font-medium text-blue-600">
-                            €{component.unitPriceEUR.toFixed(2)}
-                          </p>
-                        )}
-                    </div>
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="בחר סוג" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {COMPONENT_TYPES.map(type => (
+                          <SelectItem key={type.value} value={type.value}>
+                            {type.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-
-                  <div>
-                    <span className="text-muted-foreground">שולי רווח:</span>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="0.1"
-                        value={
-                          component.marginPercent ||
-                          component.partnerDiscountPercent ||
-                          globalMarginPercent
-                        }
-                        onChange={e =>
-                          handleItemMarginChange(
-                            component.id,
-                            parseFloat(e.target.value) || 0
-                          )
-                        }
-                        className="w-20 h-8 text-sm"
-                      />
-                      <span className="text-sm">%</span>
-                      {component.hasMarginOverride && (
-                        <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded">
-                          ידני
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div>
-                    <span className="text-muted-foreground">MSRP:</span>
-                    <p className="font-medium text-purple-600">
-                      {component.msrpCurrency === 'USD' &&
-                        `$${component.msrpPrice.toFixed(2)}`}
-                      {component.msrpCurrency === 'NIS' &&
-                        `₪${component.msrpPrice.toFixed(2)}`}
-                      {component.msrpCurrency === 'EUR' &&
-                        `€${component.msrpPrice.toFixed(2)}`}
-                    </p>
-                  </div>
-                </>
-              ) : (
-                <>
-                  {/* Regular mode - Show prices normally */}
-                  <div>
-                    <span className="text-muted-foreground">
-                      {component.msrpPrice ? 'מחיר שותף:' : 'מחירים:'}
-                    </span>
-                    <div className="flex gap-2 flex-wrap">
-                      {component.unitPriceNIS && (
-                        <p
-                          className={`font-medium ${component.currency === 'NIS' ? 'text-green-600' : ''}`}
-                        >
-                          ₪{component.unitPriceNIS.toFixed(2)}
-                        </p>
-                      )}
-                      {component.unitPriceUSD && (
-                        <p
-                          className={`font-medium ${component.currency === 'USD' ? 'text-green-600' : ''}`}
-                        >
-                          ${component.unitPriceUSD.toFixed(2)}
-                        </p>
-                      )}
-                      {component.unitPriceEUR && (
-                        <p
-                          className={`font-medium ${component.currency === 'EUR' ? 'text-green-600' : ''}`}
-                        >
-                          €{component.unitPriceEUR.toFixed(2)}
-                        </p>
-                      )}
-                      {!component.unitPriceNIS &&
-                        !component.unitPriceUSD &&
-                        !component.unitPriceEUR &&
-                        '—'}
-                    </div>
-                  </div>
-                  {/* MSRP Display */}
-                  {component.msrpPrice && (
+                  {component.componentType === 'labor' && (
                     <div>
-                      <span className="text-muted-foreground">MSRP:</span>
-                      <div className="flex gap-2 items-center">
-                        <p className="font-medium text-purple-600">
-                          {component.msrpCurrency === 'USD' &&
-                            `$${component.msrpPrice.toFixed(2)}`}
-                          {component.msrpCurrency === 'NIS' &&
-                            `₪${component.msrpPrice.toFixed(2)}`}
-                          {component.msrpCurrency === 'EUR' &&
-                            `€${component.msrpPrice.toFixed(2)}`}
-                        </p>
-                        {component.partnerDiscountPercent && (
-                          <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded">
-                            -{component.partnerDiscountPercent.toFixed(1)}% הנחה
+                      <label className="text-xs text-muted-foreground">
+                        סוג עבודה
+                      </label>
+                      <Select
+                        value={component.laborSubtype || undefined}
+                        onValueChange={(
+                          value:
+                            | 'engineering'
+                            | 'commissioning'
+                            | 'installation'
+                            | 'programming'
+                        ) =>
+                          handleFieldChange(component.id, 'laborSubtype', value)
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="בחר סוג עבודה" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {LABOR_SUBTYPES.map(subtype => (
+                            <SelectItem
+                              key={subtype.value}
+                              value={subtype.value}
+                            >
+                              {subtype.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  <div>
+                    <label className="text-xs text-muted-foreground">
+                      מחיר (
+                      {component.currency === 'USD'
+                        ? '$'
+                        : component.currency === 'EUR'
+                          ? '€'
+                          : '₪'}
+                      )
+                    </label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={
+                        component.currency === 'USD'
+                          ? component.unitPriceUSD || ''
+                          : component.currency === 'EUR'
+                            ? component.unitPriceEUR || ''
+                            : component.unitPriceNIS || ''
+                      }
+                      onChange={e => {
+                        const value = parseFloat(e.target.value) || 0;
+                        if (component.currency === 'USD') {
+                          handleFieldChange(
+                            component.id,
+                            'unitPriceUSD',
+                            value
+                          );
+                        } else if (component.currency === 'EUR') {
+                          handleFieldChange(
+                            component.id,
+                            'unitPriceEUR',
+                            value
+                          );
+                        } else {
+                          handleFieldChange(
+                            component.id,
+                            'unitPriceNIS',
+                            value
+                          );
+                        }
+                      }}
+                      placeholder="0.00"
+                    />
+                  </div>
+                  {/* Notes - Full width */}
+                  <div className="col-span-2">
+                    <label className="text-xs text-muted-foreground">
+                      הערות
+                    </label>
+                    <textarea
+                      value={component.notes || ''}
+                      onChange={e =>
+                        handleFieldChange(component.id, 'notes', e.target.value)
+                      }
+                      placeholder="הערות נוספות"
+                      className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-y"
+                      rows={2}
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-sm">
+                <div>
+                  <span className="text-muted-foreground">יצרן:</span>
+                  <p className="font-medium truncate">
+                    {component.manufacturer || '—'}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">מק"ט:</span>
+                  <p className="font-medium truncate">
+                    {component.manufacturerPN || '—'}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">קטגוריה:</span>
+                  <p className="font-medium">{component.category || '—'}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">סוג:</span>
+                  <p className="font-medium">
+                    {component.componentType === 'hardware'
+                      ? 'חומרה'
+                      : component.componentType === 'software'
+                        ? 'תוכנה'
+                        : component.componentType === 'labor'
+                          ? 'עבודה'
+                          : '—'}
+                    {component.componentType === 'labor' &&
+                      component.laborSubtype &&
+                      ` (${
+                        component.laborSubtype === 'engineering'
+                          ? 'הנדסה'
+                          : component.laborSubtype === 'commissioning'
+                            ? 'הפעלה'
+                            : component.laborSubtype === 'installation'
+                              ? 'התקנה'
+                              : component.laborSubtype === 'programming'
+                                ? 'תכנות'
+                                : ''
+                      })`}
+                  </p>
+                </div>
+                {/* Price Display - Different layouts based on MSRP mode */}
+                {component.msrpPrice && msrpOptions?.mode === 'discount' ? (
+                  <>
+                    {/* Mode: Discount - Show Partner Price | Margin % | MSRP */}
+                    <div>
+                      <span className="text-muted-foreground">מחיר שותף:</span>
+                      <div className="flex gap-2 flex-wrap">
+                        {component.msrpCurrency === 'USD' &&
+                          component.unitPriceUSD && (
+                            <p className="font-medium text-blue-600">
+                              ${component.unitPriceUSD.toFixed(2)}
+                            </p>
+                          )}
+                        {component.msrpCurrency === 'NIS' &&
+                          component.unitPriceNIS && (
+                            <p className="font-medium text-blue-600">
+                              ₪{component.unitPriceNIS.toFixed(2)}
+                            </p>
+                          )}
+                        {component.msrpCurrency === 'EUR' &&
+                          component.unitPriceEUR && (
+                            <p className="font-medium text-blue-600">
+                              €{component.unitPriceEUR.toFixed(2)}
+                            </p>
+                          )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="text-muted-foreground">שולי רווח:</span>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.1"
+                          value={
+                            component.marginPercent ||
+                            component.partnerDiscountPercent ||
+                            globalMarginPercent
+                          }
+                          onChange={e =>
+                            handleItemMarginChange(
+                              component.id,
+                              parseFloat(e.target.value) || 0
+                            )
+                          }
+                          className="w-20 h-8 text-sm"
+                        />
+                        <span className="text-sm">%</span>
+                        {component.hasMarginOverride && (
+                          <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded">
+                            ידני
                           </span>
                         )}
                       </div>
                     </div>
-                  )}
-                </>
+
+                    <div>
+                      <span className="text-muted-foreground">MSRP:</span>
+                      <p className="font-medium text-purple-600">
+                        {component.msrpCurrency === 'USD' &&
+                          `$${component.msrpPrice.toFixed(2)}`}
+                        {component.msrpCurrency === 'NIS' &&
+                          `₪${component.msrpPrice.toFixed(2)}`}
+                        {component.msrpCurrency === 'EUR' &&
+                          `€${component.msrpPrice.toFixed(2)}`}
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {/* Regular mode - Show prices normally */}
+                    <div>
+                      <span className="text-muted-foreground">
+                        {component.msrpPrice ? 'מחיר שותף:' : 'מחירים:'}
+                      </span>
+                      <div className="flex gap-2 flex-wrap">
+                        {component.unitPriceNIS && (
+                          <p
+                            className={`font-medium ${component.currency === 'NIS' ? 'text-green-600' : ''}`}
+                          >
+                            ₪{component.unitPriceNIS.toFixed(2)}
+                          </p>
+                        )}
+                        {component.unitPriceUSD && (
+                          <p
+                            className={`font-medium ${component.currency === 'USD' ? 'text-green-600' : ''}`}
+                          >
+                            ${component.unitPriceUSD.toFixed(2)}
+                          </p>
+                        )}
+                        {component.unitPriceEUR && (
+                          <p
+                            className={`font-medium ${component.currency === 'EUR' ? 'text-green-600' : ''}`}
+                          >
+                            €{component.unitPriceEUR.toFixed(2)}
+                          </p>
+                        )}
+                        {!component.unitPriceNIS &&
+                          !component.unitPriceUSD &&
+                          !component.unitPriceEUR &&
+                          '—'}
+                      </div>
+                    </div>
+                    {/* MSRP Display */}
+                    {component.msrpPrice && (
+                      <div>
+                        <span className="text-muted-foreground">MSRP:</span>
+                        <div className="flex gap-2 items-center">
+                          <p className="font-medium text-purple-600">
+                            {component.msrpCurrency === 'USD' &&
+                              `$${component.msrpPrice.toFixed(2)}`}
+                            {component.msrpCurrency === 'NIS' &&
+                              `₪${component.msrpPrice.toFixed(2)}`}
+                            {component.msrpCurrency === 'EUR' &&
+                              `€${component.msrpPrice.toFixed(2)}`}
+                          </p>
+                          {component.partnerDiscountPercent && (
+                            <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded">
+                              -{component.partnerDiscountPercent.toFixed(1)}%
+                              הנחה
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {component.notes && (
+                <div className="mt-2 text-xs text-muted-foreground bg-gray-100 p-2 rounded">
+                  <span className="font-medium">הערות:</span> {component.notes}
+                </div>
               )}
             </div>
-
-            {component.notes && (
-              <div className="mt-2 text-xs text-muted-foreground bg-gray-100 p-2 rounded">
-                <span className="font-medium">הערות:</span> {component.notes}
-              </div>
-            )}
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Low Confidence Warning */}
@@ -1452,14 +1514,29 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
         <Button variant="outline" onClick={onCancel}>
           ביטול
         </Button>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
           <div className="text-sm text-muted-foreground mr-4">
             {approvedCount + modifiedCount} רכיבים ייובאו
           </div>
+          {pendingDecisionsCount > 0 && (
+            <div className="text-xs text-purple-600 bg-purple-50 px-3 py-1 rounded border border-purple-200 flex items-center gap-1">
+              <AlertTriangle className="w-3 h-3" />
+              <span>{pendingDecisionsCount} ממתינים להחלטה</span>
+            </div>
+          )}
           <Button
             onClick={handleConfirm}
-            disabled={approvedCount + modifiedCount === 0}
+            disabled={
+              approvedCount + modifiedCount === 0 || pendingDecisionsCount > 0
+            }
             className="min-w-[120px]"
+            title={
+              pendingDecisionsCount > 0
+                ? 'אנא קבל החלטה עבור כל הרכיבים הדומים לפני הייבוא'
+                : approvedCount + modifiedCount === 0
+                  ? 'אין רכיבים לייבוא'
+                  : ''
+            }
           >
             ייבא לספרייה
           </Button>

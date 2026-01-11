@@ -55,7 +55,13 @@ export async function exportData(
   progressCallback?: ExportProgressCallback
 ): Promise<ExportServiceResult> {
   try {
-    logger.info('Starting export operation', { teamId, options });
+    logger.info('Starting export operation', {
+      teamId,
+      includeQuotations: options.includeQuotations,
+      includeComponents: options.includeComponents,
+      includeAssemblies: options.includeAssemblies,
+      includeSettings: options.includeSettings,
+    });
     progressCallback?.('preparing', 0, 'Preparing export...');
 
     // Get current user
@@ -130,7 +136,13 @@ export async function exportData(
     }
 
     if (options.includeQuotations) {
+      logger.info('Extracting quotations for team:', teamId);
       const quotations = await extractQuotations(teamId, options);
+      logger.info('Extracted quotations:', {
+        quotationsCount: quotations.quotations.length,
+        systemsCount: quotations.systems.length,
+        itemsCount: quotations.items.length,
+      });
       exportData.quotations = quotations.quotations;
       exportData.quotationSystems = quotations.systems;
       exportData.quotationItems = quotations.items;
@@ -280,15 +292,22 @@ async function extractQuotations(
 }> {
   try {
     // Get quotations
+    logger.info('Querying quotations table for team:', teamId);
     const { data: quotations, error: quotationsError } = await supabase
       .from('quotations')
       .select('*')
       .eq('team_id', teamId)
       .order('created_at', { ascending: true });
 
+    logger.info('Quotations query result:', {
+      count: quotations?.length || 0,
+      error: quotationsError,
+    });
+
     if (quotationsError) throw quotationsError;
 
     if (!quotations || quotations.length === 0) {
+      logger.warn('No quotations found for team');
       return { quotations: [], systems: [], items: [] };
     }
 

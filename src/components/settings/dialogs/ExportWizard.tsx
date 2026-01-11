@@ -153,6 +153,11 @@ export function ExportWizard({ open, onOpenChange }: ExportWizardProps) {
         description,
       };
 
+      console.log('ExportWizard - Export options:', {
+        includeQuotations: options.includeQuotations,
+        selectedEntities,
+      });
+
       // Export data
       const result = await exportData(
         currentTeam.id,

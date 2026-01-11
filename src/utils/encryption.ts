@@ -20,6 +20,36 @@ const ITERATIONS = 100000; // PBKDF2 iterations
 const TAG_LENGTH = 128; // 128 bits authentication tag
 
 /**
+ * Convert Uint8Array to base64 string
+ * Handles large arrays by processing in chunks to avoid stack overflow
+ */
+function uint8ArrayToBase64(bytes: Uint8Array): string {
+  let binary = '';
+  const chunkSize = 8192; // Process 8KB at a time
+
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.slice(i, i + chunkSize);
+    binary += String.fromCharCode.apply(null, Array.from(chunk));
+  }
+
+  return btoa(binary);
+}
+
+/**
+ * Convert base64 string to Uint8Array
+ */
+function base64ToUint8Array(base64: string): Uint8Array {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+
+  return bytes;
+}
+
+/**
  * Derive encryption key from password using PBKDF2
  */
 async function deriveKey(
@@ -106,11 +136,11 @@ export async function encryptExportPackage(
     const ciphertext = encryptedArray.slice(0, tagStart);
     const authTag = encryptedArray.slice(tagStart);
 
-    // Convert to base64 for storage
-    const encryptedData = btoa(String.fromCharCode(...Array.from(ciphertext)));
-    const authTagB64 = btoa(String.fromCharCode(...Array.from(authTag)));
-    const saltB64 = btoa(String.fromCharCode(...Array.from(salt)));
-    const ivB64 = btoa(String.fromCharCode(...Array.from(iv)));
+    // Convert to base64 for storage (using chunked conversion for large data)
+    const encryptedData = uint8ArrayToBase64(ciphertext);
+    const authTagB64 = uint8ArrayToBase64(authTag);
+    const saltB64 = uint8ArrayToBase64(salt);
+    const ivB64 = uint8ArrayToBase64(iv);
 
     logger.info('Export package encrypted successfully');
 
@@ -148,17 +178,11 @@ export async function decryptExportPackage(
 
     logger.info('Decrypting export package...');
 
-    // Decode base64 to Uint8Array
-    const salt = Uint8Array.from(atob(encryptedFile.salt), c =>
-      c.charCodeAt(0)
-    );
-    const iv = Uint8Array.from(atob(encryptedFile.iv), c => c.charCodeAt(0));
-    const authTag = Uint8Array.from(atob(encryptedFile.authTag), c =>
-      c.charCodeAt(0)
-    );
-    const ciphertext = Uint8Array.from(atob(encryptedFile.encryptedData), c =>
-      c.charCodeAt(0)
-    );
+    // Decode base64 to Uint8Array (using helper for consistency)
+    const salt = base64ToUint8Array(encryptedFile.salt);
+    const iv = base64ToUint8Array(encryptedFile.iv);
+    const authTag = base64ToUint8Array(encryptedFile.authTag);
+    const ciphertext = base64ToUint8Array(encryptedFile.encryptedData);
 
     // Combine ciphertext and auth tag for decryption
     const encryptedData = new Uint8Array(ciphertext.length + authTag.length);
@@ -174,7 +198,7 @@ export async function decryptExportPackage(
       decryptedBuffer = await crypto.subtle.decrypt(
         {
           name: ALGORITHM,
-          iv,
+          iv: iv as BufferSource,
           tagLength: TAG_LENGTH,
         },
         key,

@@ -92,8 +92,17 @@ export async function exportData(
       return { success: false, error: 'Team not found' };
     }
 
-    // Create audit log entry
-    const logId = await createAuditLog(teamId, user.id, options);
+    // Create audit log entry (non-blocking - optional feature)
+    let logId: string | undefined;
+    try {
+      logId = await createAuditLog(teamId, user.id, options);
+    } catch (error) {
+      logger.warn(
+        'Failed to create audit log (table may not exist yet):',
+        error
+      );
+      // Continue without audit log - it's optional
+    }
 
     progressCallback?.('exporting', 10, 'Extracting components...');
 
@@ -170,8 +179,10 @@ export async function exportData(
       attachments,
     };
 
-    // Update audit log with success
-    await completeAuditLog(logId, 'completed', manifest.counts);
+    // Update audit log with success (if it was created)
+    if (logId) {
+      await completeAuditLog(logId, 'completed', manifest.counts);
+    }
 
     progressCallback?.('completed', 100, 'Export completed successfully');
     logger.info('Export completed successfully', {

@@ -164,7 +164,7 @@ export async function exportData(
     // Extract attachments if requested
     let attachments: AttachmentData[] | undefined;
     if (options.includeAttachments) {
-      attachments = await extractAttachments(exportData, options);
+      attachments = await extractAttachments(teamId, exportData, options);
       progressCallback?.(
         'exporting',
         90,
@@ -418,15 +418,116 @@ async function extractSettings(teamId: string): Promise<SystemSettings> {
 }
 
 /**
- * Extract attachment data
+ * Extract attachment data (supplier quote files)
  */
 async function extractAttachments(
-  __exportData: ExportPackage['data'],
-  __options: ExportOptions
+  teamId: string,
+  exportData: ExportPackage['data'],
+  options: ExportOptions
 ): Promise<AttachmentData[]> {
-  // For now, return empty array
-  // TODO: Implement attachment extraction from storage
-  return [];
+  try {
+    const attachments: AttachmentData[] = [];
+
+    // Get supplier quote files if components are included
+    if (options.includeComponents && exportData.components) {
+      logger.info('Extracting supplier quote attachments...');
+
+      // Query supplier_quotes table
+      const { data: supplierQuotes, error } = await supabase
+        .from('supplier_quotes')
+        .select('*')
+        .eq('team_id', teamId);
+
+      if (error) {
+        logger.error('Failed to query supplier_quotes:', error);
+        return [];
+      }
+
+      if (!supplierQuotes || supplierQuotes.length === 0) {
+        logger.info('No supplier quotes found for team');
+        return [];
+      }
+
+      logger.info(`Found ${supplierQuotes.length} supplier quote files`);
+
+      // For each supplier quote, add to attachments
+      for (const quote of supplierQuotes) {
+        // Check if we should download and embed the file
+        const shouldEmbed = options.includeAttachments === true;
+
+        let base64Data: string | undefined;
+        let fileSizeBytes = 0;
+
+        if (shouldEmbed) {
+          try {
+            // Extract bucket and path from file_url
+            // URL format: https://[project].supabase.co/storage/v1/object/public/[bucket]/[path]
+            const urlMatch = quote.file_url.match(
+              /\/storage\/v1\/object\/[^/]+\/([^/]+)\/(.+)$/
+            );
+            if (urlMatch) {
+              const bucket = urlMatch[1];
+              const path = urlMatch[2];
+
+              // Download file from Supabase Storage
+              const { data: fileData, error: downloadError } =
+                await supabase.storage.from(bucket).download(path);
+
+              if (downloadError) {
+                logger.error(
+                  `Failed to download file ${quote.file_name}:`,
+                  downloadError
+                );
+              } else if (fileData) {
+                // Convert blob to base64
+                const arrayBuffer = await fileData.arrayBuffer();
+                const uint8Array = new Uint8Array(arrayBuffer);
+                const binaryString = Array.from(uint8Array)
+                  .map(byte => String.fromCharCode(byte))
+                  .join('');
+                base64Data = btoa(binaryString);
+                fileSizeBytes = uint8Array.length;
+
+                logger.info(
+                  `Downloaded and encoded file ${quote.file_name} (${fileSizeBytes} bytes)`
+                );
+              }
+            } else {
+              logger.warn(`Could not parse storage URL: ${quote.file_url}`);
+            }
+          } catch (downloadError) {
+            logger.error(
+              `Error downloading file ${quote.file_name}:`,
+              downloadError
+            );
+          }
+        } else {
+          // Just include metadata and URL reference
+          fileSizeBytes = (quote.file_size_kb || 0) * 1024;
+        }
+
+        attachments.push({
+          id: quote.id,
+          fileName: quote.file_name,
+          fileType: quote.file_type || 'unknown',
+          fileSizeBytes,
+          url: quote.file_url,
+          embedded: shouldEmbed && !!base64Data,
+          base64Data,
+          entityType: 'component',
+          entityId: quote.id, // Use quote ID as entity reference
+        });
+      }
+    }
+
+    logger.info(
+      `Extracted ${attachments.length} attachments (${attachments.filter(a => a.embedded).length} embedded)`
+    );
+    return attachments;
+  } catch (error) {
+    logger.error('Failed to extract attachments:', error);
+    return [];
+  }
 }
 
 /**

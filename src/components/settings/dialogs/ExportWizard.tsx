@@ -346,17 +346,24 @@ export function ExportWizard({ open, onOpenChange }: ExportWizardProps) {
                 </Label>
               </div>
 
-              <div className="flex items-center space-x-2 space-x-reverse">
-                <Checkbox
-                  id="attachments"
-                  checked={includeAttachments}
-                  onCheckedChange={checked =>
-                    setIncludeAttachments(checked as boolean)
-                  }
-                />
-                <Label htmlFor="attachments" className="cursor-pointer">
-                  כלול קבצים מצורפים
-                </Label>
+              <div className="space-y-1">
+                <div className="flex items-center space-x-2 space-x-reverse">
+                  <Checkbox
+                    id="attachments"
+                    checked={includeAttachments}
+                    onCheckedChange={checked =>
+                      setIncludeAttachments(checked as boolean)
+                    }
+                  />
+                  <Label htmlFor="attachments" className="cursor-pointer">
+                    כלול קבצים מצורפים (הצעות מחיר ספקים)
+                  </Label>
+                </div>
+                {includeAttachments && (
+                  <p className="text-xs text-muted-foreground pr-6">
+                    שים לב: הכללת קבצים מצורפים תגדיל משמעותית את גודל הקובץ
+                  </p>
+                )}
               </div>
             </div>
 

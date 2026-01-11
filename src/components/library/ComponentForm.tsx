@@ -112,8 +112,11 @@ export function ComponentForm({
     };
   }, [currentTeam?.id]);
 
-  // Initialize form data when component changes
+  // Initialize form data when component changes OR when dialog opens
   useEffect(() => {
+    // Only reset if dialog is open
+    if (!isOpen) return;
+
     let newFormData: typeof formData;
 
     if (component) {
@@ -156,6 +159,7 @@ export function ComponentForm({
         setPriceInputField(formDataCurrency);
       }
     } else {
+      // New component - start with empty price fields
       newFormData = {
         name: '',
         description: '',
@@ -183,7 +187,7 @@ export function ComponentForm({
     setFormData(newFormData);
     // Save initial state for change detection
     setInitialFormData(JSON.parse(JSON.stringify(newFormData)));
-  }, [component]);
+  }, [component, isOpen]);
 
   const handleInputChange = (
     field:
@@ -600,13 +604,18 @@ export function ComponentForm({
                     </label>
                     <Input
                       type="number"
-                      step="1"
+                      step="0.01"
                       min="0"
-                      value={Math.round(formData.unitCostNIS)}
-                      onChange={e =>
-                        handlePriceChange('NIS', parseInt(e.target.value) || 0)
+                      value={
+                        formData.unitCostNIS === 0 ? '' : formData.unitCostNIS
                       }
-                      placeholder="0"
+                      onChange={e =>
+                        handlePriceChange(
+                          'NIS',
+                          parseFloat(e.target.value) || 0
+                        )
+                      }
+                      placeholder="0.00"
                       className={
                         priceInputField === 'NIS'
                           ? 'bg-green-100 border-green-400'
@@ -621,13 +630,18 @@ export function ComponentForm({
                     </label>
                     <Input
                       type="number"
-                      step="1"
+                      step="0.01"
                       min="0"
-                      value={Math.round(formData.unitCostUSD || 0)}
-                      onChange={e =>
-                        handlePriceChange('USD', parseInt(e.target.value) || 0)
+                      value={
+                        formData.unitCostUSD === 0 ? '' : formData.unitCostUSD
                       }
-                      placeholder="0"
+                      onChange={e =>
+                        handlePriceChange(
+                          'USD',
+                          parseFloat(e.target.value) || 0
+                        )
+                      }
+                      placeholder="0.00"
                       className={
                         priceInputField === 'USD'
                           ? 'bg-green-100 border-green-400'
@@ -642,13 +656,18 @@ export function ComponentForm({
                     </label>
                     <Input
                       type="number"
-                      step="1"
+                      step="0.01"
                       min="0"
-                      value={Math.round(formData.unitCostEUR || 0)}
-                      onChange={e =>
-                        handlePriceChange('EUR', parseInt(e.target.value) || 0)
+                      value={
+                        formData.unitCostEUR === 0 ? '' : formData.unitCostEUR
                       }
-                      placeholder="0"
+                      onChange={e =>
+                        handlePriceChange(
+                          'EUR',
+                          parseFloat(e.target.value) || 0
+                        )
+                      }
+                      placeholder="0.00"
                       className={
                         priceInputField === 'EUR'
                           ? 'bg-green-100 border-green-400'
@@ -713,11 +732,12 @@ export function ComponentForm({
                     </label>
                     <Input
                       type="number"
-                      step="1"
+                      step="0.01"
                       min="0"
                       value={formData.msrpPrice || ''}
                       onChange={e => {
-                        const msrpPrice = parseInt(e.target.value) || undefined;
+                        const msrpPrice =
+                          parseFloat(e.target.value) || undefined;
                         handleInputChange('msrpPrice', msrpPrice as any);
 
                         // Auto-calculate discount % if both prices exist
@@ -731,7 +751,7 @@ export function ComponentForm({
                           );
                         }
                       }}
-                      placeholder="0"
+                      placeholder="0.00"
                       className="bg-purple-50 border-purple-300"
                     />
                   </div>

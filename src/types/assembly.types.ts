@@ -42,6 +42,7 @@ export interface AssemblyComponent {
  */
 export interface DbAssembly {
   id: string;
+  team_id?: string; // Multi-tenant team association
   name: string;
   description?: string;
   is_complete: boolean;
@@ -55,6 +56,7 @@ export interface DbAssembly {
  */
 export interface DbAssemblyComponent {
   id: string;
+  team_id?: string; // Multi-tenant team association
   assembly_id: string;
   component_id: string | null;
   component_name: string;

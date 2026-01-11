@@ -32,6 +32,7 @@ export interface Component {
 // ============ Database Schema Types ============
 export interface DbComponent {
   id: string;
+  team_id?: string; // Multi-tenant team association
   name: string;
   manufacturer?: string;
   manufacturer_part_number?: string;

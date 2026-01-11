@@ -18,10 +18,16 @@ import type {
   ConflictResolution,
   ImportResult,
   ImportProgress,
+  AttachmentData,
+  SystemSettings,
 } from '@/types/import-export.types';
 import type { DbComponent } from '@/types/component.types';
-import type { DbAssembly } from '@/types/assembly.types';
-import type { DbQuotation } from '@/types/quotation.types';
+import type { DbAssembly, DbAssemblyComponent } from '@/types/assembly.types';
+import type {
+  DbQuotation,
+  DbQuotationSystem,
+  DbQuotationItem,
+} from '@/types/quotation.types';
 
 /**
  * Import service result
@@ -477,19 +483,45 @@ function generateEmptyPreview(): ImportPreview {
 
 /**
  * Apply import with conflict resolutions
- * This is a placeholder - full implementation would be in batch processor
+ * Implements batch processing with progress tracking
  */
 export async function applyImport(
-  __exportPackage: ExportPackage,
+  exportPackage: ExportPackage,
   teamId: string,
-  __resolutions: ConflictResolution[],
-  __options?: ImportOptions,
-  __progressCallback?: ImportProgressCallback
+  resolutions: ConflictResolution[],
+  options?: ImportOptions,
+  progressCallback?: ImportProgressCallback
 ): Promise<ImportServiceResult> {
-  try {
-    logger.info('Starting import operation', { teamId });
+  const startTime = Date.now();
+  const batchSize = options?.batchSize || 100;
 
-    // Create audit log
+  const result: ImportResult = {
+    success: true,
+    recordsCreated: {
+      components: 0,
+      assemblies: 0,
+      quotations: 0,
+    },
+    recordsUpdated: {
+      components: 0,
+      assemblies: 0,
+      quotations: 0,
+    },
+    recordsSkipped: {
+      components: 0,
+      assemblies: 0,
+      quotations: 0,
+    },
+    errors: [],
+    warnings: [],
+    duration: 0,
+    completedAt: '',
+  };
+
+  try {
+    logger.info('Starting import operation', { teamId, batchSize });
+
+    // Get authenticated user
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -497,40 +529,894 @@ export async function applyImport(
       return { success: false, error: 'User not authenticated' };
     }
 
-    // TODO: Implement full import logic with batch processing
-    // For now, return success
-    const result: ImportResult = {
-      success: true,
-      recordsCreated: {
-        components: 0,
-        assemblies: 0,
-        quotations: 0,
-      },
-      recordsUpdated: {
-        components: 0,
-        assemblies: 0,
-        quotations: 0,
-      },
-      recordsSkipped: {
-        components: 0,
-        assemblies: 0,
-        quotations: 0,
-      },
-      errors: [],
-      warnings: [],
-      duration: 0,
-      completedAt: new Date().toISOString(),
-    };
+    // Create audit log entry
+    const { data: logEntry } = await supabase
+      .from('export_import_logs')
+      .insert({
+        team_id: teamId,
+        user_id: user.id,
+        operation_type: 'import',
+        file_format: exportPackage.manifest.includes.components
+          ? 'json'
+          : 'json',
+        record_counts: exportPackage.manifest.counts,
+        included_entities: exportPackage.manifest.includes,
+        status: 'started',
+      })
+      .select()
+      .single();
 
-    return {
-      success: true,
-      data: result,
-    };
+    const logId = logEntry?.id;
+
+    try {
+      // Build resolution map for quick lookup
+      const resolutionMap = new Map(resolutions.map(r => [r.entityId, r]));
+
+      // Calculate total records
+      const totalRecords =
+        (exportPackage.data.components?.length || 0) +
+        (exportPackage.data.assemblies?.length || 0) +
+        (exportPackage.data.quotations?.length || 0);
+
+      let recordsProcessed = 0;
+
+      // ========== STEP 1: Import Components ==========
+      if (
+        exportPackage.data.components &&
+        exportPackage.data.components.length > 0
+      ) {
+        const componentResult = await importComponents(
+          exportPackage.data.components,
+          teamId,
+          resolutionMap,
+          batchSize,
+          progress => {
+            progressCallback?.({
+              status: 'importing',
+              currentEntity: 'component',
+              currentBatch: progress.currentBatch,
+              totalBatches: progress.totalBatches,
+              recordsProcessed: recordsProcessed + progress.recordsProcessed,
+              totalRecords,
+              percentComplete:
+                ((recordsProcessed + progress.recordsProcessed) /
+                  totalRecords) *
+                100,
+              errors: result.errors.length,
+              warnings: result.warnings.length,
+            });
+          }
+        );
+
+        result.recordsCreated.components = componentResult.created;
+        result.recordsUpdated.components = componentResult.updated;
+        result.recordsSkipped.components = componentResult.skipped;
+        result.errors.push(...componentResult.errors);
+        result.warnings.push(...componentResult.warnings);
+        recordsProcessed += exportPackage.data.components.length;
+      }
+
+      // ========== STEP 2: Import Assemblies ==========
+      if (
+        exportPackage.data.assemblies &&
+        exportPackage.data.assemblies.length > 0
+      ) {
+        const assemblyResult = await importAssemblies(
+          exportPackage.data.assemblies,
+          exportPackage.data.assemblyComponents || [],
+          teamId,
+          resolutionMap,
+          batchSize,
+          progress => {
+            progressCallback?.({
+              status: 'importing',
+              currentEntity: 'assembly',
+              currentBatch: progress.currentBatch,
+              totalBatches: progress.totalBatches,
+              recordsProcessed: recordsProcessed + progress.recordsProcessed,
+              totalRecords,
+              percentComplete:
+                ((recordsProcessed + progress.recordsProcessed) /
+                  totalRecords) *
+                100,
+              errors: result.errors.length,
+              warnings: result.warnings.length,
+            });
+          }
+        );
+
+        result.recordsCreated.assemblies = assemblyResult.created;
+        result.recordsUpdated.assemblies = assemblyResult.updated;
+        result.recordsSkipped.assemblies = assemblyResult.skipped;
+        result.errors.push(...assemblyResult.errors);
+        result.warnings.push(...assemblyResult.warnings);
+        recordsProcessed += exportPackage.data.assemblies.length;
+      }
+
+      // ========== STEP 3: Import Quotations ==========
+      if (
+        exportPackage.data.quotations &&
+        exportPackage.data.quotations.length > 0
+      ) {
+        const quotationResult = await importQuotations(
+          exportPackage.data.quotations,
+          exportPackage.data.quotationSystems || [],
+          exportPackage.data.quotationItems || [],
+          teamId,
+          resolutionMap,
+          batchSize,
+          progress => {
+            progressCallback?.({
+              status: 'importing',
+              currentEntity: 'quotation',
+              currentBatch: progress.currentBatch,
+              totalBatches: progress.totalBatches,
+              recordsProcessed: recordsProcessed + progress.recordsProcessed,
+              totalRecords,
+              percentComplete:
+                ((recordsProcessed + progress.recordsProcessed) /
+                  totalRecords) *
+                100,
+              errors: result.errors.length,
+              warnings: result.warnings.length,
+            });
+          }
+        );
+
+        result.recordsCreated.quotations = quotationResult.created;
+        result.recordsUpdated.quotations = quotationResult.updated;
+        result.recordsSkipped.quotations = quotationResult.skipped;
+        result.errors.push(...quotationResult.errors);
+        result.warnings.push(...quotationResult.warnings);
+        recordsProcessed += exportPackage.data.quotations.length;
+      }
+
+      // ========== STEP 4: Restore Attachments (if included) ==========
+      if (exportPackage.attachments && exportPackage.attachments.length > 0) {
+        const attachmentResult = await restoreAttachments(
+          exportPackage.attachments,
+          teamId
+        );
+        result.warnings.push(...attachmentResult.warnings);
+      }
+
+      // ========== STEP 5: Restore Settings (if included) ==========
+      if (exportPackage.data.settings) {
+        const settingsResult = await restoreSettings(
+          exportPackage.data.settings,
+          teamId
+        );
+        result.warnings.push(...settingsResult.warnings);
+      }
+
+      // Calculate duration
+      result.duration = Date.now() - startTime;
+      result.completedAt = new Date().toISOString();
+
+      // Update audit log - success
+      if (logId) {
+        await supabase.rpc('complete_export_import_operation', {
+          p_log_id: logId,
+          p_status: 'completed',
+        });
+      }
+
+      logger.info('Import completed successfully', {
+        created: result.recordsCreated,
+        updated: result.recordsUpdated,
+        skipped: result.recordsSkipped,
+        errors: result.errors.length,
+        warnings: result.warnings.length,
+        duration: result.duration,
+      });
+
+      return {
+        success: true,
+        data: result,
+        logId,
+      };
+    } catch (error) {
+      // Update audit log - failed
+      if (logId) {
+        await supabase.rpc('complete_export_import_operation', {
+          p_log_id: logId,
+          p_status: 'failed',
+          p_error_message:
+            error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+      throw error;
+    }
   } catch (error) {
     logger.error('Import failed:', error);
+    result.success = false;
+    result.duration = Date.now() - startTime;
+    result.completedAt = new Date().toISOString();
+
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Import failed',
+      data: result,
     };
   }
+}
+
+/**
+ * Import components in batches
+ */
+async function importComponents(
+  components: DbComponent[],
+  teamId: string,
+  resolutionMap: Map<string, ConflictResolution>,
+  batchSize: number,
+  progressCallback?: (progress: {
+    currentBatch: number;
+    totalBatches: number;
+    recordsProcessed: number;
+  }) => void
+): Promise<{
+  created: number;
+  updated: number;
+  skipped: number;
+  errors: ValidationError[];
+  warnings: ValidationError[];
+}> {
+  const result = {
+    created: 0,
+    updated: 0,
+    skipped: 0,
+    errors: [] as ValidationError[],
+    warnings: [] as ValidationError[],
+  };
+
+  const totalBatches = Math.ceil(components.length / batchSize);
+
+  for (let i = 0; i < components.length; i += batchSize) {
+    const batch = components.slice(i, i + batchSize);
+    const currentBatch = Math.floor(i / batchSize) + 1;
+
+    const toCreate: DbComponent[] = [];
+    const toUpdate: { id: string; data: Partial<DbComponent> }[] = [];
+
+    for (const component of batch) {
+      const resolution = resolutionMap.get(component.id);
+
+      if (resolution?.resolution === 'skip') {
+        result.skipped++;
+        continue;
+      }
+
+      if (resolution?.resolution === 'create_new') {
+        // Generate new ID and create
+        toCreate.push({
+          ...component,
+          id: resolution.newId || crypto.randomUUID(),
+          team_id: teamId,
+        });
+      } else if (resolution?.resolution === 'update') {
+        // Update existing record
+        toUpdate.push({
+          id: component.id,
+          data: {
+            ...component,
+            team_id: teamId,
+          },
+        });
+      } else {
+        // No conflict - create with original ID (disaster recovery)
+        toCreate.push({
+          ...component,
+          team_id: teamId,
+        });
+      }
+    }
+
+    // Batch insert new components
+    if (toCreate.length > 0) {
+      try {
+        const { error } = await supabase.from('components').insert(toCreate);
+
+        if (error) {
+          logger.error('Failed to insert component batch:', error);
+          result.errors.push({
+            severity: 'error',
+            entityType: 'component',
+            message: `Failed to insert batch: ${error.message}`,
+            code: 'BATCH_INSERT_FAILED',
+          });
+        } else {
+          result.created += toCreate.length;
+        }
+      } catch (error) {
+        logger.error('Component batch insert error:', error);
+        result.errors.push({
+          severity: 'error',
+          entityType: 'component',
+          message:
+            error instanceof Error ? error.message : 'Batch insert failed',
+          code: 'BATCH_INSERT_ERROR',
+        });
+      }
+    }
+
+    // Batch update existing components
+    for (const update of toUpdate) {
+      try {
+        const { error } = await supabase
+          .from('components')
+          .update(update.data)
+          .eq('id', update.id)
+          .eq('team_id', teamId);
+
+        if (error) {
+          logger.error('Failed to update component:', error);
+          result.errors.push({
+            severity: 'error',
+            entityType: 'component',
+            entityId: update.id,
+            message: `Failed to update: ${error.message}`,
+            code: 'UPDATE_FAILED',
+          });
+        } else {
+          result.updated++;
+        }
+      } catch (error) {
+        logger.error('Component update error:', error);
+        result.errors.push({
+          severity: 'error',
+          entityType: 'component',
+          entityId: update.id,
+          message: error instanceof Error ? error.message : 'Update failed',
+          code: 'UPDATE_ERROR',
+        });
+      }
+    }
+
+    progressCallback?.({
+      currentBatch,
+      totalBatches,
+      recordsProcessed: Math.min(i + batchSize, components.length),
+    });
+  }
+
+  return result;
+}
+
+/**
+ * Import assemblies and their components in batches
+ */
+async function importAssemblies(
+  assemblies: DbAssembly[],
+  assemblyComponents: DbAssemblyComponent[],
+  teamId: string,
+  resolutionMap: Map<string, ConflictResolution>,
+  batchSize: number,
+  progressCallback?: (progress: {
+    currentBatch: number;
+    totalBatches: number;
+    recordsProcessed: number;
+  }) => void
+): Promise<{
+  created: number;
+  updated: number;
+  skipped: number;
+  errors: ValidationError[];
+  warnings: ValidationError[];
+}> {
+  const result = {
+    created: 0,
+    updated: 0,
+    skipped: 0,
+    errors: [] as ValidationError[],
+    warnings: [] as ValidationError[],
+  };
+
+  const totalBatches = Math.ceil(assemblies.length / batchSize);
+  const idMapping = new Map<string, string>(); // old ID -> new ID for create_new
+
+  for (let i = 0; i < assemblies.length; i += batchSize) {
+    const batch = assemblies.slice(i, i + batchSize);
+    const currentBatch = Math.floor(i / batchSize) + 1;
+
+    const toCreate: DbAssembly[] = [];
+    const toUpdate: { id: string; data: Partial<DbAssembly> }[] = [];
+
+    for (const assembly of batch) {
+      const resolution = resolutionMap.get(assembly.id);
+
+      if (resolution?.resolution === 'skip') {
+        result.skipped++;
+        continue;
+      }
+
+      if (resolution?.resolution === 'create_new') {
+        const newId = resolution.newId || crypto.randomUUID();
+        idMapping.set(assembly.id, newId);
+        toCreate.push({
+          ...assembly,
+          id: newId,
+          team_id: teamId,
+        });
+      } else if (resolution?.resolution === 'update') {
+        toUpdate.push({
+          id: assembly.id,
+          data: {
+            ...assembly,
+            team_id: teamId,
+          },
+        });
+      } else {
+        toCreate.push({
+          ...assembly,
+          team_id: teamId,
+        });
+      }
+    }
+
+    // Batch insert new assemblies
+    if (toCreate.length > 0) {
+      try {
+        const { error } = await supabase.from('assemblies').insert(toCreate);
+
+        if (error) {
+          result.errors.push({
+            severity: 'error',
+            entityType: 'assembly',
+            message: `Failed to insert batch: ${error.message}`,
+            code: 'BATCH_INSERT_FAILED',
+          });
+        } else {
+          result.created += toCreate.length;
+        }
+      } catch (error) {
+        result.errors.push({
+          severity: 'error',
+          entityType: 'assembly',
+          message:
+            error instanceof Error ? error.message : 'Batch insert failed',
+          code: 'BATCH_INSERT_ERROR',
+        });
+      }
+    }
+
+    // Batch update existing assemblies
+    for (const update of toUpdate) {
+      try {
+        const { error } = await supabase
+          .from('assemblies')
+          .update(update.data)
+          .eq('id', update.id)
+          .eq('team_id', teamId);
+
+        if (error) {
+          result.errors.push({
+            severity: 'error',
+            entityType: 'assembly',
+            entityId: update.id,
+            message: `Failed to update: ${error.message}`,
+            code: 'UPDATE_FAILED',
+          });
+        } else {
+          result.updated++;
+        }
+      } catch (error) {
+        result.errors.push({
+          severity: 'error',
+          entityType: 'assembly',
+          entityId: update.id,
+          message: error instanceof Error ? error.message : 'Update failed',
+          code: 'UPDATE_ERROR',
+        });
+      }
+    }
+
+    progressCallback?.({
+      currentBatch,
+      totalBatches,
+      recordsProcessed: Math.min(i + batchSize, assemblies.length),
+    });
+  }
+
+  // Import assembly_components relationships
+  if (assemblyComponents.length > 0) {
+    const componentsToInsert = assemblyComponents.map(ac => ({
+      ...ac,
+      assembly_id: idMapping.get(ac.assembly_id) || ac.assembly_id,
+      team_id: teamId,
+    }));
+
+    try {
+      // Delete existing assembly_components for updated assemblies
+      const assemblyIds = [
+        ...new Set(componentsToInsert.map(c => c.assembly_id)),
+      ];
+      await supabase
+        .from('assembly_components')
+        .delete()
+        .in('assembly_id', assemblyIds)
+        .eq('team_id', teamId);
+
+      // Insert new relationships
+      const { error } = await supabase
+        .from('assembly_components')
+        .insert(componentsToInsert);
+
+      if (error) {
+        result.warnings.push({
+          severity: 'warning',
+          entityType: 'assembly',
+          message: `Failed to restore assembly components: ${error.message}`,
+          code: 'ASSEMBLY_COMPONENTS_FAILED',
+        });
+      }
+    } catch (error) {
+      result.warnings.push({
+        severity: 'warning',
+        entityType: 'assembly',
+        message:
+          error instanceof Error
+            ? error.message
+            : 'Assembly components restore failed',
+        code: 'ASSEMBLY_COMPONENTS_ERROR',
+      });
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Import quotations with systems and items in batches
+ */
+async function importQuotations(
+  quotations: DbQuotation[],
+  quotationSystems: DbQuotationSystem[],
+  quotationItems: DbQuotationItem[],
+  teamId: string,
+  resolutionMap: Map<string, ConflictResolution>,
+  batchSize: number,
+  progressCallback?: (progress: {
+    currentBatch: number;
+    totalBatches: number;
+    recordsProcessed: number;
+  }) => void
+): Promise<{
+  created: number;
+  updated: number;
+  skipped: number;
+  errors: ValidationError[];
+  warnings: ValidationError[];
+}> {
+  const result = {
+    created: 0,
+    updated: 0,
+    skipped: 0,
+    errors: [] as ValidationError[],
+    warnings: [] as ValidationError[],
+  };
+
+  const totalBatches = Math.ceil(quotations.length / batchSize);
+  const idMapping = new Map<string, string>(); // old ID -> new ID
+  const systemIdMapping = new Map<string, string>(); // old system ID -> new system ID
+
+  for (let i = 0; i < quotations.length; i += batchSize) {
+    const batch = quotations.slice(i, i + batchSize);
+    const currentBatch = Math.floor(i / batchSize) + 1;
+
+    const toCreate: DbQuotation[] = [];
+    const toUpdate: { id: string; data: Partial<DbQuotation> }[] = [];
+
+    for (const quotation of batch) {
+      const resolution = resolutionMap.get(quotation.id);
+
+      if (resolution?.resolution === 'skip') {
+        result.skipped++;
+        continue;
+      }
+
+      if (resolution?.resolution === 'create_new') {
+        const newId = resolution.newId || crypto.randomUUID();
+        idMapping.set(quotation.id, newId);
+        toCreate.push({
+          ...quotation,
+          id: newId,
+          team_id: teamId,
+        });
+      } else if (resolution?.resolution === 'update') {
+        toUpdate.push({
+          id: quotation.id,
+          data: {
+            ...quotation,
+            team_id: teamId,
+          },
+        });
+      } else {
+        toCreate.push({
+          ...quotation,
+          team_id: teamId,
+        });
+      }
+    }
+
+    // Batch insert new quotations
+    if (toCreate.length > 0) {
+      try {
+        const { error } = await supabase.from('quotations').insert(toCreate);
+
+        if (error) {
+          result.errors.push({
+            severity: 'error',
+            entityType: 'quotation',
+            message: `Failed to insert batch: ${error.message}`,
+            code: 'BATCH_INSERT_FAILED',
+          });
+        } else {
+          result.created += toCreate.length;
+        }
+      } catch (error) {
+        result.errors.push({
+          severity: 'error',
+          entityType: 'quotation',
+          message:
+            error instanceof Error ? error.message : 'Batch insert failed',
+          code: 'BATCH_INSERT_ERROR',
+        });
+      }
+    }
+
+    // Batch update existing quotations
+    for (const update of toUpdate) {
+      try {
+        const { error } = await supabase
+          .from('quotations')
+          .update(update.data)
+          .eq('id', update.id)
+          .eq('team_id', teamId);
+
+        if (error) {
+          result.errors.push({
+            severity: 'error',
+            entityType: 'quotation',
+            entityId: update.id,
+            message: `Failed to update: ${error.message}`,
+            code: 'UPDATE_FAILED',
+          });
+        } else {
+          result.updated++;
+        }
+      } catch (error) {
+        result.errors.push({
+          severity: 'error',
+          entityType: 'quotation',
+          entityId: update.id,
+          message: error instanceof Error ? error.message : 'Update failed',
+          code: 'UPDATE_ERROR',
+        });
+      }
+    }
+
+    progressCallback?.({
+      currentBatch,
+      totalBatches,
+      recordsProcessed: Math.min(i + batchSize, quotations.length),
+    });
+  }
+
+  // Import quotation_systems
+  if (quotationSystems.length > 0) {
+    const systemsToInsert = quotationSystems.map(qs => {
+      const newSystemId = crypto.randomUUID();
+      systemIdMapping.set(qs.id, newSystemId);
+      return {
+        ...qs,
+        id: newSystemId,
+        quotation_id: idMapping.get(qs.quotation_id) || qs.quotation_id,
+        team_id: teamId,
+      };
+    });
+
+    try {
+      const quotationIds = [
+        ...new Set(systemsToInsert.map(s => s.quotation_id)),
+      ];
+      await supabase
+        .from('quotation_systems')
+        .delete()
+        .in('quotation_id', quotationIds)
+        .eq('team_id', teamId);
+
+      const { error } = await supabase
+        .from('quotation_systems')
+        .insert(systemsToInsert);
+
+      if (error) {
+        result.warnings.push({
+          severity: 'warning',
+          entityType: 'quotation',
+          message: `Failed to restore quotation systems: ${error.message}`,
+          code: 'QUOTATION_SYSTEMS_FAILED',
+        });
+      }
+    } catch (error) {
+      result.warnings.push({
+        severity: 'warning',
+        entityType: 'quotation',
+        message:
+          error instanceof Error
+            ? error.message
+            : 'Quotation systems restore failed',
+        code: 'QUOTATION_SYSTEMS_ERROR',
+      });
+    }
+  }
+
+  // Import quotation_items
+  if (quotationItems.length > 0) {
+    const itemsToInsert = quotationItems.map(qi => ({
+      ...qi,
+      id: crypto.randomUUID(),
+      quotation_system_id:
+        systemIdMapping.get(qi.quotation_system_id) || qi.quotation_system_id,
+      team_id: teamId,
+    }));
+
+    try {
+      const systemIds = [
+        ...new Set(itemsToInsert.map(i => i.quotation_system_id)),
+      ];
+      await supabase
+        .from('quotation_items')
+        .delete()
+        .in('quotation_system_id', systemIds)
+        .eq('team_id', teamId);
+
+      const { error } = await supabase
+        .from('quotation_items')
+        .insert(itemsToInsert);
+
+      if (error) {
+        result.warnings.push({
+          severity: 'warning',
+          entityType: 'quotation',
+          message: `Failed to restore quotation items: ${error.message}`,
+          code: 'QUOTATION_ITEMS_FAILED',
+        });
+      }
+    } catch (error) {
+      result.warnings.push({
+        severity: 'warning',
+        entityType: 'quotation',
+        message:
+          error instanceof Error
+            ? error.message
+            : 'Quotation items restore failed',
+        code: 'QUOTATION_ITEMS_ERROR',
+      });
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Restore attachments (supplier quote files) to storage
+ */
+async function restoreAttachments(
+  attachments: AttachmentData[],
+  teamId: string
+): Promise<{
+  warnings: ValidationError[];
+}> {
+  const warnings: ValidationError[] = [];
+
+  for (const attachment of attachments) {
+    if (!attachment.embedded || !attachment.base64Data) {
+      warnings.push({
+        severity: 'warning',
+        entityType: 'system',
+        message: `Attachment ${attachment.fileName} was not embedded and cannot be restored`,
+        code: 'ATTACHMENT_NOT_EMBEDDED',
+      });
+      continue;
+    }
+
+    try {
+      // Decode base64 data
+      const fileData = Uint8Array.from(atob(attachment.base64Data), c =>
+        c.charCodeAt(0)
+      );
+
+      // Upload to storage
+      const filePath = `${teamId}/${attachment.entityId}/${attachment.fileName}`;
+      const { error: uploadError } = await supabase.storage
+        .from('supplier-quotes')
+        .upload(filePath, fileData, {
+          contentType: attachment.fileType,
+          upsert: true,
+        });
+
+      if (uploadError) {
+        warnings.push({
+          severity: 'warning',
+          entityType: 'system',
+          message: `Failed to upload ${attachment.fileName}: ${uploadError.message}`,
+          code: 'ATTACHMENT_UPLOAD_FAILED',
+        });
+        continue;
+      }
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('supplier-quotes')
+        .getPublicUrl(filePath);
+
+      // Create supplier_quotes record if entity type is component
+      if (attachment.entityType === 'component') {
+        await supabase.from('supplier_quotes').insert({
+          id: attachment.id,
+          file_name: attachment.fileName,
+          file_url: urlData.publicUrl,
+          file_type: attachment.fileType,
+          file_size_kb: Math.round(attachment.fileSizeBytes / 1024),
+          status: 'completed',
+          team_id: teamId,
+        });
+      }
+    } catch (error) {
+      warnings.push({
+        severity: 'warning',
+        entityType: 'system',
+        message: `Failed to restore attachment ${attachment.fileName}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        code: 'ATTACHMENT_RESTORE_ERROR',
+      });
+    }
+  }
+
+  return { warnings };
+}
+
+/**
+ * Restore system settings
+ */
+async function restoreSettings(
+  settings: SystemSettings,
+  teamId: string
+): Promise<{
+  warnings: ValidationError[];
+}> {
+  const warnings: ValidationError[] = [];
+
+  try {
+    // Update team settings
+    const { error } = await supabase.from('team_settings').upsert({
+      team_id: teamId,
+      default_markup_percent: settings.defaultPricing.markupPercent,
+      default_profit_percent: settings.defaultPricing.profitPercent,
+      default_risk_percent: settings.defaultPricing.riskPercent,
+      default_vat_rate: settings.defaultPricing.vatRate,
+      default_include_vat: settings.defaultPricing.includeVAT,
+      default_day_work_cost: settings.defaultPricing.dayWorkCost,
+      usd_to_ils_rate: settings.exchangeRates.usdToIls,
+      eur_to_ils_rate: settings.exchangeRates.eurToIls,
+    });
+
+    if (error) {
+      warnings.push({
+        severity: 'warning',
+        entityType: 'setting',
+        message: `Failed to restore settings: ${error.message}`,
+        code: 'SETTINGS_RESTORE_FAILED',
+      });
+    }
+  } catch (error) {
+    warnings.push({
+      severity: 'warning',
+      entityType: 'setting',
+      message:
+        error instanceof Error ? error.message : 'Settings restore failed',
+      code: 'SETTINGS_RESTORE_ERROR',
+    });
+  }
+
+  return { warnings };
 }

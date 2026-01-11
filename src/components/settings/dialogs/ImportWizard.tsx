@@ -17,14 +17,25 @@ import {
   AlertTriangle,
   CheckCircle2,
   XCircle,
+  RefreshCw,
+  SkipForward,
+  FileEdit,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { parseImportFile, validateImportData } from '@/services/importService';
+import {
+  parseImportFile,
+  validateImportData,
+  applyImport,
+} from '@/services/importService';
 import type {
   ExportPackage,
   ImportValidationResult,
+  ConflictResolution,
+  DataConflict,
+  ImportProgress,
 } from '@/types/import-export.types';
 import { cn } from '@/lib/utils';
+import { Progress } from '@/components/ui/progress';
 
 interface ImportWizardProps {
   open: boolean;
@@ -61,6 +72,12 @@ export function ImportWizard({
   const [exportPackage, setExportPackage] = useState<ExportPackage>();
   const [validationResult, setValidationResult] =
     useState<ImportValidationResult>();
+
+  // Conflict resolution
+  const [resolutions, setResolutions] = useState<ConflictResolution[]>([]);
+
+  // Import progress
+  const [importProgress, setImportProgress] = useState<ImportProgress>();
 
   const handleClose = () => {
     if (!loading) {
@@ -194,11 +211,86 @@ export function ImportWizard({
     }
   };
 
+  const handleResolveConflicts = () => {
+    if (!validationResult) return;
+
+    // Initialize resolutions with default strategy (skip)
+    const defaultResolutions: ConflictResolution[] =
+      validationResult.conflicts.map(conflict => ({
+        conflictId: conflict.entityId,
+        entityId: conflict.entityId,
+        entityType: conflict.entityType,
+        resolution: 'skip',
+      }));
+
+    setResolutions(defaultResolutions);
+    setStep('conflicts');
+  };
+
+  const handleConflictResolutionChange = (
+    conflict: DataConflict,
+    resolution: 'update' | 'skip' | 'create_new'
+  ) => {
+    setResolutions(prev =>
+      prev.map(r =>
+        r.entityId === conflict.entityId
+          ? {
+              ...r,
+              resolution,
+              newId:
+                resolution === 'create_new' ? crypto.randomUUID() : undefined,
+            }
+          : r
+      )
+    );
+  };
+
   const handleImport = async () => {
-    // TODO: Implement actual import with conflict resolutions
-    toast.info('ייבוא עדיין בפיתוח - פונקציונליות מלאה בקרוב');
-    handleClose();
-    onImportComplete?.();
+    if (!exportPackage || !currentTeam) return;
+
+    setLoading(true);
+    setStep('importing');
+
+    try {
+      const result = await applyImport(
+        exportPackage,
+        currentTeam.id,
+        resolutions,
+        {
+          strictValidation: false,
+          batchSize: 100,
+        },
+        progress => {
+          setImportProgress(progress);
+        }
+      );
+
+      if (!result.success) {
+        throw new Error(result.error || 'Import failed');
+      }
+
+      const data = result.data!;
+
+      toast.success(
+        `ייבוא הושלם בהצלחה! נוצרו ${data.recordsCreated.components + data.recordsCreated.assemblies + data.recordsCreated.quotations} רשומות`,
+        {
+          description: `עודכנו: ${data.recordsUpdated.components + data.recordsUpdated.assemblies + data.recordsUpdated.quotations}, דולגו: ${data.recordsSkipped.components + data.recordsSkipped.assemblies + data.recordsSkipped.quotations}`,
+        }
+      );
+
+      if (data.errors.length > 0) {
+        toast.warning(`${data.errors.length} שגיאות במהלך הייבוא`);
+      }
+
+      handleClose();
+      onImportComplete?.();
+    } catch (error) {
+      console.error('Import failed:', error);
+      toast.error(error instanceof Error ? error.message : 'הייבוא נכשל');
+      setStep('preview');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const errorCount = validationResult?.errors.length || 0;
@@ -472,6 +564,139 @@ export function ImportWizard({
           </div>
         )}
 
+        {/* Step 5: Conflict Resolution */}
+        {step === 'conflicts' && validationResult && (
+          <div className="space-y-4 max-h-[500px] overflow-y-auto">
+            <div className="text-sm text-muted-foreground">
+              בחר איך לטפל בכל קונפליקט:
+            </div>
+
+            <div className="space-y-3">
+              {validationResult.conflicts.map((conflict, idx) => {
+                const currentResolution = resolutions.find(
+                  r => r.entityId === conflict.entityId
+                );
+
+                return (
+                  <div
+                    key={idx}
+                    className="border rounded-lg p-4 space-y-3 bg-card"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="font-medium text-sm">
+                          {conflict.entityName}
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          {conflict.message}
+                        </div>
+                      </div>
+                      <div className="text-xs text-orange-600 dark:text-orange-400 px-2 py-1 bg-orange-50 dark:bg-orange-900/20 rounded">
+                        {conflict.type === 'duplicate_id'
+                          ? 'ID קיים'
+                          : 'מפתח עסקי קיים'}
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant={
+                          currentResolution?.resolution === 'update'
+                            ? 'default'
+                            : 'outline'
+                        }
+                        className="flex-1"
+                        onClick={() =>
+                          handleConflictResolutionChange(conflict, 'update')
+                        }
+                      >
+                        <RefreshCw className="ml-2 h-3 w-3" />
+                        עדכן קיים
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={
+                          currentResolution?.resolution === 'skip'
+                            ? 'default'
+                            : 'outline'
+                        }
+                        className="flex-1"
+                        onClick={() =>
+                          handleConflictResolutionChange(conflict, 'skip')
+                        }
+                      >
+                        <SkipForward className="ml-2 h-3 w-3" />
+                        דלג
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={
+                          currentResolution?.resolution === 'create_new'
+                            ? 'default'
+                            : 'outline'
+                        }
+                        className="flex-1"
+                        onClick={() =>
+                          handleConflictResolutionChange(conflict, 'create_new')
+                        }
+                      >
+                        <FileEdit className="ml-2 h-3 w-3" />
+                        צור חדש
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Step 6: Importing Progress */}
+        {step === 'importing' && importProgress && (
+          <div className="space-y-6 py-8">
+            <div className="text-center space-y-2">
+              <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto" />
+              <div className="text-sm font-medium">
+                מייבא {importProgress.currentEntity === 'component' && 'רכיבים'}
+                {importProgress.currentEntity === 'assembly' && 'הרכבות'}
+                {importProgress.currentEntity === 'quotation' && 'הצעות מחיר'}
+                {importProgress.currentEntity === 'setting' && 'הגדרות'}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                אצווה {importProgress.currentBatch} מתוך{' '}
+                {importProgress.totalBatches}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Progress value={importProgress.percentComplete} />
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>
+                  {importProgress.recordsProcessed} /{' '}
+                  {importProgress.totalRecords} רשומות
+                </span>
+                <span>{Math.round(importProgress.percentComplete)}%</span>
+              </div>
+            </div>
+
+            {(importProgress.errors > 0 || importProgress.warnings > 0) && (
+              <div className="text-center text-xs space-y-1">
+                {importProgress.errors > 0 && (
+                  <div className="text-red-600 dark:text-red-400">
+                    {importProgress.errors} שגיאות
+                  </div>
+                )}
+                {importProgress.warnings > 0 && (
+                  <div className="text-yellow-600 dark:text-yellow-400">
+                    {importProgress.warnings} אזהרות
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Footer Buttons */}
         {step !== 'validating' && step !== 'importing' && (
           <div className="flex justify-between pt-4">
@@ -491,12 +716,35 @@ export function ImportWizard({
                 </Button>
               )}
               {step === 'preview' && validationResult && (
-                <Button
-                  onClick={handleImport}
-                  disabled={!validationResult.valid || loading}
-                >
-                  ייבא עכשיו
-                </Button>
+                <>
+                  {conflictCount > 0 && (
+                    <Button onClick={handleResolveConflicts} disabled={loading}>
+                      פתור קונפליקטים ({conflictCount})
+                    </Button>
+                  )}
+                  {conflictCount === 0 && (
+                    <Button
+                      onClick={handleImport}
+                      disabled={!validationResult.valid || loading}
+                    >
+                      ייבא עכשיו
+                    </Button>
+                  )}
+                </>
+              )}
+              {step === 'conflicts' && (
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={() => setStep('preview')}
+                    disabled={loading}
+                  >
+                    חזור
+                  </Button>
+                  <Button onClick={handleImport} disabled={loading}>
+                    ייבא עכשיו
+                  </Button>
+                </>
               )}
             </div>
           </div>

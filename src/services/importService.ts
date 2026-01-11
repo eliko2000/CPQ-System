@@ -75,7 +75,19 @@ export async function parseImportFile(
       };
     }
 
-    // Not encrypted
+    // Not encrypted - validate structure
+    if (!parsed.manifest || !parsed.data || !parsed.relationships) {
+      const missing: string[] = [];
+      if (!parsed.manifest) missing.push('manifest');
+      if (!parsed.data) missing.push('data');
+      if (!parsed.relationships) missing.push('relationships');
+
+      return {
+        success: false,
+        error: `Invalid export package structure. Missing: ${missing.join(', ')}`,
+      };
+    }
+
     return {
       success: true,
       data: parsed as ExportPackage,

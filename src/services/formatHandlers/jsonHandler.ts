@@ -34,18 +34,13 @@ export function createJSONBlob(exportPackage: ExportPackage): Blob {
 }
 
 /**
- * Parse JSON string to export package
+ * Parse JSON string to export package or encrypted file
+ * Note: Validation happens in parseImportFile after checking encryption
  */
-export function parseJSONString(jsonString: string): ExportPackage {
+export function parseJSONString(jsonString: string): any {
   try {
     const parsed = JSON.parse(jsonString);
-
-    // Validate structure
-    if (!parsed.manifest || !parsed.data || !parsed.relationships) {
-      throw new Error('Invalid export package structure');
-    }
-
-    return parsed as ExportPackage;
+    return parsed;
   } catch (error) {
     logger.error('Failed to parse JSON:', error);
     throw new Error('Invalid JSON format');
@@ -53,9 +48,10 @@ export function parseJSONString(jsonString: string): ExportPackage {
 }
 
 /**
- * Parse JSON file to export package
+ * Parse JSON file to export package or encrypted file
+ * Note: Validation happens in parseImportFile after checking encryption
  */
-export async function parseJSONFile(file: File): Promise<ExportPackage> {
+export async function parseJSONFile(file: File): Promise<any> {
   try {
     const text = await file.text();
     return parseJSONString(text);

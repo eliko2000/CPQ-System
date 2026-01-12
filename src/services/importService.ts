@@ -675,9 +675,25 @@ export async function applyImport(
       if (exportPackage.attachments && exportPackage.attachments.length > 0) {
         const attachmentResult = await restoreAttachments(
           exportPackage.attachments,
-          teamId
+          teamId,
+          progress => {
+            progressCallback?.({
+              status: 'importing',
+              currentEntity: 'attachment',
+              currentBatch: progress.current,
+              totalBatches: progress.total,
+              currentOperation: progress.operation,
+              recordsProcessed: recordsProcessed + progress.current,
+              totalRecords,
+              percentComplete:
+                ((recordsProcessed + progress.current) / totalRecords) * 100,
+              errors: result.errors.length,
+              warnings: result.warnings.length,
+            });
+          }
         );
         result.warnings.push(...attachmentResult.warnings);
+        recordsProcessed += exportPackage.attachments.length;
       }
 
       // ========== STEP 5: Restore Settings (if included) ==========
@@ -1362,13 +1378,27 @@ function sanitizeFilename(filename: string): string {
  */
 async function restoreAttachments(
   attachments: AttachmentData[],
-  teamId: string
+  teamId: string,
+  progressCallback?: (progress: {
+    current: number;
+    total: number;
+    operation: string;
+  }) => void
 ): Promise<{
   warnings: ValidationError[];
 }> {
   const warnings: ValidationError[] = [];
+  const total = attachments.length;
 
-  for (const attachment of attachments) {
+  for (let i = 0; i < attachments.length; i++) {
+    const attachment = attachments[i];
+
+    // Report progress
+    progressCallback?.({
+      current: i + 1,
+      total,
+      operation: `מעלה קובץ: ${attachment.fileName}`,
+    });
     if (!attachment.embedded || !attachment.base64Data) {
       warnings.push({
         severity: 'warning',
@@ -1521,7 +1551,7 @@ async function restoreSettings(
             user_id: user.id,
             updated_at: new Date().toISOString(),
           },
-          { onConflict: 'team_id,setting_key' }
+          { onConflict: 'user_id,setting_key' }
         );
 
       if (categoriesError) {
@@ -1553,7 +1583,7 @@ async function restoreSettings(
           user_id: user.id,
           updated_at: new Date().toISOString(),
         },
-        { onConflict: 'team_id,setting_key' }
+        { onConflict: 'user_id,setting_key' }
       );
 
       if (ratesError) {
@@ -1581,7 +1611,7 @@ async function restoreSettings(
             user_id: user.id,
             updated_at: new Date().toISOString(),
           },
-          { onConflict: 'team_id,setting_key' }
+          { onConflict: 'user_id,setting_key' }
         );
 
       if (numberingError) {

@@ -363,7 +363,13 @@ export interface ImportProgress {
   totalBatches: number;
   recordsProcessed: number;
   totalRecords: number;
-  currentEntity: 'component' | 'assembly' | 'quotation' | 'setting';
+  currentEntity:
+    | 'component'
+    | 'assembly'
+    | 'quotation'
+    | 'setting'
+    | 'attachment';
+  currentOperation?: string; // Detailed operation description (e.g., "Uploading file: quote.pdf")
   percentComplete: number;
   errors: number;
   warnings: number;

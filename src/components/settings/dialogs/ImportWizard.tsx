@@ -503,18 +503,76 @@ export function ImportWizard({
               <div className="text-sm font-medium">תצוגה מקדימה:</div>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span>ייווצרו:</span>
-                  <span className="font-medium">
+                  <span>רשומות חדשות:</span>
+                  <span className="font-medium text-green-600 dark:text-green-400">
                     {validationResult.preview.toCreate.components +
                       validationResult.preview.toCreate.assemblies +
-                      validationResult.preview.toCreate.quotations}{' '}
-                    רשומות
+                      validationResult.preview.toCreate.quotations}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>רשומות לעדכון (כפילויות):</span>
+                  <span className="font-medium text-blue-600 dark:text-blue-400">
+                    {validationResult.preview.toUpdate.components +
+                      validationResult.preview.toUpdate.assemblies +
+                      validationResult.preview.toUpdate.quotations}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>רשומות לדילוג:</span>
+                  <span className="font-medium text-gray-600 dark:text-gray-400">
+                    {validationResult.preview.toSkip.components +
+                      validationResult.preview.toSkip.assemblies +
+                      validationResult.preview.toSkip.quotations}
                   </span>
                 </div>
                 {conflictCount > 0 && (
                   <div className="flex justify-between text-orange-600 dark:text-orange-400">
-                    <span>קונפליקטים:</span>
+                    <span>קונפליקטים לפתרון:</span>
                     <span className="font-medium">{conflictCount}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Detailed breakdown */}
+              <div className="pt-3 border-t space-y-2 text-xs">
+                <div className="font-medium text-muted-foreground">
+                  פירוט לפי סוג:
+                </div>
+                {validationResult.preview.toCreate.components > 0 && (
+                  <div className="flex justify-between">
+                    <span>רכיבים חדשים:</span>
+                    <span>{validationResult.preview.toCreate.components}</span>
+                  </div>
+                )}
+                {validationResult.preview.toUpdate.components > 0 && (
+                  <div className="flex justify-between text-blue-600 dark:text-blue-400">
+                    <span>רכיבים קיימים:</span>
+                    <span>{validationResult.preview.toUpdate.components}</span>
+                  </div>
+                )}
+                {validationResult.preview.toCreate.assemblies > 0 && (
+                  <div className="flex justify-between">
+                    <span>הרכבות חדשות:</span>
+                    <span>{validationResult.preview.toCreate.assemblies}</span>
+                  </div>
+                )}
+                {validationResult.preview.toUpdate.assemblies > 0 && (
+                  <div className="flex justify-between text-blue-600 dark:text-blue-400">
+                    <span>הרכבות קיימות:</span>
+                    <span>{validationResult.preview.toUpdate.assemblies}</span>
+                  </div>
+                )}
+                {validationResult.preview.toCreate.quotations > 0 && (
+                  <div className="flex justify-between">
+                    <span>הצעות מחיר חדשות:</span>
+                    <span>{validationResult.preview.toCreate.quotations}</span>
+                  </div>
+                )}
+                {validationResult.preview.toUpdate.quotations > 0 && (
+                  <div className="flex justify-between text-blue-600 dark:text-blue-400">
+                    <span>הצעות מחיר קיימות:</span>
+                    <span>{validationResult.preview.toUpdate.quotations}</span>
                   </div>
                 )}
               </div>
@@ -687,7 +745,13 @@ export function ImportWizard({
                 {importProgress.currentEntity === 'assembly' && 'הרכבות'}
                 {importProgress.currentEntity === 'quotation' && 'הצעות מחיר'}
                 {importProgress.currentEntity === 'setting' && 'הגדרות'}
+                {importProgress.currentEntity === 'attachment' && 'קבצים'}
               </div>
+              {importProgress.currentOperation && (
+                <div className="text-xs text-muted-foreground max-w-md mx-auto truncate">
+                  {importProgress.currentOperation}
+                </div>
+              )}
               <div className="text-xs text-muted-foreground">
                 אצווה {importProgress.currentBatch} מתוך{' '}
                 {importProgress.totalBatches}

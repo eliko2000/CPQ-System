@@ -1305,6 +1305,59 @@ async function importQuotations(
 }
 
 /**
+ * Get MIME type from filename extension
+ */
+function getMimeTypeFromFilename(filename: string): string {
+  const extension = filename.toLowerCase().split('.').pop();
+
+  const mimeTypes: Record<string, string> = {
+    pdf: 'application/pdf',
+    xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    xls: 'application/vnd.ms-excel',
+    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    doc: 'application/msword',
+    png: 'image/png',
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    gif: 'image/gif',
+    webp: 'image/webp',
+  };
+
+  return mimeTypes[extension || ''] || 'application/octet-stream';
+}
+
+/**
+ * Sanitize filename for storage (ASCII-only, safe characters)
+ * Preserves file extension
+ */
+function sanitizeFilename(filename: string): string {
+  // Extract extension
+  const lastDotIndex = filename.lastIndexOf('.');
+  const name =
+    lastDotIndex > 0 ? filename.substring(0, lastDotIndex) : filename;
+  const extension = lastDotIndex > 0 ? filename.substring(lastDotIndex) : '';
+
+  // Replace non-ASCII and unsafe characters with underscores
+  // Keep only: letters, numbers, hyphens, underscores
+  const safeName = name
+    .replace(/[^a-zA-Z0-9_-]/g, '_')
+    .replace(/_+/g, '_') // Replace multiple underscores with single
+    .replace(/^_|_$/g, ''); // Remove leading/trailing underscores
+
+  // If name becomes empty, use timestamp
+  const finalName = safeName || `file_${Date.now()}`;
+
+  const result = `${finalName}${extension}`;
+
+  // Log sanitization for debugging
+  if (filename !== result) {
+    logger.debug(`[Import] Sanitized filename: "${filename}" -> "${result}"`);
+  }
+
+  return result;
+}
+
+/**
  * Restore attachments (supplier quote files) to storage
  */
 async function restoreAttachments(
@@ -1332,24 +1385,53 @@ async function restoreAttachments(
         c.charCodeAt(0)
       );
 
-      // Upload to storage
-      const filePath = `${teamId}/${attachment.entityId}/${attachment.fileName}`;
+      // Sanitize filename for storage (removes Hebrew/special characters)
+      const sanitizedFileName = sanitizeFilename(attachment.fileName);
+
+      // Get proper MIME type from file extension
+      const mimeType = getMimeTypeFromFilename(attachment.fileName);
+
+      // Upload to storage with sanitized filename
+      const filePath = `${teamId}/${attachment.entityId}/${sanitizedFileName}`;
+
+      logger.info(
+        `[Import] Uploading file: ${attachment.fileName} -> ${filePath} (MIME: ${mimeType})`
+      );
+
       const { error: uploadError } = await supabase.storage
         .from('supplier-quotes')
         .upload(filePath, fileData, {
-          contentType: attachment.fileType,
+          contentType: mimeType,
           upsert: true,
         });
 
       if (uploadError) {
+        logger.error(
+          `[Import] File upload failed: ${attachment.fileName}`,
+          uploadError
+        );
+
+        // Check if it's an RLS policy violation
+        const isRLSError =
+          uploadError.message?.includes('row-level security') ||
+          uploadError.message?.includes('policy');
+
         warnings.push({
           severity: 'warning',
           entityType: 'system',
-          message: `Failed to upload ${attachment.fileName}: ${uploadError.message}`,
-          code: 'ATTACHMENT_UPLOAD_FAILED',
+          message: isRLSError
+            ? `RLS policy blocked upload: ${attachment.fileName}. Check storage bucket permissions.`
+            : `Failed to upload ${attachment.fileName}: ${uploadError.message}`,
+          code: isRLSError
+            ? 'RLS_POLICY_VIOLATION'
+            : 'ATTACHMENT_UPLOAD_FAILED',
         });
         continue;
       }
+
+      logger.info(
+        `[Import] File uploaded successfully: ${attachment.fileName}`
+      );
 
       // Get public URL
       const { data: urlData } = supabase.storage
@@ -1357,16 +1439,36 @@ async function restoreAttachments(
         .getPublicUrl(filePath);
 
       // Create supplier_quotes record if entity type is component
+      // Store ORIGINAL filename for display, but use sanitized URL
+      // Use UPSERT to handle existing records (from previous import attempts)
       if (attachment.entityType === 'component') {
-        await supabase.from('supplier_quotes').insert({
-          id: attachment.id,
-          file_name: attachment.fileName,
-          file_url: urlData.publicUrl,
-          file_type: attachment.fileType,
-          file_size_kb: Math.round(attachment.fileSizeBytes / 1024),
-          status: 'completed',
-          team_id: teamId,
-        });
+        const { error: dbError } = await supabase
+          .from('supplier_quotes')
+          .upsert(
+            {
+              id: attachment.id,
+              file_name: attachment.fileName, // Original filename for display
+              file_url: urlData.publicUrl, // URL with sanitized filename
+              file_type: attachment.fileType,
+              file_size_kb: Math.round(attachment.fileSizeBytes / 1024),
+              status: 'completed',
+              team_id: teamId,
+            },
+            { onConflict: 'id' }
+          );
+
+        if (dbError) {
+          logger.error(
+            `[Import] Failed to create supplier_quotes record for ${attachment.fileName}`,
+            dbError
+          );
+          warnings.push({
+            severity: 'warning',
+            entityType: 'system',
+            message: `File uploaded but database record failed: ${attachment.fileName}`,
+            code: 'DB_RECORD_FAILED',
+          });
+        }
       }
     } catch (error) {
       warnings.push({
@@ -1393,7 +1495,7 @@ async function restoreSettings(
   const warnings: ValidationError[] = [];
 
   try {
-    // Update team settings
+    // Check if team_settings table exists by attempting the query
     const { error } = await supabase.from('team_settings').upsert({
       team_id: teamId,
       default_markup_percent: settings.defaultPricing.markupPercent,
@@ -1407,20 +1509,49 @@ async function restoreSettings(
     });
 
     if (error) {
-      warnings.push({
-        severity: 'warning',
-        entityType: 'setting',
-        message: `Failed to restore settings: ${error.message}`,
-        code: 'SETTINGS_RESTORE_FAILED',
-      });
+      // Check if it's a missing table error
+      const isTableMissing =
+        error.message?.includes('Could not find the table') ||
+        error.message?.includes('does not exist');
+
+      if (isTableMissing) {
+        logger.info(
+          '[Import] team_settings table not found - skipping settings restore'
+        );
+        warnings.push({
+          severity: 'info' as any,
+          entityType: 'setting',
+          message:
+            'Settings not restored: team_settings table does not exist in database',
+          code: 'SETTINGS_TABLE_MISSING',
+        });
+      } else {
+        warnings.push({
+          severity: 'warning',
+          entityType: 'setting',
+          message: `Failed to restore settings: ${error.message}`,
+          code: 'SETTINGS_RESTORE_FAILED',
+        });
+      }
     }
   } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : 'Settings restore failed';
+    const isTableMissing =
+      errorMessage.includes('Could not find the table') ||
+      errorMessage.includes('does not exist');
+
+    logger.warn('[Import] Settings restore error:', error);
+
     warnings.push({
-      severity: 'warning',
+      severity: isTableMissing ? ('info' as any) : 'warning',
       entityType: 'setting',
-      message:
-        error instanceof Error ? error.message : 'Settings restore failed',
-      code: 'SETTINGS_RESTORE_ERROR',
+      message: isTableMissing
+        ? 'Settings not restored: team_settings table does not exist'
+        : errorMessage,
+      code: isTableMissing
+        ? 'SETTINGS_TABLE_MISSING'
+        : 'SETTINGS_RESTORE_ERROR',
     });
   }
 

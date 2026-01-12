@@ -307,7 +307,7 @@ export function ImportWizard({
 
       // Show completion step
       setStep('complete');
-      onImportComplete?.();
+      // DON'T call onImportComplete here - let user see results first
     } catch (error) {
       console.error('Import failed:', error);
       toast.error(error instanceof Error ? error.message : 'הייבוא נכשל');
@@ -820,7 +820,14 @@ export function ImportWizard({
               </Button>
             )}
             {step === 'complete' && (
-              <Button onClick={handleClose} className="w-full">
+              <Button
+                onClick={() => {
+                  // Call completion callback AFTER user closes dialog
+                  onImportComplete?.();
+                  handleClose();
+                }}
+                className="w-full"
+              >
                 סגור
               </Button>
             )}

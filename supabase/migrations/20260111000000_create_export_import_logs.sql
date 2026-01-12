@@ -3,11 +3,14 @@
 -- Created: 2026-01-11
 -- Feature: Import/Export System
 
+-- Enable UUID extension if not already enabled
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
 -- ============================================================================
 -- STEP 1: Create export_import_logs table
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS export_import_logs (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   team_id UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
   user_id UUID NOT NULL,
   operation_type TEXT NOT NULL CHECK (operation_type IN ('export', 'import')),
@@ -101,15 +104,15 @@ WITH CHECK (
   )
 );
 
--- Policy 4: System admins can delete old logs (cleanup)
-CREATE POLICY "System admins can delete export/import logs"
+-- Policy 4: Team admins can delete logs (cleanup)
+CREATE POLICY "Team admins can delete export/import logs"
 ON export_import_logs
 FOR DELETE
 USING (
-  EXISTS (
-    SELECT 1 FROM team_members
+  team_id IN (
+    SELECT team_id FROM team_members
     WHERE user_id = auth.uid()
-    AND is_system_admin = true
+    AND role = 'admin'
   )
 );
 

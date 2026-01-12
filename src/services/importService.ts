@@ -552,11 +552,12 @@ export async function applyImport(
       // Build resolution map for quick lookup
       const resolutionMap = new Map(resolutions.map(r => [r.entityId, r]));
 
-      // Calculate total records
+      // Calculate total records (including attachments for accurate progress)
       const totalRecords =
         (exportPackage.data.components?.length || 0) +
         (exportPackage.data.assemblies?.length || 0) +
-        (exportPackage.data.quotations?.length || 0);
+        (exportPackage.data.quotations?.length || 0) +
+        (exportPackage.attachments?.length || 0);
 
       let recordsProcessed = 0;
 

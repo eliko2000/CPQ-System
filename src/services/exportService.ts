@@ -334,16 +334,22 @@ async function extractQuotations(
 async function extractSettings(teamId: string): Promise<SystemSettings> {
   try {
     // Get team-scoped settings
-    const { data: __settings } = await supabase
+    const { data: settings } = await supabase
       .from('user_settings')
       .select('setting_key, setting_value')
       .eq('team_id', teamId);
 
     // Parse settings into structured format
+    const settingsMap = new Map(
+      settings?.map(s => [s.setting_key, s.setting_value]) || []
+    );
+
+    // Get exchange rates from settings or use defaults
+    const exchangeRatesData = settingsMap.get('exchangeRates') as any;
     const exchangeRates = {
-      usdToIls: 3.7,
-      eurToIls: 4.0,
-      updatedAt: new Date().toISOString(),
+      usdToIls: exchangeRatesData?.usdToIls || 3.7,
+      eurToIls: exchangeRatesData?.eurToIls || 4.0,
+      updatedAt: exchangeRatesData?.updatedAt || new Date().toISOString(),
     };
 
     const defaultPricing = {
@@ -355,20 +361,46 @@ async function extractSettings(teamId: string): Promise<SystemSettings> {
       dayWorkCost: 1000,
     };
 
-    // Extract categories from components
-    const { data: categoriesData } = await supabase
-      .from('components')
-      .select('category')
-      .eq('team_id', teamId);
+    // Get categories from user_settings (saved custom categories)
+    const categoriesData = settingsMap.get('componentCategories') as any;
+    let categories: string[] = [];
 
-    const categories = [
-      ...new Set(categoriesData?.map(c => c.category).filter(Boolean) || []),
-    ];
+    if (
+      categoriesData?.categories &&
+      Array.isArray(categoriesData.categories)
+    ) {
+      categories = categoriesData.categories;
+      logger.info(
+        `[Export] Found ${categories.length} categories in user_settings`
+      );
+    } else {
+      // Fallback: Extract unique categories from components
+      logger.info('[Export] No saved categories, extracting from components');
+      const { data: componentCategories } = await supabase
+        .from('components')
+        .select('category')
+        .eq('team_id', teamId);
+
+      categories = [
+        ...new Set(
+          componentCategories?.map(c => c.category).filter(Boolean) || []
+        ),
+      ];
+    }
+
+    // Get numbering config from settings
+    const numberingConfig = settingsMap.get('numbering_config') as any;
 
     return {
       exchangeRates,
       defaultPricing,
       categories,
+      numberingTemplates: numberingConfig
+        ? {
+            projectNumberFormat: numberingConfig.projectPrefix,
+            quotationNumberFormat: numberingConfig.quotationPrefix,
+          }
+        : undefined,
       preferences: {
         defaultCurrency: 'NIS',
       },

@@ -310,13 +310,62 @@ export function useSupplierQuotes() {
       try {
         setError(null);
 
-        const { error } = await supabase
+        // First, get the quote to extract file path
+        const { data: quote, error: fetchError } = await supabase
+          .from('supplier_quotes')
+          .select('file_url')
+          .eq('id', id)
+          .eq('team_id', currentTeam.id)
+          .single();
+
+        if (fetchError) throw fetchError;
+
+        // Delete from database (with team_id check for security)
+        const { error: deleteError } = await supabase
           .from('supplier_quotes')
           .delete()
           .eq('id', id)
           .eq('team_id', currentTeam.id);
 
-        if (error) throw error;
+        if (deleteError) throw deleteError;
+
+        // Delete file from storage if it exists and belongs to this team
+        if (quote?.file_url) {
+          try {
+            // Extract file path from URL
+            // URL format: https://[project].supabase.co/storage/v1/object/public/supplier-quotes/[path]
+            const urlMatch = quote.file_url.match(
+              /\/storage\/v1\/object\/[^/]+\/[^/]+\/(.+)$/
+            );
+
+            if (urlMatch) {
+              const filePath = urlMatch[1];
+
+              // SECURITY: Only delete if path starts with current team's ID
+              if (filePath.startsWith(`${currentTeam.id}/`)) {
+                logger.debug(`Deleting file from storage: ${filePath}`);
+                const { error: storageError } = await supabase.storage
+                  .from('supplier-quotes')
+                  .remove([filePath]);
+
+                if (storageError) {
+                  logger.warn(
+                    'Failed to delete file from storage:',
+                    storageError
+                  );
+                  // Don't fail the whole operation if storage deletion fails
+                }
+              } else {
+                logger.warn(
+                  `Skipping file deletion - path does not belong to current team: ${filePath}`
+                );
+              }
+            }
+          } catch (storageErr) {
+            logger.warn('Error deleting file from storage:', storageErr);
+            // Continue - database record is already deleted
+          }
+        }
 
         // Update local state
         setQuotes(prev => prev.filter(q => q.id !== id));

@@ -58,13 +58,17 @@ export const ComponentAIImport: React.FC<ComponentAIImportProps> = ({
    */
   const uploadFileToStorage = async (file: File): Promise<string> => {
     try {
-      // Generate unique file path
+      if (!currentTeam) {
+        throw new Error('No active team');
+      }
+
+      // Generate unique file path with team isolation
       const timestamp = new Date();
       const year = timestamp.getFullYear();
       const month = String(timestamp.getMonth() + 1).padStart(2, '0');
       const uuid = crypto.randomUUID();
       const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-      const filePath = `${year}/${month}/${uuid}_${sanitizedName}`;
+      const filePath = `${currentTeam.id}/${year}/${month}/${uuid}_${sanitizedName}`;
 
       logger.debug('📤 Uploading file to Supabase Storage:', filePath);
 

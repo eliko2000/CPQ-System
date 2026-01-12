@@ -811,30 +811,32 @@ async function importComponents(
       }
     }
 
-    // Batch insert new components
+    // Batch upsert new components (INSERT or UPDATE if exists)
     if (toCreate.length > 0) {
       try {
-        const { error } = await supabase.from('components').insert(toCreate);
+        const { error } = await supabase
+          .from('components')
+          .upsert(toCreate, { onConflict: 'id' });
 
         if (error) {
-          logger.error('Failed to insert component batch:', error);
+          logger.error('Failed to upsert component batch:', error);
           result.errors.push({
             severity: 'error',
             entityType: 'component',
-            message: `Failed to insert batch: ${error.message}`,
-            code: 'BATCH_INSERT_FAILED',
+            message: `Failed to upsert batch: ${error.message}`,
+            code: 'BATCH_UPSERT_FAILED',
           });
         } else {
           result.created += toCreate.length;
         }
       } catch (error) {
-        logger.error('Component batch insert error:', error);
+        logger.error('Component batch upsert error:', error);
         result.errors.push({
           severity: 'error',
           entityType: 'component',
           message:
-            error instanceof Error ? error.message : 'Batch insert failed',
-          code: 'BATCH_INSERT_ERROR',
+            error instanceof Error ? error.message : 'Batch upsert failed',
+          code: 'BATCH_UPSERT_ERROR',
         });
       }
     }
@@ -953,10 +955,12 @@ async function importAssemblies(
       }
     }
 
-    // Batch insert new assemblies
+    // Batch upsert new assemblies (INSERT or UPDATE if exists)
     if (toCreate.length > 0) {
       try {
-        const { error } = await supabase.from('assemblies').insert(toCreate);
+        const { error } = await supabase
+          .from('assemblies')
+          .upsert(toCreate, { onConflict: 'id' });
 
         if (error) {
           result.errors.push({
@@ -1036,10 +1040,10 @@ async function importAssemblies(
         .in('assembly_id', assemblyIds)
         .eq('team_id', teamId);
 
-      // Insert new relationships
+      // Upsert relationships (INSERT or UPDATE if exists)
       const { error } = await supabase
         .from('assembly_components')
-        .insert(componentsToInsert);
+        .upsert(componentsToInsert, { onConflict: 'id' });
 
       if (error) {
         result.warnings.push({
@@ -1138,10 +1142,12 @@ async function importQuotations(
       }
     }
 
-    // Batch insert new quotations
+    // Batch upsert new quotations (INSERT or UPDATE if exists)
     if (toCreate.length > 0) {
       try {
-        const { error } = await supabase.from('quotations').insert(toCreate);
+        const { error } = await supabase
+          .from('quotations')
+          .upsert(toCreate, { onConflict: 'id' });
 
         if (error) {
           result.errors.push({
@@ -1227,7 +1233,7 @@ async function importQuotations(
 
       const { error } = await supabase
         .from('quotation_systems')
-        .insert(systemsToInsert);
+        .upsert(systemsToInsert, { onConflict: 'id' });
 
       if (error) {
         result.warnings.push({
@@ -1272,7 +1278,7 @@ async function importQuotations(
 
       const { error } = await supabase
         .from('quotation_items')
-        .insert(itemsToInsert);
+        .upsert(itemsToInsert, { onConflict: 'id' });
 
       if (error) {
         result.warnings.push({

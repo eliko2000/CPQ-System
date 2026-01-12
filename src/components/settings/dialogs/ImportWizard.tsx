@@ -49,7 +49,8 @@ type ImportStep =
   | 'validating'
   | 'preview'
   | 'conflicts'
-  | 'importing';
+  | 'importing'
+  | 'complete';
 
 export function ImportWizard({
   open,
@@ -72,6 +73,7 @@ export function ImportWizard({
   const [exportPackage, setExportPackage] = useState<ExportPackage>();
   const [validationResult, setValidationResult] =
     useState<ImportValidationResult>();
+  const [importResult, setImportResult] = useState<any>();
 
   // Conflict resolution
   const [resolutions, setResolutions] = useState<ConflictResolution[]>([]);
@@ -271,18 +273,40 @@ export function ImportWizard({
 
       const data = result.data!;
 
+      // Save result for display
+      setImportResult(data);
+
+      // Log errors to console
+      if (data.errors.length > 0) {
+        console.error('Import errors:', data.errors);
+        data.errors.forEach(error => {
+          console.error(`  - [${error.entityType}] ${error.message}`);
+        });
+      }
+      if (data.warnings.length > 0) {
+        console.warn('Import warnings:', data.warnings);
+        data.warnings.forEach(warning => {
+          console.warn(`  - [${warning.entityType}] ${warning.message}`);
+        });
+      }
+
       toast.success(
         `ייבוא הושלם בהצלחה! נוצרו ${data.recordsCreated.components + data.recordsCreated.assemblies + data.recordsCreated.quotations} רשומות`,
         {
           description: `עודכנו: ${data.recordsUpdated.components + data.recordsUpdated.assemblies + data.recordsUpdated.quotations}, דולגו: ${data.recordsSkipped.components + data.recordsSkipped.assemblies + data.recordsSkipped.quotations}`,
+          duration: 10000,
         }
       );
 
       if (data.errors.length > 0) {
-        toast.warning(`${data.errors.length} שגיאות במהלך הייבוא`);
+        toast.warning(`${data.errors.length} שגיאות במהלך הייבוא`, {
+          description: 'בדוק את הקונסול לפרטים',
+          duration: 10000,
+        });
       }
 
-      handleClose();
+      // Show completion step
+      setStep('complete');
       onImportComplete?.();
     } catch (error) {
       console.error('Import failed:', error);
@@ -309,6 +333,7 @@ export function ImportWizard({
             {step === 'preview' && 'תצוגה מקדימה ואימות'}
             {step === 'conflicts' && 'פתרון קונפליקטים'}
             {step === 'importing' && 'מייבא נתונים...'}
+            {step === 'complete' && 'ייבוא הושלם'}
           </DialogDescription>
         </DialogHeader>
 
@@ -697,56 +722,160 @@ export function ImportWizard({
           </div>
         )}
 
+        {/* Step 7: Complete */}
+        {step === 'complete' && importResult && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-center gap-3 py-4">
+              <CheckCircle2 className="h-12 w-12 text-green-600" />
+              <div className="text-lg font-medium">ייבוא הושלם בהצלחה!</div>
+            </div>
+
+            {/* Summary */}
+            <div className="border rounded-lg p-4 space-y-3">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">נוצרו:</span>
+                <span className="font-medium text-green-600">
+                  {importResult.recordsCreated.components +
+                    importResult.recordsCreated.assemblies +
+                    importResult.recordsCreated.quotations}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">עודכנו:</span>
+                <span className="font-medium text-blue-600">
+                  {importResult.recordsUpdated.components +
+                    importResult.recordsUpdated.assemblies +
+                    importResult.recordsUpdated.quotations}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">דולגו:</span>
+                <span className="font-medium text-gray-600">
+                  {importResult.recordsSkipped.components +
+                    importResult.recordsSkipped.assemblies +
+                    importResult.recordsSkipped.quotations}
+                </span>
+              </div>
+            </div>
+
+            {/* Errors */}
+            {importResult.errors && importResult.errors.length > 0 && (
+              <div className="border border-red-200 rounded-lg p-4 space-y-2">
+                <div className="font-medium text-red-600 flex items-center gap-2">
+                  <XCircle className="h-4 w-4" />
+                  שגיאות ({importResult.errors.length}):
+                </div>
+                <div className="space-y-1 max-h-60 overflow-y-auto">
+                  {importResult.errors.map((error: any, idx: number) => (
+                    <div
+                      key={idx}
+                      className="text-xs text-red-600 bg-red-50 p-2 rounded"
+                    >
+                      <div className="font-medium">{error.entityType}</div>
+                      <div>{error.message}</div>
+                      {error.entityName && (
+                        <div className="text-muted-foreground">
+                          {error.entityName}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Warnings */}
+            {importResult.warnings && importResult.warnings.length > 0 && (
+              <div className="border border-yellow-200 rounded-lg p-4 space-y-2">
+                <div className="font-medium text-yellow-600 flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4" />
+                  אזהרות ({importResult.warnings.length}):
+                </div>
+                <div className="space-y-1 max-h-40 overflow-y-auto">
+                  {importResult.warnings.map((warning: any, idx: number) => (
+                    <div
+                      key={idx}
+                      className="text-xs text-yellow-600 bg-yellow-50 p-2 rounded"
+                    >
+                      <div className="font-medium">{warning.entityType}</div>
+                      <div>{warning.message}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Footer Buttons */}
         {step !== 'validating' && step !== 'importing' && (
           <div className="flex justify-between pt-4">
-            <Button variant="outline" onClick={handleClose} disabled={loading}>
-              ביטול
-            </Button>
-            <div className="flex gap-2">
-              {step === 'upload' && selectedFile && (
-                <Button onClick={handleParseFile} disabled={loading}>
-                  <Upload className="ml-2 h-4 w-4" />
-                  המשך
-                </Button>
-              )}
-              {step === 'password' && (
-                <Button onClick={handleDecrypt} disabled={!password || loading}>
-                  פענח
-                </Button>
-              )}
-              {step === 'preview' && validationResult && (
-                <>
-                  {conflictCount > 0 && (
-                    <Button onClick={handleResolveConflicts} disabled={loading}>
-                      פתור קונפליקטים ({conflictCount})
-                    </Button>
-                  )}
-                  {conflictCount === 0 && (
+            {step !== 'complete' && (
+              <Button
+                variant="outline"
+                onClick={handleClose}
+                disabled={loading}
+              >
+                ביטול
+              </Button>
+            )}
+            {step === 'complete' && (
+              <Button onClick={handleClose} className="w-full">
+                סגור
+              </Button>
+            )}
+            {step !== 'complete' && (
+              <div className="flex gap-2">
+                {step === 'upload' && selectedFile && (
+                  <Button onClick={handleParseFile} disabled={loading}>
+                    <Upload className="ml-2 h-4 w-4" />
+                    המשך
+                  </Button>
+                )}
+                {step === 'password' && (
+                  <Button
+                    onClick={handleDecrypt}
+                    disabled={!password || loading}
+                  >
+                    פענח
+                  </Button>
+                )}
+                {step === 'preview' && validationResult && (
+                  <>
+                    {conflictCount > 0 && (
+                      <Button
+                        onClick={handleResolveConflicts}
+                        disabled={loading}
+                      >
+                        פתור קונפליקטים ({conflictCount})
+                      </Button>
+                    )}
+                    {conflictCount === 0 && (
+                      <Button
+                        onClick={handleImport}
+                        disabled={!validationResult.valid || loading}
+                      >
+                        ייבא עכשיו
+                      </Button>
+                    )}
+                  </>
+                )}
+                {step === 'conflicts' && (
+                  <>
                     <Button
-                      onClick={handleImport}
-                      disabled={!validationResult.valid || loading}
+                      variant="outline"
+                      onClick={() => setStep('preview')}
+                      disabled={loading}
                     >
+                      חזור
+                    </Button>
+                    <Button onClick={handleImport} disabled={loading}>
                       ייבא עכשיו
                     </Button>
-                  )}
-                </>
-              )}
-              {step === 'conflicts' && (
-                <>
-                  <Button
-                    variant="outline"
-                    onClick={() => setStep('preview')}
-                    disabled={loading}
-                  >
-                    חזור
-                  </Button>
-                  <Button onClick={handleImport} disabled={loading}>
-                    ייבא עכשיו
-                  </Button>
-                </>
-              )}
-            </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         )}
       </DialogContent>

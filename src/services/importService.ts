@@ -1484,7 +1484,7 @@ async function restoreAttachments(
 }
 
 /**
- * Restore system settings
+ * Restore system settings to user_settings table
  */
 async function restoreSettings(
   settings: SystemSettings,
@@ -1495,63 +1495,122 @@ async function restoreSettings(
   const warnings: ValidationError[] = [];
 
   try {
-    // Check if team_settings table exists by attempting the query
-    const { error } = await supabase.from('team_settings').upsert({
-      team_id: teamId,
-      default_markup_percent: settings.defaultPricing.markupPercent,
-      default_profit_percent: settings.defaultPricing.profitPercent,
-      default_risk_percent: settings.defaultPricing.riskPercent,
-      default_vat_rate: settings.defaultPricing.vatRate,
-      default_include_vat: settings.defaultPricing.includeVAT,
-      default_day_work_cost: settings.defaultPricing.dayWorkCost,
-      usd_to_ils_rate: settings.exchangeRates.usdToIls,
-      eur_to_ils_rate: settings.exchangeRates.eurToIls,
-    });
+    // Get current user
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      warnings.push({
+        severity: 'warning',
+        entityType: 'setting',
+        message: 'Settings not restored: no authenticated user',
+        code: 'NO_USER',
+      });
+      return { warnings };
+    }
 
-    if (error) {
-      // Check if it's a missing table error
-      const isTableMissing =
-        error.message?.includes('Could not find the table') ||
-        error.message?.includes('does not exist');
-
-      if (isTableMissing) {
-        logger.info(
-          '[Import] team_settings table not found - skipping settings restore'
+    // Restore component categories
+    if (settings.categories && settings.categories.length > 0) {
+      const { error: categoriesError } = await supabase
+        .from('user_settings')
+        .upsert(
+          {
+            setting_key: 'componentCategories',
+            setting_value: { categories: settings.categories },
+            team_id: teamId,
+            user_id: user.id,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'team_id,setting_key' }
         );
-        warnings.push({
-          severity: 'info' as any,
-          entityType: 'setting',
-          message:
-            'Settings not restored: team_settings table does not exist in database',
-          code: 'SETTINGS_TABLE_MISSING',
-        });
-      } else {
+
+      if (categoriesError) {
+        logger.error('[Import] Failed to restore categories:', categoriesError);
         warnings.push({
           severity: 'warning',
           entityType: 'setting',
-          message: `Failed to restore settings: ${error.message}`,
-          code: 'SETTINGS_RESTORE_FAILED',
+          message: `Failed to restore categories: ${categoriesError.message}`,
+          code: 'CATEGORIES_RESTORE_FAILED',
         });
+      } else {
+        logger.info(
+          `[Import] Restored ${settings.categories.length} categories`
+        );
       }
     }
+
+    // Restore exchange rates
+    if (settings.exchangeRates) {
+      const { error: ratesError } = await supabase.from('user_settings').upsert(
+        {
+          setting_key: 'exchangeRates',
+          setting_value: {
+            usdToIls: settings.exchangeRates.usdToIls,
+            eurToIls: settings.exchangeRates.eurToIls,
+            updatedAt: settings.exchangeRates.updatedAt,
+          },
+          team_id: teamId,
+          user_id: user.id,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'team_id,setting_key' }
+      );
+
+      if (ratesError) {
+        logger.error('[Import] Failed to restore exchange rates:', ratesError);
+        warnings.push({
+          severity: 'warning',
+          entityType: 'setting',
+          message: `Failed to restore exchange rates: ${ratesError.message}`,
+          code: 'EXCHANGE_RATES_RESTORE_FAILED',
+        });
+      } else {
+        logger.info('[Import] Restored exchange rates');
+      }
+    }
+
+    // Restore numbering templates
+    if (settings.numberingTemplates) {
+      const { error: numberingError } = await supabase
+        .from('user_settings')
+        .upsert(
+          {
+            setting_key: 'numbering_config',
+            setting_value: settings.numberingTemplates,
+            team_id: teamId,
+            user_id: user.id,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'team_id,setting_key' }
+        );
+
+      if (numberingError) {
+        logger.error(
+          '[Import] Failed to restore numbering templates:',
+          numberingError
+        );
+        warnings.push({
+          severity: 'warning',
+          entityType: 'setting',
+          message: `Failed to restore numbering templates: ${numberingError.message}`,
+          code: 'NUMBERING_RESTORE_FAILED',
+        });
+      } else {
+        logger.info('[Import] Restored numbering templates');
+      }
+    }
+
+    logger.info('[Import] Settings restore complete');
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : 'Settings restore failed';
-    const isTableMissing =
-      errorMessage.includes('Could not find the table') ||
-      errorMessage.includes('does not exist');
-
-    logger.warn('[Import] Settings restore error:', error);
+    logger.error('[Import] Settings restore error:', error);
 
     warnings.push({
-      severity: isTableMissing ? ('info' as any) : 'warning',
+      severity: 'warning',
       entityType: 'setting',
-      message: isTableMissing
-        ? 'Settings not restored: team_settings table does not exist'
-        : errorMessage,
-      code: isTableMissing
-        ? 'SETTINGS_TABLE_MISSING'
-        : 'SETTINGS_RESTORE_ERROR',
+      message: errorMessage,
+      code: 'SETTINGS_RESTORE_ERROR',
     });
   }
 

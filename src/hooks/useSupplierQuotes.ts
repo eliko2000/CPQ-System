@@ -311,14 +311,25 @@ export function useSupplierQuotes() {
         setError(null);
 
         // First, get the quote to extract file path
+        // Use maybeSingle() to avoid error if record doesn't exist
         const { data: quote, error: fetchError } = await supabase
           .from('supplier_quotes')
           .select('file_url')
           .eq('id', id)
           .eq('team_id', currentTeam.id)
-          .single();
+          .maybeSingle();
 
         if (fetchError) throw fetchError;
+
+        // If quote doesn't exist or doesn't belong to this team, log and return success
+        if (!quote) {
+          logger.info(
+            `Quote ${id} not found or doesn't belong to team ${currentTeam.id}`
+          );
+          // Update local state anyway (optimistic removal)
+          setQuotes(prev => prev.filter(q => q.id !== id));
+          return true;
+        }
 
         // Delete from database (with team_id check for security)
         const { error: deleteError } = await supabase

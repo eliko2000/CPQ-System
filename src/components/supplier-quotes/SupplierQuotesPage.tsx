@@ -238,11 +238,11 @@ export function SupplierQuotesPage() {
               {filteredQuotes.map(quote => (
                 <div
                   key={quote.id}
-                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors"
+                  className="flex items-center gap-4 p-4 border rounded-lg hover:bg-accent/50 transition-colors"
                 >
                   {/* Left side - File info */}
-                  <div className="flex items-center gap-4 flex-1">
-                    <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-accent">
+                  <div className="flex items-center gap-4 flex-1 min-w-0">
+                    <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-accent flex-shrink-0">
                       {getFileTypeIcon(quote.fileType)}
                     </div>
 
@@ -306,7 +306,7 @@ export function SupplierQuotesPage() {
                   </div>
 
                   {/* Right side - Actions */}
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-shrink-0">
                     <Button
                       variant="ghost"
                       size="sm"

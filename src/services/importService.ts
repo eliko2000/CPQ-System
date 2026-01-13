@@ -820,11 +820,25 @@ async function importComponents(
           },
         });
       } else {
-        // No conflict - create with original ID (disaster recovery)
-        toCreate.push({
-          ...component,
-          team_id: teamId,
-        });
+        // No conflict in target team
+        // CRITICAL: Check if this is cross-team import
+        if (component.team_id && component.team_id !== teamId) {
+          // Cross-team import - MUST generate new ID to avoid overwriting source team
+          logger.debug(
+            `Cross-team import detected for component ${component.id}, generating new ID`
+          );
+          toCreate.push({
+            ...component,
+            id: crypto.randomUUID(),
+            team_id: teamId,
+          });
+        } else {
+          // Same team disaster recovery - preserve original ID
+          toCreate.push({
+            ...component,
+            team_id: teamId,
+          });
+        }
       }
     }
 
@@ -965,10 +979,27 @@ async function importAssemblies(
           },
         });
       } else {
-        toCreate.push({
-          ...assembly,
-          team_id: teamId,
-        });
+        // No conflict in target team
+        // CRITICAL: Check if this is cross-team import
+        if (assembly.team_id && assembly.team_id !== teamId) {
+          // Cross-team import - MUST generate new ID
+          const newId = crypto.randomUUID();
+          idMapping.set(assembly.id, newId);
+          logger.debug(
+            `Cross-team import detected for assembly ${assembly.id}, generating new ID ${newId}`
+          );
+          toCreate.push({
+            ...assembly,
+            id: newId,
+            team_id: teamId,
+          });
+        } else {
+          // Same team disaster recovery - preserve original ID
+          toCreate.push({
+            ...assembly,
+            team_id: teamId,
+          });
+        }
       }
     }
 
@@ -1152,10 +1183,27 @@ async function importQuotations(
           },
         });
       } else {
-        toCreate.push({
-          ...quotation,
-          team_id: teamId,
-        });
+        // No conflict in target team
+        // CRITICAL: Check if this is cross-team import
+        if (quotation.team_id && quotation.team_id !== teamId) {
+          // Cross-team import - MUST generate new ID
+          const newId = crypto.randomUUID();
+          idMapping.set(quotation.id, newId);
+          logger.debug(
+            `Cross-team import detected for quotation ${quotation.id}, generating new ID ${newId}`
+          );
+          toCreate.push({
+            ...quotation,
+            id: newId,
+            team_id: teamId,
+          });
+        } else {
+          // Same team disaster recovery - preserve original ID
+          toCreate.push({
+            ...quotation,
+            team_id: teamId,
+          });
+        }
       }
     }
 
@@ -1471,13 +1519,13 @@ async function restoreAttachments(
 
       // Create supplier_quotes record if entity type is component
       // Store ORIGINAL filename for display, but use sanitized URL
-      // Use UPSERT to handle existing records (from previous import attempts)
+      // CRITICAL: Always use new ID for cross-team imports to avoid overwriting source
       if (attachment.entityType === 'component') {
         const { error: dbError } = await supabase
           .from('supplier_quotes')
           .upsert(
             {
-              id: attachment.id,
+              id: crypto.randomUUID(), // Always generate new ID for imported files
               file_name: attachment.fileName, // Original filename for display
               file_url: urlData.publicUrl, // URL with sanitized filename
               file_type: attachment.fileType,

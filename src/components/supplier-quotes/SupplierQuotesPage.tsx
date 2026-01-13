@@ -246,25 +246,25 @@ export function SupplierQuotesPage() {
                       {getFileTypeIcon(quote.fileType)}
                     </div>
 
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-medium truncate">
+                    <div className="flex-1 min-w-0 max-w-full">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <h3 className="font-medium truncate max-w-full">
                           {quote.fileName}
                         </h3>
                         {getStatusBadge(quote.status)}
                       </div>
 
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
                         {quote.supplierName && (
-                          <div className="flex items-center gap-1">
-                            <Building2 className="h-3 w-3" />
+                          <div className="flex items-center gap-1 whitespace-nowrap">
+                            <Building2 className="h-3 w-3 flex-shrink-0" />
                             <span>{quote.supplierName}</span>
                           </div>
                         )}
 
                         {quote.quoteDate && (
-                          <div className="flex items-center gap-1">
-                            <Calendar className="h-3 w-3" />
+                          <div className="flex items-center gap-1 whitespace-nowrap">
+                            <Calendar className="h-3 w-3 flex-shrink-0" />
                             <span>
                               {new Date(quote.quoteDate).toLocaleDateString(
                                 'he-IL'
@@ -273,13 +273,13 @@ export function SupplierQuotesPage() {
                           </div>
                         )}
 
-                        <div className="flex items-center gap-1">
-                          <Package className="h-3 w-3" />
+                        <div className="flex items-center gap-1 whitespace-nowrap">
+                          <Package className="h-3 w-3 flex-shrink-0" />
                           <span>{quote.totalComponents} רכיבים</span>
                         </div>
 
                         {quote.confidenceScore && (
-                          <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-1 whitespace-nowrap">
                             <span
                               className={`font-medium ${
                                 quote.confidenceScore >= 0.8

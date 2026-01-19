@@ -15,7 +15,7 @@ import { logger } from '@/lib/logger';
 
 export function GeneralSettings() {
   const { currentTeam } = useTeam();
-  // State for API key management
+  // State for Anthropic API key management
   const [apiKey, setApiKey] = useState<string>('');
   const [showApiKey, setShowApiKey] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -28,9 +28,23 @@ export function GeneralSettings() {
     type: 'success' | 'error';
   } | null>(null);
 
-  // Load API key on mount
+  // State for Tavily API key management
+  const [tavilyApiKey, setTavilyApiKey] = useState<string>('');
+  const [showTavilyApiKey, setShowTavilyApiKey] = useState(false);
+  const [isSavingTavily, setIsSavingTavily] = useState(false);
+  const [isTestingTavily, setIsTestingTavily] = useState(false);
+  const [tavilyTestStatus, setTavilyTestStatus] = useState<
+    'idle' | 'success' | 'error'
+  >('idle');
+  const [tavilySaveStatus, setTavilySaveStatus] = useState<{
+    message: string;
+    type: 'success' | 'error';
+  } | null>(null);
+
+  // Load API keys on mount
   useEffect(() => {
     loadApiKey();
+    loadTavilyApiKey();
   }, [currentTeam?.id]);
 
   const loadApiKey = async () => {
@@ -44,6 +58,20 @@ export function GeneralSettings() {
       }
     } catch (error) {
       logger.error('Error loading API key:', error);
+    }
+  };
+
+  const loadTavilyApiKey = async () => {
+    try {
+      const result = await loadSetting<{ apiKey: string }>(
+        'tavilyApiKey',
+        currentTeam?.id
+      );
+      if (result.success && result.data?.apiKey) {
+        setTavilyApiKey(result.data.apiKey);
+      }
+    } catch (error) {
+      logger.error('Error loading Tavily API key:', error);
     }
   };
 
@@ -146,6 +174,128 @@ export function GeneralSettings() {
       }
     } finally {
       setIsTesting(false);
+    }
+  };
+
+  const handleSaveTavilyApiKey = async () => {
+    setTavilySaveStatus(null);
+
+    if (!tavilyApiKey.trim()) {
+      setTavilySaveStatus({ message: 'נא להזין מפתח API', type: 'error' });
+      return;
+    }
+
+    // Validate format - Tavily keys start with "tvly-"
+    if (!tavilyApiKey.startsWith('tvly-')) {
+      setTavilySaveStatus({
+        message: 'מפתח API לא תקין. צריך להתחיל ב-tvly-',
+        type: 'error',
+      });
+      return;
+    }
+
+    setIsSavingTavily(true);
+
+    try {
+      const result = await saveSetting(
+        'tavilyApiKey',
+        {
+          apiKey: tavilyApiKey.trim(),
+        },
+        currentTeam?.id
+      );
+
+      if (result.success) {
+        setTavilySaveStatus({
+          message: 'מפתח API נשמר בהצלחה',
+          type: 'success',
+        });
+        // Dispatch event to notify services (include team ID for team-scoped settings)
+        window.dispatchEvent(
+          new CustomEvent('cpq-tavily-api-key-updated', {
+            detail: { teamId: currentTeam?.id },
+          })
+        );
+
+        // Clear success message after 3 seconds
+        setTimeout(() => {
+          setTavilySaveStatus(null);
+        }, 3000);
+      } else {
+        setTavilySaveStatus({
+          message: 'שגיאה בשמירת מפתח API: ' + result.error,
+          type: 'error',
+        });
+      }
+    } catch (error) {
+      logger.error('Error saving Tavily API key:', error);
+      setTavilySaveStatus({ message: 'שגיאה בשמירת מפתח API', type: 'error' });
+    } finally {
+      setIsSavingTavily(false);
+    }
+  };
+
+  const handleTestTavilyConnection = async () => {
+    if (!tavilyApiKey.trim()) {
+      setTavilySaveStatus({
+        message: 'נא להזין מפתח API תחילה',
+        type: 'error',
+      });
+      return;
+    }
+
+    setIsTestingTavily(true);
+    setTavilyTestStatus('idle');
+    setTavilySaveStatus(null);
+
+    try {
+      // Test Tavily API with a simple search
+      const response = await fetch('https://api.tavily.com/search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          api_key: tavilyApiKey.trim(),
+          query: 'test connection',
+          max_results: 1,
+        }),
+      });
+
+      if (response.ok) {
+        setTavilyTestStatus('success');
+        setTavilySaveStatus({
+          message: 'התחברות ל-Tavily הצליחה!',
+          type: 'success',
+        });
+
+        // Clear success message after 3 seconds
+        setTimeout(() => {
+          setTavilySaveStatus(null);
+        }, 3000);
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.message || `HTTP ${response.status}`);
+      }
+    } catch (error: any) {
+      setTavilyTestStatus('error');
+      logger.error('Tavily API test failed:', error);
+
+      if (
+        error.message?.includes('401') ||
+        error.message?.includes('Unauthorized')
+      ) {
+        setTavilySaveStatus({ message: 'מפתח API לא תקין', type: 'error' });
+      } else if (error.message?.includes('429')) {
+        setTavilySaveStatus({ message: 'חרגת ממכסת השימוש', type: 'error' });
+      } else {
+        setTavilySaveStatus({
+          message: 'שגיאה בחיבור: ' + error.message,
+          type: 'error',
+        });
+      }
+    } finally {
+      setIsTestingTavily(false);
     }
   };
 
@@ -301,6 +451,107 @@ export function GeneralSettings() {
               ) : (
                 <p className="text-xs text-muted-foreground">
                   המפתח נשמר באופן מאובטח ומאפשר עיבוד מסמכים באמצעות AI Vision
+                </p>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>חיפוש מידע על רכיבים (Tavily)</CardTitle>
+          <CardDescription>
+            חיפוש אוטומטי של מידע על רכיבים לא מזוהים - עוזר לזהות סוג הרכיב לפי
+            מספר קטלוגי
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              מפתח API של Tavily
+            </label>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Input
+                  type={showTavilyApiKey ? 'text' : 'password'}
+                  value={tavilyApiKey}
+                  onChange={e => setTavilyApiKey(e.target.value)}
+                  placeholder="tvly-..."
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowTavilyApiKey(!showTavilyApiKey)}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showTavilyApiKey ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
+              <Button
+                onClick={handleTestTavilyConnection}
+                variant="outline"
+                disabled={isTestingTavily || !tavilyApiKey.trim()}
+              >
+                {isTestingTavily ? (
+                  <>
+                    <Loader2 className="h-4 w-4 ml-2 animate-spin" />
+                    בודק...
+                  </>
+                ) : (
+                  <>
+                    {tavilyTestStatus === 'success' && (
+                      <Check className="h-4 w-4 ml-2 text-green-600" />
+                    )}
+                    {tavilyTestStatus === 'error' && (
+                      <X className="h-4 w-4 ml-2 text-red-600" />
+                    )}
+                    {tavilyTestStatus === 'idle' && (
+                      <AlertCircle className="h-4 w-4 ml-2" />
+                    )}
+                    בדוק חיבור
+                  </>
+                )}
+              </Button>
+              <Button
+                onClick={handleSaveTavilyApiKey}
+                disabled={isSavingTavily || !tavilyApiKey.trim()}
+              >
+                {isSavingTavily ? (
+                  <>
+                    <Loader2 className="h-4 w-4 ml-2 animate-spin" />
+                    שומר...
+                  </>
+                ) : (
+                  'שמור'
+                )}
+              </Button>
+            </div>
+            {/* Status Message Area */}
+            <div className="min-h-[24px] mt-2">
+              {tavilySaveStatus ? (
+                <div
+                  className={`flex items-center gap-2 text-sm ${
+                    tavilySaveStatus.type === 'success'
+                      ? 'text-green-600'
+                      : 'text-red-600'
+                  }`}
+                >
+                  {tavilySaveStatus.type === 'success' ? (
+                    <Check className="h-4 w-4" />
+                  ) : (
+                    <AlertCircle className="h-4 w-4" />
+                  )}
+                  <span>{tavilySaveStatus.message}</span>
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  הרשמה חינמית ב-tavily.com (1,000 חיפושים/חודש). עוזר לזהות
+                  רכיבים לפי מספר קטלוגי.
                 </p>
               )}
             </div>

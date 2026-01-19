@@ -5,6 +5,11 @@ import { getComponentCategories } from '../constants/settings';
 import { logger } from '@/lib/logger';
 import { config } from '@/lib/config';
 import { loadSetting } from '@/services/settingsService';
+import {
+  isTavilyAvailable,
+  identifyComponent,
+  type ComponentSearchResult,
+} from '@/services/tavilySearch';
 
 // Initialize Anthropic client with dynamic API key loading
 let anthropic: Anthropic | null = null;
@@ -338,129 +343,276 @@ The user has specified which price columns to extract:`;
 `;
   }
 
-  return `You are an expert at extracting structured component data from supplier quotations, price lists, and technical documents.${columnInstructions}
+  return `You are a data extraction specialist for supplier quotations and price lists.${columnInstructions}
 
-Analyze this document and extract ALL component/product information. The document may be in English, Hebrew (עברית), or mixed languages.
+<extraction_workflow>
+  <step_1>COLUMN MAPPING - Identify all column headers and map them to fields</step_1>
+  <step_2>SUPPLIER/MANUFACTURER - Determine who is the supplier vs manufacturer</step_2>
+  <step_3>EXTRACT - Extract data row by row using the mapping</step_3>
+  <step_4>VALIDATE - Check manufacturerPN vs name separation, Hebrew name quality</step_4>
+</extraction_workflow>
 
-Extract the following information for each component:
-1. **name** - **CRITICAL**: Create a concise, descriptive Hebrew name (2-5 words max)
-   - If source is English: Translate key product type to Hebrew + keep model number
-   - Examples:
-     * "Dobot CRA20 Collaborative Robot" → "רובוט CRA20"
-     * "Heavy Duty Belt Conveyor 500mm" → "מסוע רצועה"
-     * "Siemens PLC S7-1200" → "בקר PLC S7-1200"
-     * "SMC Pneumatic Cylinder CDQ2B32-50DCZ" → "צילינדר פנאומטי CDQ2B32"
-   - Keep manufacturer in the manufacturer field, NOT in name
-   - Focus on WHAT it is, not ALL the specs
-2. **description** - A brief, informative description of the component (1-3 sentences)
-   - Extract from any description, product details, or specifications column in the document
-   - Include key features, capabilities, or technical specifications
-   - More detailed than name, but more concise than notes
-   - Example: 'רובוט שיתופי עם טווח זרוע 900 מ"מ, מטען עד 20 ק"ג, 6 צירים, מתאים לעבודה בסביבה משותפת עם בני אדם'
-   - If no description column exists, create a brief description from available data
-   - Leave empty (null) if no meaningful description can be created
-3. **manufacturer** - Manufacturer name (e.g., Siemens, Festo, SMC, Dobot)
-4. **manufacturerPN** - Manufacturer part number
-   - **CRITICAL FOR HEBREW DOCUMENTS**: If you see BOTH **"מק"ט"** column AND **"שם פריט"** column:
-     * **מק"ט** column → Use for manufacturerPN (this contains the actual catalog/part number, often numeric like "1234308", "3003023")
-     * **שם פריט** column → Use for name (this contains the item name/description like "PS-EE-2G/1", "UK-D 20 4/10-NS 35")
-     * **DO NOT confuse these two columns!** They serve different purposes.
-     * Example from table:
-       - Row with מק"ט="1234308" and שם פריט="PS-EE-2G/1 AC/24DC/48" should extract:
-         * manufacturerPN: "1234308" (from מק"ט column)
-         * name: Create short Hebrew name from שם פריט + description
-   - Look for column labels: P/N, PN, Part#, Part Number, קטלוגי, מק"ט, מקט, Catalog#, מספר קטלוגי, Cat No
-   - **IGNORE "מקט ללקוח" (customer part number) - this is NOT the manufacturerPN**
-   - Part numbers can be numeric (e.g., "1234308") or alphanumeric (e.g., "PS-EE-2G/1")
-   - If only one column exists, use that value appropriately
-   - **Never use the item name/description as the manufacturerPN if a separate מק"ט column exists**
-5. **category** - Component category - MUST be one of these EXACT Hebrew values:
+<critical_constraints>
+  <constraint_1>
+    ⚠️ PART NUMBER vs PRODUCT NAME - COLUMN IDENTIFICATION
+
+    PART NUMBER COLUMN HEADERS (priority order):
+    1. מק"ט, מקט, קטלוגי, מספר קטלוגי, P/N, PN, Part#, Part Number, Cat No, Catalog#
+    2. מקט ללקוח, Customer P/N (use ONLY if no other P/N column exists)
+
+    PRODUCT NAME COLUMN HEADERS:
+    שם פריט, תאור מוצר, פריט, תאור, Description, Product, Item, Model
+
+    ⚠️ WHAT IS A VALID PART NUMBER:
+    - Typically 5-15 characters
+    - Usually starts with letters or numbers
+    - Examples: "1404187", "DVP14SS211R", "750-362", "6ES7214-1AG40-0XB0", "SAC-8P-1,5-PUR/M8FS"
+
+    ⚠️ WHAT IS NOT A VALID PART NUMBER (use as name instead):
+    - Cable specifications like "AI 0,75-8 BU" (wire type + gauge + conductors + color)
+    - Generic descriptions like "כבל", "מחבר", "ספק כוח"
+    - Specifications like "24V 5A", "M12 8-pin"
+    - Color codes alone like "BU", "GN/YE", "RD"
+    - Wire gauges like "0,75", "1,5", "2,5"
+
+    EXTRACTION RULES:
+    1. First, identify columns by their HEADERS - look for מק"ט, P/N, Part#, etc.
+    2. If a clear P/N column exists → use its value for manufacturerPN
+    3. If NO clear P/N column exists → leave manufacturerPN EMPTY (do not guess)
+    4. manufacturerPN can be numeric ("1404187") OR alphanumeric ("DVP14SS211R")
+    5. Cable specs like "AI 0,75-8 BU" go in NAME, not manufacturerPN
+    6. If product name is a model code and you know what it is → create descriptive Hebrew name
+    7. If product name is a model code and you DON'T know → use as-is (system will search later)
+
+    EXAMPLE:
+    | מק"ט        | שם פריט              | manufacturerPN  | name                    |
+    |-------------|---------------------|-----------------|-------------------------|
+    | 1404187     | SAC-8P-1,5-PUR/M8FS | 1404187         | כבל חיישן M8 (if known) |
+    | DVP14SS211R | בקר PLC 14 נקודות    | DVP14SS211R     | בקר PLC 14 נקודות        |
+    | 3003023     | UK 5 N              | 3003023         | UK 5 N (if unknown)     |
+
+    EXAMPLE - NO P/N COLUMN (only product names):
+    | שם פריט              | manufacturerPN  | name                    |
+    |---------------------|-----------------|-------------------------|
+    | AI 0,75-8 BU        | (empty)         | כבל AI 0,75-8 BU        |
+    | ספק כוח 24V          | (empty)         | ספק כוח 24V              |
+  </constraint_1>
+
+  <constraint_2>
+    ⚠️ SUPPLIER vs MANUFACTURER vs CUSTOMER:
+    - SUPPLIER = company sending the quote (from header/logo, NOT "לכבוד:" field)
+    - MANUFACTURER = product manufacturer (from "יצרן"/"Manuf" column in table)
+    - CUSTOMER = recipient of quote (usually "רדיון חברה להנדסה" in "לכבוד:" field)
+    - ❌ NEVER use "רדיון חברה להנדסה" as supplier - it's the customer!
+  </constraint_2>
+
+  <constraint_3>
+    ⚠️ NAME FIELD RULES:
+    - Must be descriptive Hebrew (2-5 words)
+    - NO manufacturer part numbers in name
+    - NO manufacturer names in name
+    - Focus on WHAT the product is, not ALL the specs
+    - Put detailed specs in notes field, NOT in name
+    - Examples:
+      * "ספק כוח 24V 20 אמפר" ✅
+      * "דופן למהדק" ✅
+      * "כבל M12 אורך 10 מטר" ✅
+      * "בקר PLC עם תקשורת" ✅
+      * "PS-EE-2G/1 ספק כוח" ❌ (contains part number)
+      * "Phoenix Contact ספק כוח" ❌ (contains manufacturer)
+      * "ספק כוח חד פאזי 20 אמפר יציאה 24 וולט DC עם הגנות" ❌ (too detailed - move to notes)
+  </constraint_3>
+
+  <constraint_4>
+    ⚠️ PRICE DETECTION:
+    - Use unit price BEFORE VAT/מע"מ
+    - Look for: "מחיר ליחידה", "Unit Price", "מחיר יח", "Price", "מחיר"
+    - Ignore: "סה"כ", "Total", "מחיר כולל מע"מ", "Total Line"
+    - If document has מע"מ calculation, use the price BEFORE it
+    - Recognize various formats: "$1,234.56", "1234.56 USD", "₪5,000", "5000 ש״ח", "5,000.00 €"
+  </constraint_4>
+</critical_constraints>
+
+<hebrew_terminology>
+  Common Hebrew terms you'll encounter:
+  - מחיר / מחיר ליחידה / מחיר יח = price / unit price
+  - יצרן = manufacturer
+  - ספק = supplier
+  - מק"ט / קטלוגי / מספר קטלוגי = catalog number / part number
+  - שם פריט / תאור מוצר = item name / product description
+  - תאור / תאור בעברית = description
+  - כמות = quantity (ignore - not needed)
+  - מע"מ = VAT
+  - סה"כ = total
+  - הנחה = discount
+</hebrew_terminology>
+
+<column_mapping_logic>
+  <hebrew_documents>
+    Common patterns:
+    - מק"ט / מקט / קטלוגי / מספר קטלוגי / Cat No → manufacturerPN (PRIORITY 1)
+    - מק"ט ללקוח / מקט לקוח → manufacturerPN (ONLY if no other P/N column exists)
+    - שם פריט / תאור מוצר / פריט → base for name (create descriptive Hebrew or use as-is if unknown)
+    - תאור / תאור בעברית / תיאור / תאור מלא → description
+    - יצרן → manufacturer
+    - ספק → usually supplier (but verify context)
+    - מחיר ליחידה / מחיר יח / מחיר → unitPrice (pre-VAT)
+    - מחיר כולל מע"מ → ignore (post-VAT)
+  </hebrew_documents>
+
+  <english_documents>
+    Common patterns:
+    - P/N / PN / Part# / Part Number / Catalog# / Cat No → manufacturerPN (PRIORITY 1)
+    - Customer P/N → manufacturerPN (ONLY if no other P/N column exists)
+    - Description / Product / Item → base for name
+    - Manuf / Manufacturer → manufacturer
+    - Unit Price / Price / Cost → unitPrice
+    - MSRP / List Price / Retail / RRP → msrpPrice
+  </english_documents>
+
+  <mixed_documents>
+    - Use table headers to understand column meanings
+    - If P/N and שם פריט both exist, use P/N for manufacturerPN
+    - If מק"ט and שם פריט both exist, use מק"ט for manufacturerPN
+    - Handle merged cells and multi-line descriptions
+    - Extract ALL items, even if some fields are missing
+  </mixed_documents>
+</column_mapping_logic>
+
+<field_extraction_rules>
+  <name>
+    - Create concise Hebrew description (2-5 words)
+    - If source is English: translate product type + keep key identifiers
+    - DO NOT include manufacturer name
+    - DO NOT include full part number
+    - DO include: product type, key specs (voltage, size, length)
+    - Put detailed specifications in notes, NOT here
+    - Examples:
+      * English "Dobot CRA20 Collaborative Robot" → "רובוט שיתופי CRA20"
+      * Hebrew "ספק כוח חד פאזי 20 אמפר יציאה 24 וולט PS-EE-2G/1" → "ספק כוח 24V 20 אמפר"
+      * English "WAGO Fieldbus Coupler Modbus TCP 750-362" → "בקר Modbus TCP"
+      * Hebrew "צינור שרשורי פוליאמיד 17 ממ F-17PAREB" → "צינור שרשורי 17 ממ"
+      * English "SMC Pneumatic Cylinder CDQ2B32-50DCZ" → "צילינדר פנאומטי"
+  </name>
+
+  <description>
+    - 1-3 sentences, more detailed than name
+    - Extract from description/תאור/תאור בעברית column if exists
+    - Include key features and technical specifications
+    - If no description column, create brief description from available data
+    - Can be null if no meaningful description possible
+  </description>
+
+  <manufacturer>
+    - Extract from "יצרן"/"Manuf"/"Manufacturer" column in table
+    - Clean up: "פניקס קונטקט ישראל" → "Phoenix Contact"
+    - If no column exists, check product description or notes
+    - Can be null if not found
+    - Examples: WAGO, Phoenix Contact, Festo, SMC, Siemens, METE, DELTA
+  </manufacturer>
+
+  <manufacturerPN>
+    - ONLY extract from a dedicated P/N column (מק"ט, P/N, Part#, Catalog#, Cat No)
+    - Hebrew docs with מק"ט + שם פריט columns: use מק"ט value
+    - English docs: use P/N/Part Number column
+    - Can be numeric ("1234308", "3003023") or alphanumeric ("750-362", "PS-EE-2G/1", "SAC-8P-1,5-PUR/M8FS")
+    - ❌ If NO P/N column exists → leave EMPTY (do not use product name/description)
+    - ❌ Never use cable specs as P/N: "AI 0,75-8 BU", "H07V-K 1,5"
+    - ❌ Never use generic names as P/N: "כבל", "מחבר", "ספק כוח"
+    - ❌ Never use שם פריט column value when there's no מק"ט column
+    - ❌ Never use "מקט ללקוח"/"Customer P/N" unless it's the ONLY P/N column
+  </manufacturerPN>
+
+  <category>
+    - MUST be one of these exact Hebrew values:
 ${categoryList}
-   Use the most appropriate category, or use "${categories[categories.length - 1]}" if none fit
-6. **componentType** - MUST be one of: "hardware", "software", or "labor"
-   - "hardware": Physical components (PLCs, sensors, motors, robots, etc.)
-   - "software": Software licenses, applications, configuration tools
-   - "labor": Services like engineering, installation, commissioning, programming
-7. **laborSubtype** - (ONLY if componentType is "labor") MUST be one of:
-   - "engineering": Engineering design, system design (הנדסה, תכנון)
-   - "commissioning": System commissioning, testing, startup (הפעלה, בדיקות)
-   - "installation": Physical installation work (התקנה)
-   - "programming": PLC programming, robot programming (תכנות)
-8. **supplier** - Supplier/vendor name (if mentioned)
-9. **quantity** - Quantity (if specified)
-10. **unitPriceNIS** - Unit price in Israeli Shekels (₪, NIS, ILS, שקלים) - PARTNER/YOUR COST (auto-select first price column if available)
-11. **unitPriceUSD** - Unit price in US Dollars ($, USD) - PARTNER/YOUR COST (auto-select first price column if available)
-12. **unitPriceEUR** - Unit price in Euros (€, EUR) - PARTNER/YOUR COST (auto-select first price column if available)
-13. **currency** - Primary currency (NIS, USD, or EUR)
-14. **msrpPrice** - MSRP/List price if there's a SEPARATE column for it (auto-select second price column if available)
-   - Look for column headers like: "MSRP", "List Price", "Retail", "מחיר מחירון", "מחיר קטלוגי"
-   - Only populate if there are TWO+ price columns (partner price + MSRP)
-   - If only ONE price column exists, leave this null
-15. **msrpCurrency** - Currency of MSRP price (NIS, USD, or EUR) - only if msrpPrice is present
-16. **allPriceColumns** - **CRITICAL**: Extract ALL price columns found in this row (for user column selection UI)
-   - Array of objects with: { columnName: string, value: number, currency: 'NIS'|'USD'|'EUR' }
-   - Example: [
-       { columnName: "Unit Price (USD) Camera+SDK", value: 4400, currency: "USD" },
-       { columnName: "Unit Price (USD) Camera+Vision+Viz", value: 5200, currency: "USD" },
-       { columnName: "MSRP (USD) Camera+SDK", value: 6670, currency: "USD" },
-       { columnName: "MSRP (USD) Camera+Vision+Viz", value: 7890, currency: "USD" }
-     ]
-   - Extract EVERY price column, even if there are 5+ columns
-   - This allows user to select which columns to use for partner price and MSRP
-17. **quoteDate** - Date of quotation (if visible)
-18. **notes** - Any important notes, specifications, or remarks (keep technical specs here, NOT in name)
-19. **confidence** - Your confidence level (0.0 to 1.0) in the extraction accuracy for this item
+    - Use "אחר" if none fit
+    - Be intelligent about categorization based on product description
+  </category>
 
-**Important guidelines:**
-- **HEBREW TABLE COLUMN MAPPING** (Critical for Hebrew quotations/price lists):
-  * **מק"ט** = Manufacturer part number (manufacturerPN) - often numeric codes like "1234308"
-  * **שם פריט** = Item name (name) - descriptive names like "PS-EE-2G/1" or "דופן מהדק"
-  * **מקט ללקוח** = Customer part number - IGNORE this, do not use for manufacturerPN
-  * **תאור בעברית** = Hebrew description (description) - full product description
-  * **מחיר ליחידה** = Unit price (unitPriceNIS/USD/EUR)
-  * **כמות** = Quantity (quantity)
-  * **יצרן** = Manufacturer (manufacturer)
-  * When BOTH מק"ט and שם פריט exist, they are DIFFERENT fields - do not confuse them!
-- **NAME MUST BE SHORT & DESCRIPTIVE IN HEBREW**: Translate product type + model number only
-- Handle merged cells, multi-line descriptions, and complex table layouts
-- Recognize prices in various formats: "$1,234.56", "1234.56 USD", "₪5,000", "5000 ש״ח"
-- Understand Hebrew terms: מחיר (price), יצרן (manufacturer), ספק (supplier), כמות (quantity)
-- **DUAL PRICING**: If document has TWO price columns (e.g., "Partner Price" + "MSRP" or "Your Price" + "List Price"):
-  * Put the LOWER price (partner/distributor price) in unitPriceUSD/NIS/EUR
-  * Put the HIGHER price (MSRP/list price) in msrpPrice + msrpCurrency
-  * Common MSRP column headers: "MSRP", "List Price", "Retail", "RRP", "מחיר מחירון"
-  * Common partner price headers: "Partner", "Your Price", "Net", "Cost", "מחיר שותף"
-- **CRITICAL: category MUST be one of the 10 exact Hebrew values listed above - do NOT invent new categories!**
-- If unsure about category, use "אחר" (Other)
-- If a field is not found, set it as null
-- Be intelligent about categorization based on product description
-- Extract ALL items, even if some fields are missing
-- For tables with headers, use them to understand column meanings
-- Put detailed specifications in the notes field, NOT in the name
+  <componentType>
+    - "hardware": physical components (PLCs, sensors, cables, robots, pneumatics, power supplies)
+    - "software": licenses, applications, configuration tools
+    - "labor": services (engineering, installation, commissioning, programming)
+  </componentType>
 
-**Response format:**
-Return a valid JSON object with this exact structure:
+  <laborSubtype>
+    Only if componentType = "labor":
+    - "engineering": engineering design, system design (הנדסה, תכנון)
+    - "commissioning": system commissioning, testing, startup (הפעלה, בדיקות)
+    - "installation": physical installation work (התקנה)
+    - "programming": PLC programming, robot programming (תכנות)
+  </laborSubtype>
 
+  <supplier>
+    - Extract from document header/logo (top of page)
+    - NOT from "לכבוד:"/"To:" field (that's the customer!)
+    - Look for company name, address, phone at document top
+    - Common suppliers: קומטל, פניקס קונטקט ישראל, פסטו ישראל, אילן את גביש, אוטומציה ירוחם, טכנו-בורג, אלקם
+    - ❌ "רדיון חברה להנדסה" is NEVER the supplier (it's the customer)
+  </supplier>
+
+  <unitPrice_currency>
+    - Find unit price column: "מחיר ליחידה", "Unit Price", "Price", "מחיר"
+    - Use price BEFORE VAT/מע"מ
+    - If only post-VAT price exists, reverse calculate (divide by 1.18 for 18% VAT)
+    - Recognize formats: "$1,234.56", "1234.56 USD", "₪5,000", "5000 ש״ח", "5,000.00 €"
+    - Currency detection:
+      * ₪ / NIS / ILS / ש"ח / שקלים → NIS
+      * $ / USD → USD
+      * € / EUR / Eur → EUR
+    - Populate unitPriceNIS, unitPriceUSD, or unitPriceEUR based on currency
+  </unitPrice_currency>
+
+  <msrp_logic>
+    - Only populate if document has TWO+ price columns (partner + MSRP)
+    - MSRP indicators: "MSRP", "List Price", "Retail", "RRP", "מחיר מחירון", "מחיר קטלוגי"
+    - Partner price indicators: "Partner", "Your Price", "Net", "Cost", "מחיר שותף"
+    - Logic: Put LOWER price in unitPrice, HIGHER price in msrpPrice
+    - If only ONE price column exists, leave msrpPrice null
+  </msrp_logic>
+
+  <allPriceColumns>
+    - Extract EVERY price column found in the row
+    - Format: [{ columnName: "column header", value: number, currency: "NIS"|"USD"|"EUR" }]
+    - This allows user to select which price to use in UI
+    - Include ALL price columns, even if 5+ exist
+  </allPriceColumns>
+
+  <notes>
+    - Extract from notes/remarks/specifications columns
+    - Include detailed technical specs that don't fit in name
+    - Include any important information about lead time, MOQ, special conditions
+    - Can be null if no additional information
+  </notes>
+
+  <confidence>
+    - Self-assessment of extraction accuracy (0.0 to 1.0)
+    - Lower confidence if: missing fields, unclear columns, ambiguous data
+    - Higher confidence if: clear structure, all fields present, standard format
+  </confidence>
+</field_extraction_rules>
+
+<output_format>
 {
-  "documentType": "quotation" | "price_list" | "invoice" | "catalog" | "unknown",
+  "documentType": "quotation" | "price_list" | "catalog" | "unknown",
   "metadata": {
-    "supplier": "supplier name if found",
-    "quoteDate": "date if found (YYYY-MM-DD format)",
-    "currency": "primary currency in document",
+    "supplier": "supplier name from header",
+    "quoteDate": "YYYY-MM-DD or null",
+    "currency": "primary currency",
     "totalItems": number,
-    "columnHeaders": ["array of ALL column header names found in the document, especially ALL price column names"]
+    "columnHeaders": ["array of ALL column names found in document"]
   },
   "components": [
     {
-      "name": "Component name",
-      "description": "Brief description of the component or null",
+      "name": "Hebrew descriptive name (2-5 words, NO part numbers, NO manufacturer names)",
+      "description": "Brief description or null",
       "manufacturer": "Manufacturer name or null",
       "manufacturerPN": "Part number or null",
-      "category": "Category or null",
+      "category": "Exact Hebrew category from list or null",
       "componentType": "hardware" | "software" | "labor",
       "laborSubtype": "engineering" | "commissioning" | "installation" | "programming" | null,
-      "supplier": "Supplier name or null",
-      "quantity": number or null,
+      "supplier": "Supplier from document header or null",
       "unitPriceNIS": number or null,
       "unitPriceUSD": number or null,
       "unitPriceEUR": number or null,
@@ -468,25 +620,30 @@ Return a valid JSON object with this exact structure:
       "msrpPrice": number or null,
       "msrpCurrency": "NIS" | "USD" | "EUR" | null,
       "allPriceColumns": [
-        {
-          "columnName": "Unit Price (USD) Camera+SDK",
-          "value": 4400,
-          "currency": "USD"
-        },
-        {
-          "columnName": "MSRP (USD) Camera+SDK",
-          "value": 6670,
-          "currency": "USD"
-        }
+        { "columnName": "Unit Price", "value": 100.00, "currency": "NIS" }
       ],
       "quoteDate": "YYYY-MM-DD or null",
-      "notes": "any notes or null",
+      "notes": "Technical specs, remarks or null",
       "confidence": 0.0 to 1.0
     }
   ]
 }
+</output_format>
 
-Respond ONLY with valid JSON. No markdown, no explanations, just the JSON object.`;
+<critical_reminders>
+1. מק"ט ≠ שם פריט - they are DIFFERENT columns in Hebrew documents!
+2. Supplier = document header/logo, NOT "לכבוד:" field
+3. Name = descriptive Hebrew (2-5 words) WITHOUT part numbers or manufacturer names
+4. רדיון חברה להנדסה = customer, NEVER supplier
+5. Use prices BEFORE VAT/מע"מ
+6. Category must be from predefined list only
+7. Put detailed specs in notes field, NOT in name
+8. Extract ALL items, even if some fields are missing
+9. Handle merged cells, multi-line descriptions, and complex layouts
+10. NO quantity field needed - focus on unit price only
+</critical_reminders>
+
+Respond ONLY with valid JSON. No markdown, no explanations.`;
 }
 
 /**
@@ -934,6 +1091,211 @@ export async function extractComponentsFromDocument(
           ? error.message
           : 'Unknown error during extraction',
     };
+  }
+}
+
+/**
+ * Check if a component name needs enrichment (is unclear/cryptic)
+ * Returns true if the name appears to be a model code rather than a descriptive name
+ */
+export function needsEnrichment(component: AIExtractedComponent): boolean {
+  const name = component.name || '';
+
+  // If name is empty or very short, needs enrichment
+  if (name.length < 3) return true;
+
+  // If manufacturer is missing, might benefit from enrichment
+  if (!component.manufacturer) return true;
+
+  // Model code patterns that indicate unclear names:
+  // - "UK 5 N", "PATG 1/15", "SAC-8P-1,5-PUR/M8FS", "DVP14SS211R"
+  // These typically have: uppercase letters, numbers, dashes, slashes, dots
+
+  // Pattern 1: Looks like a model code (alphanumeric with special chars, no Hebrew)
+  const modelCodePattern = /^[A-Z0-9_./, -]+$/i;
+  if (modelCodePattern.test(name) && !/[\u0590-\u05FF]/.test(name)) {
+    return true;
+  }
+
+  // Pattern 2: Very short with numbers (like "UK 5 N")
+  if (name.length < 15 && /\d/.test(name) && !/[\u0590-\u05FF]/.test(name)) {
+    return true;
+  }
+
+  // Pattern 3: Contains slash or dash with numbers (like "PATG 1/15", "SAC-8P-1,5-PUR")
+  if (/[A-Z]+[-/][0-9]/.test(name) || /[0-9][-/][A-Z0-9]/.test(name)) {
+    return true;
+  }
+
+  // If confidence is low, might need enrichment
+  if (component.confidence !== undefined && component.confidence < 0.5) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Enrich components with web search data for unclear items
+ * Uses Tavily API to identify component types from part numbers
+ */
+export async function enrichComponentsWithWebSearch(
+  components: AIExtractedComponent[],
+  maxSearches = 10
+): Promise<{
+  enrichedComponents: AIExtractedComponent[];
+  searchesPerformed: number;
+  enrichedCount: number;
+}> {
+  if (!isTavilyAvailable()) {
+    logger.info('Tavily not available, skipping component enrichment');
+    return {
+      enrichedComponents: components,
+      searchesPerformed: 0,
+      enrichedCount: 0,
+    };
+  }
+
+  // Find components that need enrichment
+  const needsEnrichmentList = components
+    .map((comp, index) => ({ comp, index, needs: needsEnrichment(comp) }))
+    .filter(item => item.needs)
+    .slice(0, maxSearches); // Limit to maxSearches to avoid rate limits
+
+  if (needsEnrichmentList.length === 0) {
+    logger.info('No components need enrichment');
+    return {
+      enrichedComponents: components,
+      searchesPerformed: 0,
+      enrichedCount: 0,
+    };
+  }
+
+  logger.info(
+    `Enriching ${needsEnrichmentList.length} components with web search`
+  );
+
+  // Create a copy of components to enrich
+  const enrichedComponents = [...components];
+  let enrichedCount = 0;
+
+  // Process each component that needs enrichment
+  for (const item of needsEnrichmentList) {
+    const { comp, index } = item;
+    const searchQuery = comp.manufacturerPN || comp.name || '';
+
+    if (!searchQuery) continue;
+
+    try {
+      const result: ComponentSearchResult = await identifyComponent(
+        searchQuery,
+        comp.manufacturer,
+        comp.description
+      );
+
+      if (result.success && result.productTypeHebrew) {
+        // Enrich the component with search results
+        const enriched = { ...enrichedComponents[index] };
+
+        // Update name if we found a product type
+        if (result.productTypeHebrew) {
+          // Create a better name: Hebrew product type + key identifier
+          const identifier = comp.manufacturerPN
+            ? comp.manufacturerPN.split('-')[0]
+            : '';
+          enriched.name = identifier
+            ? `${result.productTypeHebrew} ${identifier}`
+            : result.productTypeHebrew;
+        }
+
+        // Update manufacturer if found and not already set
+        if (result.manufacturer && !enriched.manufacturer) {
+          enriched.manufacturer = result.manufacturer;
+        }
+
+        // Update description if found and not already set
+        if (result.description && !enriched.description) {
+          enriched.description = result.description;
+        }
+
+        // Mark as enriched with higher confidence
+        enriched.confidence = Math.max(enriched.confidence || 0.5, 0.7);
+
+        // Add note about enrichment
+        enriched.notes = enriched.notes
+          ? `${enriched.notes} | זוהה אוטומטית: ${result.productType}`
+          : `זוהה אוטומטית: ${result.productType}`;
+
+        enrichedComponents[index] = enriched;
+        enrichedCount++;
+
+        logger.info(
+          `Enriched component: ${searchQuery} -> ${enriched.name} (${result.productType})`
+        );
+      }
+    } catch (error) {
+      logger.error(`Failed to enrich component ${searchQuery}:`, error);
+    }
+
+    // Small delay between requests to avoid rate limiting
+    await new Promise(resolve => setTimeout(resolve, 300));
+  }
+
+  return {
+    enrichedComponents,
+    searchesPerformed: needsEnrichmentList.length,
+    enrichedCount,
+  };
+}
+
+/**
+ * Extract components with optional web search enrichment
+ * This is the main function to use when you want automatic enrichment
+ */
+export async function extractComponentsWithEnrichment(
+  file: File,
+  columnOptions?: ColumnExtractionOptions,
+  teamId?: string,
+  enableEnrichment = true
+): Promise<
+  AIExtractionResult & {
+    enrichmentStats?: { searchesPerformed: number; enrichedCount: number };
+  }
+> {
+  // First, extract components normally
+  const result = await extractComponentsFromDocument(
+    file,
+    columnOptions,
+    teamId
+  );
+
+  // If extraction failed or no components, return as-is
+  if (!result.success || result.components.length === 0) {
+    return result;
+  }
+
+  // If enrichment is disabled or Tavily not available, return as-is
+  if (!enableEnrichment || !isTavilyAvailable()) {
+    return result;
+  }
+
+  // Enrich components with web search
+  try {
+    const { enrichedComponents, searchesPerformed, enrichedCount } =
+      await enrichComponentsWithWebSearch(result.components);
+
+    return {
+      ...result,
+      components: enrichedComponents,
+      enrichmentStats: {
+        searchesPerformed,
+        enrichedCount,
+      },
+    };
+  } catch (error) {
+    logger.error('Component enrichment failed:', error);
+    // Return original result if enrichment fails
+    return result;
   }
 }
 

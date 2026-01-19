@@ -14,6 +14,8 @@ import {
   PanelLeftClose,
   PanelLeft,
   Maximize2,
+  Search,
+  Loader2,
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -39,6 +41,12 @@ import {
 import { logger } from '@/lib/logger';
 import { useTeam } from '../../contexts/TeamContext';
 import { SourceFileViewer } from './viewers';
+import {
+  checkTavilyAvailable,
+  setTavilyTeamContext,
+  identifyComponent,
+  type ComponentSearchResult,
+} from '@/services/tavilySearch';
 
 // Type guards for metadata
 interface ExcelMetadata {
@@ -274,6 +282,200 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
   // Bulk edit state
   const [bulkManufacturer, setBulkManufacturer] = useState<string>('');
   const [bulkSupplier, setBulkSupplier] = useState<string>('');
+
+  // Enrichment state
+  const [enrichingIds, setEnrichingIds] = useState<Set<string>>(new Set());
+  const [enrichmentConflict, setEnrichmentConflict] = useState<{
+    componentId: string;
+    searchResult: ComponentSearchResult;
+    originalData: PreviewComponent;
+  } | null>(null);
+
+  // Check if Tavily is available - use state to handle async initialization
+  const [tavilyAvailable, setTavilyAvailable] = useState<boolean>(false);
+
+  // Set team context and check Tavily availability on mount and when team changes
+  useEffect(() => {
+    // Set team context first, then check availability
+    setTavilyTeamContext(currentTeam?.id);
+
+    // Check availability after team context is set
+    checkTavilyAvailable().then(available => {
+      setTavilyAvailable(available);
+      if (available) {
+        logger.info('Tavily search is available', { teamId: currentTeam?.id });
+      }
+    });
+
+    // Listen for API key updates
+    const handleTavilyUpdate = () => {
+      checkTavilyAvailable().then(setTavilyAvailable);
+    };
+    window.addEventListener('cpq-tavily-api-key-updated', handleTavilyUpdate);
+
+    return () => {
+      window.removeEventListener(
+        'cpq-tavily-api-key-updated',
+        handleTavilyUpdate
+      );
+    };
+  }, [currentTeam?.id]);
+
+  /**
+   * Handle enrichment for a single component
+   */
+  const handleEnrichComponent = async (id: string) => {
+    const component = components.find(c => c.id === id);
+    if (!component) return;
+
+    // Start loading
+    setEnrichingIds(prev => new Set(prev).add(id));
+
+    try {
+      // Build search query - prefer notes (often contains model code) or manufacturerPN
+      // Notes field often has the actual model code like "SPB1 80 ED-65 G1/4-AG"
+      // which gives better search results than internal part numbers like "10.01.06.03504"
+      const searchQuery =
+        component.notes || component.manufacturerPN || component.name || '';
+      if (!searchQuery) {
+        logger.warn('No search query available for component', { id });
+        return;
+      }
+
+      const result = await identifyComponent(
+        searchQuery,
+        component.manufacturer,
+        component.description
+      );
+
+      logger.info('Enrichment search result', { id, searchQuery, result });
+
+      if (result.success) {
+        // Check if there are conflicts (different data than what we have)
+        const hasConflict =
+          (result.productTypeHebrew &&
+            component.name &&
+            result.productTypeHebrew !== component.name) ||
+          (result.manufacturer &&
+            component.manufacturer &&
+            result.manufacturer !== component.manufacturer);
+
+        if (hasConflict) {
+          // Show conflict resolution dialog
+          setEnrichmentConflict({
+            componentId: id,
+            searchResult: result,
+            originalData: component,
+          });
+        } else {
+          // No conflict - auto-apply enrichment
+          applyEnrichment(id, result);
+        }
+      } else {
+        logger.warn('Enrichment search failed', { id, error: result.error });
+      }
+    } catch (error) {
+      logger.error('Enrichment error', { id, error });
+    } finally {
+      setEnrichingIds(prev => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }
+  };
+
+  /**
+   * Apply enrichment results to a component
+   * Creates a descriptive name by combining product type with original details
+   */
+  const applyEnrichment = (id: string, result: ComponentSearchResult) => {
+    setComponents(prev =>
+      prev.map(c => {
+        if (c.id !== id) return c;
+
+        const updated = { ...c };
+
+        // Update name if we found a product type
+        if (result.productTypeHebrew) {
+          const originalName = c.name || '';
+          const hasHebrew = /[\u0590-\u05FF]/.test(originalName);
+
+          // If original name is a model code (no Hebrew), combine with product type
+          // e.g., "AI 0,75-8 BU" + "כבל" → "כבל AI 0,75-8 BU"
+          if (!hasHebrew && originalName) {
+            updated.name = `${result.productTypeHebrew} ${originalName}`;
+          } else if (!originalName || originalName === c.manufacturerPN) {
+            // No name or name equals part number - use product type + part number
+            updated.name = c.manufacturerPN
+              ? `${result.productTypeHebrew} ${c.manufacturerPN}`
+              : result.productTypeHebrew;
+          }
+          // If already has Hebrew, keep original (don't overwrite good names)
+        }
+
+        // Update manufacturer if found and not already set
+        if (result.manufacturer && !c.manufacturer) {
+          updated.manufacturer = result.manufacturer;
+        }
+
+        // Update description if found and not already set
+        if (result.description && !c.description) {
+          updated.description = result.description;
+        }
+
+        // Add enrichment note
+        if (result.productType) {
+          updated.notes = c.notes
+            ? `${c.notes} | זוהה: ${result.productType}`
+            : `זוהה: ${result.productType}`;
+        }
+
+        updated.status = 'modified';
+        return updated;
+      })
+    );
+  };
+
+  /**
+   * Handle conflict resolution - user chose to keep original
+   */
+  const handleRejectEnrichment = () => {
+    setEnrichmentConflict(null);
+  };
+
+  /**
+   * Handle conflict resolution - user chose specific fields
+   */
+  const handlePartialEnrichment = (fields: {
+    name?: boolean;
+    manufacturer?: boolean;
+  }) => {
+    if (!enrichmentConflict) return;
+
+    const { componentId, searchResult } = enrichmentConflict;
+
+    setComponents(prev =>
+      prev.map(c => {
+        if (c.id !== componentId) return c;
+
+        const updated = { ...c };
+
+        if (fields.name && searchResult.productTypeHebrew) {
+          updated.name = searchResult.productTypeHebrew;
+        }
+
+        if (fields.manufacturer && searchResult.manufacturer) {
+          updated.manufacturer = searchResult.manufacturer;
+        }
+
+        updated.status = 'modified';
+        return updated;
+      })
+    );
+
+    setEnrichmentConflict(null);
+  };
 
   const handleStatusChange = (id: string, status: ComponentStatus) => {
     setComponents(prev =>
@@ -1002,6 +1204,22 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
                       <Edit2 className="w-4 h-4" />
                     )}
                   </Button>
+                  {/* Enrich Button */}
+                  {tavilyAvailable && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleEnrichComponent(component.id)}
+                      disabled={enrichingIds.has(component.id)}
+                      title="העשר מידע מהאינטרנט"
+                    >
+                      {enrichingIds.has(component.id) ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Search className="w-4 h-4 text-blue-500" />
+                      )}
+                    </Button>
+                  )}
                   <Button
                     size="sm"
                     variant="outline"
@@ -1492,6 +1710,88 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
           );
         })}
       </div>
+
+      {/* Enrichment Conflict Resolution Dialog */}
+      {enrichmentConflict && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+            <div className="flex items-center gap-2 mb-4">
+              <Search className="w-5 h-5 text-blue-500" />
+              <h3 className="text-lg font-semibold">נמצא מידע נוסף</h3>
+            </div>
+
+            <p className="text-sm text-muted-foreground mb-4">
+              החיפוש מצא מידע שונה מהמידע הקיים. בחר אילו שדות לעדכן:
+            </p>
+
+            <div className="space-y-3 mb-6">
+              {/* Name comparison */}
+              {enrichmentConflict.searchResult.productTypeHebrew &&
+                enrichmentConflict.originalData.name !==
+                  enrichmentConflict.searchResult.productTypeHebrew && (
+                  <div className="border rounded p-3">
+                    <div className="text-sm font-medium mb-2">שם רכיב:</div>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div className="bg-gray-100 p-2 rounded">
+                        <div className="text-xs text-muted-foreground">
+                          קיים:
+                        </div>
+                        <div>{enrichmentConflict.originalData.name || '—'}</div>
+                      </div>
+                      <div className="bg-blue-100 p-2 rounded">
+                        <div className="text-xs text-blue-600">מהחיפוש:</div>
+                        <div>
+                          {enrichmentConflict.searchResult.productTypeHebrew}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+              {/* Manufacturer comparison */}
+              {enrichmentConflict.searchResult.manufacturer &&
+                enrichmentConflict.originalData.manufacturer !==
+                  enrichmentConflict.searchResult.manufacturer && (
+                  <div className="border rounded p-3">
+                    <div className="text-sm font-medium mb-2">יצרן:</div>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div className="bg-gray-100 p-2 rounded">
+                        <div className="text-xs text-muted-foreground">
+                          קיים:
+                        </div>
+                        <div>
+                          {enrichmentConflict.originalData.manufacturer || '—'}
+                        </div>
+                      </div>
+                      <div className="bg-blue-100 p-2 rounded">
+                        <div className="text-xs text-blue-600">מהחיפוש:</div>
+                        <div>
+                          {enrichmentConflict.searchResult.manufacturer}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+            </div>
+
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={handleRejectEnrichment}>
+                שמור קיים
+              </Button>
+              <Button
+                onClick={() =>
+                  handlePartialEnrichment({
+                    name: !!enrichmentConflict.searchResult.productTypeHebrew,
+                    manufacturer: false,
+                  })
+                }
+              >
+                עדכן שם
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Low Confidence Warning */}
       {extractionResult.confidence < 0.7 && (

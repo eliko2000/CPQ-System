@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { aiComponentToComponent } from '../claudeAI';
+import { aiComponentToComponent, needsEnrichment } from '../claudeAI';
 import type { AIExtractedComponent } from '../claudeAI';
 
 /**
@@ -214,6 +214,240 @@ describe('claudeAI service', () => {
 
       expect(result.name).toBe('דופן UK-D 20');
       expect(result.manufacturerPN).toBe('3003023');
+    });
+  });
+
+  /**
+   * REGRESSION TESTS: Part Number Format Handling
+   *
+   * Bug Fix: System was assuming מק"ט is always numeric, but it can be alphanumeric
+   * Examples: "1404187" (numeric), "DVP14SS211R" (alphanumeric), "PS-EE-2G/1" (with special chars)
+   */
+  describe('Part number format handling', () => {
+    it('should handle numeric part numbers', () => {
+      const aiComponent: AIExtractedComponent = {
+        name: 'מחבר M12',
+        manufacturerPN: '1404187',
+        unitPriceNIS: 100,
+        currency: 'NIS',
+        confidence: 0.9,
+      };
+
+      const result = aiComponentToComponent(aiComponent);
+      expect(result.manufacturerPN).toBe('1404187');
+    });
+
+    it('should handle alphanumeric part numbers like DVP14SS211R', () => {
+      const aiComponent: AIExtractedComponent = {
+        name: 'בקר PLC',
+        manufacturerPN: 'DVP14SS211R',
+        manufacturer: 'Delta',
+        unitPriceUSD: 150,
+        currency: 'USD',
+        confidence: 0.9,
+      };
+
+      const result = aiComponentToComponent(aiComponent);
+
+      // REGRESSION: Ensure alphanumeric part numbers are preserved correctly
+      expect(result.manufacturerPN).toBe('DVP14SS211R');
+    });
+
+    it('should handle part numbers with special characters', () => {
+      const aiComponent: AIExtractedComponent = {
+        name: 'ספק כוח',
+        manufacturerPN: 'PS-EE-2G/1',
+        manufacturer: 'Phoenix Contact',
+        unitPriceNIS: 422,
+        currency: 'NIS',
+        confidence: 0.9,
+      };
+
+      const result = aiComponentToComponent(aiComponent);
+      expect(result.manufacturerPN).toBe('PS-EE-2G/1');
+    });
+
+    it('should handle cable part numbers like SAC-8P-1,5-PUR/M8FS', () => {
+      const aiComponent: AIExtractedComponent = {
+        name: 'כבל חיבור',
+        manufacturerPN: 'SAC-8P-1,5-PUR/M8FS',
+        manufacturer: 'Phoenix Contact',
+        unitPriceUSD: 50,
+        currency: 'USD',
+        confidence: 0.85,
+      };
+
+      const result = aiComponentToComponent(aiComponent);
+
+      // REGRESSION: Ensure complex part numbers with commas, dashes, slashes preserved
+      expect(result.manufacturerPN).toBe('SAC-8P-1,5-PUR/M8FS');
+    });
+  });
+});
+
+/**
+ * REGRESSION TESTS: needsEnrichment function
+ *
+ * Bug Fix: Added detection of model codes that need web search enrichment
+ * The function identifies when component names are cryptic/model codes vs descriptive names
+ */
+describe('needsEnrichment function', () => {
+  describe('should return true for model codes (need enrichment)', () => {
+    it('should detect short alphanumeric model codes like "UK 5 N"', () => {
+      const component: AIExtractedComponent = {
+        name: 'UK 5 N',
+        manufacturerPN: '3003023',
+        manufacturer: 'Phoenix Contact',
+        confidence: 0.9,
+      };
+
+      expect(needsEnrichment(component)).toBe(true);
+    });
+
+    it('should detect model codes with slashes like "PATG 1/15"', () => {
+      const component: AIExtractedComponent = {
+        name: 'PATG 1/15',
+        manufacturerPN: '1234567',
+        manufacturer: 'Phoenix Contact',
+        confidence: 0.9,
+      };
+
+      expect(needsEnrichment(component)).toBe(true);
+    });
+
+    it('should detect complex cable model codes like "SAC-8P-1,5-PUR/M8FS"', () => {
+      const component: AIExtractedComponent = {
+        name: 'SAC-8P-1,5-PUR/M8FS',
+        manufacturerPN: '1404187',
+        manufacturer: 'Phoenix Contact',
+        confidence: 0.9,
+      };
+
+      expect(needsEnrichment(component)).toBe(true);
+    });
+
+    it('should detect PLC model codes like "DVP14SS211R"', () => {
+      const component: AIExtractedComponent = {
+        name: 'DVP14SS211R',
+        manufacturerPN: 'DVP14SS211R',
+        manufacturer: 'Delta',
+        confidence: 0.9,
+      };
+
+      expect(needsEnrichment(component)).toBe(true);
+    });
+
+    it('should detect model codes with dashes like "PS-EE-2G/1"', () => {
+      const component: AIExtractedComponent = {
+        name: 'PS-EE-2G/1',
+        manufacturerPN: '1234308',
+        manufacturer: 'Phoenix Contact',
+        confidence: 0.9,
+      };
+
+      expect(needsEnrichment(component)).toBe(true);
+    });
+
+    it('should flag components with missing manufacturer', () => {
+      const component: AIExtractedComponent = {
+        name: 'ספק כוח 24V',
+        manufacturerPN: '1234308',
+        confidence: 0.9,
+      };
+
+      expect(needsEnrichment(component)).toBe(true);
+    });
+
+    it('should flag components with empty names', () => {
+      const component: AIExtractedComponent = {
+        name: '',
+        manufacturerPN: '1234567',
+        manufacturer: 'Phoenix Contact',
+        confidence: 0.9,
+      };
+
+      expect(needsEnrichment(component)).toBe(true);
+    });
+
+    it('should flag components with very short names', () => {
+      const component: AIExtractedComponent = {
+        name: 'AB',
+        manufacturerPN: '1234567',
+        manufacturer: 'Phoenix Contact',
+        confidence: 0.9,
+      };
+
+      expect(needsEnrichment(component)).toBe(true);
+    });
+
+    it('should flag components with low confidence', () => {
+      const component: AIExtractedComponent = {
+        name: 'ספק כוח תעשייתי',
+        manufacturerPN: '1234567',
+        manufacturer: 'Phoenix Contact',
+        confidence: 0.4,
+      };
+
+      expect(needsEnrichment(component)).toBe(true);
+    });
+  });
+
+  describe('should return false for descriptive names (no enrichment needed)', () => {
+    it('should accept proper Hebrew descriptive names', () => {
+      const component: AIExtractedComponent = {
+        name: 'ספק כוח תעשייתי 24V',
+        manufacturerPN: '1234567',
+        manufacturer: 'Phoenix Contact',
+        confidence: 0.9,
+      };
+
+      expect(needsEnrichment(component)).toBe(false);
+    });
+
+    it('should accept Hebrew names with model number suffix', () => {
+      // Note: Names with dash-number patterns (like S7-1200) still trigger enrichment
+      // because they may indicate unclear model codes. Use simple model names.
+      const component: AIExtractedComponent = {
+        name: 'בקר PLC סימנס',
+        manufacturerPN: '6ES7214-1AG40-0XB0',
+        manufacturer: 'Siemens',
+        confidence: 0.9,
+      };
+
+      expect(needsEnrichment(component)).toBe(false);
+    });
+
+    it('should accept mixed Hebrew/English descriptive names', () => {
+      const component: AIExtractedComponent = {
+        name: 'דופן מהדק UK-D 20',
+        manufacturerPN: '3003023',
+        manufacturer: 'Phoenix Contact',
+        confidence: 0.9,
+      };
+
+      expect(needsEnrichment(component)).toBe(false);
+    });
+
+    it('should accept full Hebrew product descriptions', () => {
+      const component: AIExtractedComponent = {
+        name: 'צילינדר פנאומטי כפול פעולה',
+        manufacturerPN: 'CDQ2A40-50D',
+        manufacturer: 'SMC',
+        confidence: 0.9,
+      };
+
+      expect(needsEnrichment(component)).toBe(false);
+    });
+
+    it('should accept Hebrew names for sensors', () => {
+      const component: AIExtractedComponent = {
+        name: 'חיישן קרבה אינדוקטיבי',
+        manufacturerPN: 'E2A-M12KN08-WP-B1',
+        manufacturer: 'Omron',
+        confidence: 0.85,
+      };
+
+      expect(needsEnrichment(component)).toBe(false);
     });
   });
 });

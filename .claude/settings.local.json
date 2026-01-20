@@ -52,7 +52,13 @@
       "Bash(git pull:*)",
       "Bash(dir:*)",
       "Bash(findstr:*)",
-      "Bash(node -e:*)"
+      "Bash(node -e:*)",
+      "Bash(for table in components quotations assemblies projects supplier_quotes activity_logs labor_types)",
+      "Bash(do echo \"=== $table ===\" grep -A 20 \"CREATE TABLE.*$table\" migrations/*.sql)",
+      "Bash(done)",
+      "Bash(git merge:*)",
+      "Bash(git worktree:*)",
+      "Bash(git fetch:*)"
     ],
     "deny": [],
     "ask": []

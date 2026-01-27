@@ -218,6 +218,112 @@ describe('claudeAI service', () => {
   });
 
   /**
+   * REGRESSION TESTS: RTL Text Reversal Bug Fix
+   *
+   * Bug: When extracting part numbers from Hebrew (RTL) documents, Latin text was being reversed
+   * Example: "VSBM25 SI" was extracted as "SI 25VSBM" (reversed)
+   * Example: "IM11A" was extracted as "A11IM" (reversed)
+   *
+   * Root Cause: Claude AI misinterpreted the text direction of Latin characters in RTL context
+   * Fix: Added explicit RTL handling instructions to the extraction prompt (constraint_0)
+   *
+   * These tests verify that part numbers are preserved in their correct LTR order
+   * after being extracted and passed through aiComponentToComponent.
+   */
+  describe('RTL text reversal prevention', () => {
+    it('should preserve "VSBM25 SI" part number (not reverse to "SI 25VSBM")', () => {
+      // REGRESSION TEST: This was the exact bug reported
+      const aiComponent: AIExtractedComponent = {
+        name: 'טבעת ספוג לאטימה',
+        manufacturerPN: 'VSBM25 SI', // Correct extraction - NOT reversed
+        unitPriceNIS: 22,
+        currency: 'NIS',
+        confidence: 0.9,
+      };
+
+      const result = aiComponentToComponent(aiComponent);
+
+      // The part number should be exactly as extracted, not reversed
+      expect(result.manufacturerPN).toBe('VSBM25 SI');
+      expect(result.manufacturerPN).not.toBe('SI 25VSBM'); // This was the bug
+      expect(result.manufacturerPN).not.toBe('IS 52MBSV'); // Full reversal
+    });
+
+    it('should preserve "IM11A" part number (not reverse to "A11IM")', () => {
+      // REGRESSION TEST: This was the exact bug reported
+      const aiComponent: AIExtractedComponent = {
+        name: 'מתאם להברגה חיצונית',
+        manufacturerPN: 'IM11A', // Correct extraction - NOT reversed
+        unitPriceNIS: 15,
+        currency: 'NIS',
+        confidence: 0.9,
+      };
+
+      const result = aiComponentToComponent(aiComponent);
+
+      // The part number should be exactly as extracted, not reversed
+      expect(result.manufacturerPN).toBe('IM11A');
+      expect(result.manufacturerPN).not.toBe('A11IM'); // This was the bug
+      expect(result.manufacturerPN).not.toBe('A11MI'); // Full reversal
+    });
+
+    it('should preserve "VSA25 SI" part number from RTL documents', () => {
+      const aiComponent: AIExtractedComponent = {
+        name: 'פסטות ואקום סיליקון קוטר',
+        manufacturerPN: 'VSA25 SI',
+        unitPriceNIS: 25,
+        currency: 'NIS',
+        confidence: 0.9,
+      };
+
+      const result = aiComponentToComponent(aiComponent);
+
+      expect(result.manufacturerPN).toBe('VSA25 SI');
+      expect(result.manufacturerPN).not.toBe('IS 52ASV'); // Reversed
+    });
+
+    it('should preserve "VSBM25 SIF" part number from RTL documents', () => {
+      const aiComponent: AIExtractedComponent = {
+        name: 'טבעת ספוג לאטימה במשטחים',
+        manufacturerPN: 'VSBM25 SIF',
+        unitPriceNIS: 46,
+        currency: 'NIS',
+        confidence: 0.9,
+      };
+
+      const result = aiComponentToComponent(aiComponent);
+
+      expect(result.manufacturerPN).toBe('VSBM25 SIF');
+      expect(result.manufacturerPN).not.toBe('FIS 52MBSV'); // Reversed
+    });
+
+    it('should handle part numbers with mixed letters and numbers correctly', () => {
+      // Various patterns that could be affected by RTL reversal
+      const testCases = [
+        { input: 'ABC123', reversed: '321CBA' },
+        { input: 'XY-45-Z', reversed: 'Z-54-YX' },
+        { input: 'M12-8PIN', reversed: 'NIP8-21M' },
+        { input: 'PLC1200', reversed: '0021CLP' },
+      ];
+
+      for (const { input, reversed } of testCases) {
+        const aiComponent: AIExtractedComponent = {
+          name: 'Test Component',
+          manufacturerPN: input,
+          unitPriceNIS: 100,
+          currency: 'NIS',
+          confidence: 0.9,
+        };
+
+        const result = aiComponentToComponent(aiComponent);
+
+        expect(result.manufacturerPN).toBe(input);
+        expect(result.manufacturerPN).not.toBe(reversed);
+      }
+    });
+  });
+
+  /**
    * REGRESSION TESTS: Part Number Format Handling
    *
    * Bug Fix: System was assuming מק"ט is always numeric, but it can be alphanumeric

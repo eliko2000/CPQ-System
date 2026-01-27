@@ -353,6 +353,37 @@ The user has specified which price columns to extract:`;
 </extraction_workflow>
 
 <critical_constraints>
+  <constraint_0>
+    ⚠️ RTL DOCUMENT DETECTION AND PART NUMBER CORRECTION ⚠️
+
+    STEP 1: DETECT DOCUMENT LANGUAGE
+    - If document contains Hebrew text (עברית), Arabic (عربي), or RTL layout → it's an RTL document
+    - If document is purely English/European → it's an LTR document
+
+    STEP 2: FOR RTL DOCUMENTS ONLY - CHECK FOR REVERSED PART NUMBERS
+    RTL documents have a KNOWN ISSUE where Latin text (part numbers) can appear VISUALLY REVERSED.
+
+    DETECTION: A part number is likely REVERSED if:
+    - It ENDS with 2-4 uppercase letters (manufacturer prefix at wrong end)
+    - It STARTS with numbers when it should start with letters
+    - Examples of REVERSED text: "14NS15GVP", "14NS20GVP", "A11MI", "IS 52MBSV"
+
+    CORRECTION: If you detect reversed text in an RTL document:
+    - "14NS15GVP" → Fix to: "GVP15NS14"
+    - "14NS20GVP" → Fix to: "GVP20NS14"
+    - "A11MI" → Fix to: "IM11A"
+    - "IS 52MBSV" → Fix to: "VSBM25 SI"
+
+    HOW TO FIX: Split into letter/number groups, reverse group order:
+    "14NS15GVP" → ["14","NS","15","GVP"] → ["GVP","15","NS","14"] → "GVP15NS14"
+
+    STEP 3: FOR LTR DOCUMENTS - EXTRACT AS-IS
+    English documents don't have this issue. Extract part numbers exactly as shown.
+
+    COMMON MANUFACTURER PREFIXES (should be at START of part number):
+    GVP, VSA, VSB, VSBM, DVP, SAC, PS, IM, UK, PLC, HMI, VFD
+  </constraint_0>
+
   <constraint_1>
     ⚠️ PART NUMBER vs PRODUCT NAME - COLUMN IDENTIFICATION
 
@@ -641,6 +672,7 @@ ${categoryList}
 8. Extract ALL items, even if some fields are missing
 9. Handle merged cells, multi-line descriptions, and complex layouts
 10. NO quantity field needed - focus on unit price only
+11. ⚠️ RTL DOCS ONLY: If part number ends with letters (like "14NS15GVP"), it's reversed → fix to "GVP15NS14"
 </critical_reminders>
 
 Respond ONLY with valid JSON. No markdown, no explanations.`;

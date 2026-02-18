@@ -16,6 +16,7 @@ import {
   Maximize2,
   Search,
   Loader2,
+  RotateCcw,
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -114,6 +115,37 @@ const LABOR_SUBTYPES = [
   { value: 'installation', label: 'התקנה' },
   { value: 'programming', label: 'תכנות' },
 ] as const;
+
+/**
+ * Reverse a part number to fix RTL extraction issues.
+ * Reverses the ORDER of letter/number SEGMENTS (not characters).
+ *
+ * Examples:
+ * - "A11IM" → segments ['A','11','IM'] → reversed ['IM','11','A'] → "IM11A"
+ * - "SI 25VSBM" → words reversed + segments: "VSBM25 SI"
+ * - "25VSBM" → segments ['25','VSBM'] → reversed ['VSBM','25'] → "VSBM25"
+ */
+function reversePartNumber(pn: string): string {
+  if (!pn) return pn;
+
+  // Helper to reverse segments (letter/number groups) within a token
+  const reverseSegments = (token: string): string => {
+    // Split into alternating letter/number groups
+    const segments = token.match(/[A-Za-z]+|\d+|[^A-Za-z\d]+/g);
+    if (!segments || segments.length <= 1) return token;
+    return segments.reverse().join('');
+  };
+
+  // If has spaces, reverse word order AND reverse segments within each word
+  if (pn.includes(' ')) {
+    const words = pn.trim().split(/\s+/);
+    const reversed = words.reverse().map(reverseSegments);
+    return reversed.join(' ');
+  }
+
+  // No spaces - just reverse segments
+  return reverseSegments(pn);
+}
 
 export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
   extractionResult,
@@ -1277,10 +1309,12 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
                             .manufacturerPN && (
                             <div>
                               <span className="font-medium">מק"ט:</span>{' '}
-                              {
-                                component.matchDecision.matches[0].component
-                                  .manufacturerPN
-                              }
+                              <span dir="ltr" className="text-left">
+                                {
+                                  component.matchDecision.matches[0].component
+                                    .manufacturerPN
+                                }
+                              </span>
                             </div>
                           )}
                           <div className="text-xs text-blue-600 mt-1">
@@ -1374,17 +1408,37 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
                     <label className="text-xs text-muted-foreground">
                       מק"ט
                     </label>
-                    <Input
-                      value={component.manufacturerPN || ''}
-                      onChange={e =>
-                        handleFieldChange(
-                          component.id,
-                          'manufacturerPN',
-                          e.target.value
-                        )
-                      }
-                      placeholder='מק"ט'
-                    />
+                    <div className="flex gap-1">
+                      <Input
+                        dir="ltr"
+                        className="text-left flex-1"
+                        value={component.manufacturerPN || ''}
+                        onChange={e =>
+                          handleFieldChange(
+                            component.id,
+                            'manufacturerPN',
+                            e.target.value
+                          )
+                        }
+                        placeholder='מק"ט'
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="h-9 w-9 shrink-0"
+                        title="הפוך סדר (RTL fix)"
+                        onClick={() =>
+                          handleFieldChange(
+                            component.id,
+                            'manufacturerPN',
+                            reversePartNumber(component.manufacturerPN || '')
+                          )
+                        }
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                   <div>
                     <label className="text-xs text-muted-foreground">
@@ -1537,9 +1591,31 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
                 </div>
                 <div>
                   <span className="text-muted-foreground">מק"ט:</span>
-                  <p className="font-medium truncate">
-                    {component.manufacturerPN || '—'}
-                  </p>
+                  <div className="flex items-center gap-1">
+                    <p
+                      dir="ltr"
+                      className={`font-medium truncate text-left ${component.potentialRTLIssue ? 'text-amber-600' : ''}`}
+                    >
+                      {component.manufacturerPN || '—'}
+                    </p>
+                    {component.manufacturerPN && (
+                      <button
+                        type="button"
+                        className="text-muted-foreground hover:text-foreground p-0.5 rounded"
+                        title="הפוך סדר (RTL fix)"
+                        onClick={e => {
+                          e.stopPropagation();
+                          handleFieldChange(
+                            component.id,
+                            'manufacturerPN',
+                            reversePartNumber(component.manufacturerPN || '')
+                          );
+                        }}
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <div>
                   <span className="text-muted-foreground">קטגוריה:</span>
@@ -1788,6 +1864,38 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
               >
                 עדכן שם
               </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* RTL Document Warnings */}
+      {extractionResult.warnings && extractionResult.warnings.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+          <div className="flex gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0" />
+            <div className="flex-1">
+              <h4 className="font-medium text-amber-900">אזהרות RTL</h4>
+              <p className="text-sm text-amber-700 mt-1">
+                מסמך זה זוהה כמסמך עברי (RTL). מומלץ לבדוק שמספרי המק״ט לא
+                התהפכו.
+              </p>
+              {extractionResult.warnings.filter(
+                w => w.type === 'potential_reversal'
+              ).length > 0 && (
+                <div className="mt-2 space-y-1">
+                  <p className="text-xs font-medium text-amber-800">
+                    רכיבים שעשויים להיות מושפעים:
+                  </p>
+                  <ul className="text-xs text-amber-700 list-disc list-inside">
+                    {extractionResult.warnings
+                      .filter(w => w.type === 'potential_reversal')
+                      .map((w, i) => (
+                        <li key={i}>{w.message}</li>
+                      ))}
+                  </ul>
+                </div>
+              )}
             </div>
           </div>
         </div>

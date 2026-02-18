@@ -107,6 +107,21 @@ export interface AIExtractedComponent extends ExtractedItem {
   notes?: string;
   // Multi-column price extraction (for user column selection)
   allPriceColumns?: PriceColumn[]; // All price columns found in the row
+  // RTL safeguard: flag for potential RTL text direction issues
+  potentialRTLIssue?: boolean;
+  rtlIssueReason?: string;
+}
+
+// Warning for extraction issues
+export interface ExtractionWarning {
+  type:
+    | 'rtl_document'
+    | 'potential_reversal'
+    | 'low_confidence'
+    | 'missing_data';
+  message: string;
+  componentIndex?: number; // Which component this warning applies to (undefined = all)
+  severity: 'info' | 'warning' | 'error';
 }
 
 export interface AIExtractionResult {
@@ -118,6 +133,8 @@ export interface AIExtractionResult {
     quoteDate?: string;
     currency?: string;
     totalItems: number;
+    // RTL document detection
+    isRTLDocument?: boolean;
     // Excel-specific metadata
     sheetName?: string;
     rowCount?: number;
@@ -133,6 +150,8 @@ export interface AIExtractionResult {
   confidence: number;
   rawResponse?: string;
   error?: string;
+  // RTL safeguard: warnings for user review
+  warnings?: ExtractionWarning[];
 }
 
 /**
@@ -354,34 +373,47 @@ The user has specified which price columns to extract:`;
 
 <critical_constraints>
   <constraint_0>
-    ⚠️ RTL DOCUMENT DETECTION AND PART NUMBER CORRECTION ⚠️
+    ⚠️ CRITICAL: RTL DOCUMENT PART NUMBER EXTRACTION ⚠️
 
-    STEP 1: DETECT DOCUMENT LANGUAGE
-    - If document contains Hebrew text (עברית), Arabic (عربي), or RTL layout → it's an RTL document
-    - If document is purely English/European → it's an LTR document
+    IN HEBREW/RTL DOCUMENTS: Part numbers appear in a dedicated column (usually rightmost, labeled פריט or מק"ט).
+    These part numbers are LATIN TEXT and must be read LEFT-TO-RIGHT within that column.
 
-    STEP 2: FOR RTL DOCUMENTS ONLY - CHECK FOR REVERSED PART NUMBERS
-    RTL documents have a KNOWN ISSUE where Latin text (part numbers) can appear VISUALLY REVERSED.
+    ⚠️⚠️⚠️ SEGMENT REVERSAL BUG - YOU MUST AVOID THIS ⚠️⚠️⚠️
+    In RTL documents, you have been reversing the ORDER OF SEGMENTS. This is WRONG.
 
-    DETECTION: A part number is likely REVERSED if:
-    - It ENDS with 2-4 uppercase letters (manufacturer prefix at wrong end)
-    - It STARTS with numbers when it should start with letters
-    - Examples of REVERSED text: "14NS15GVP", "14NS20GVP", "A11MI", "IS 52MBSV"
+    SPECIFIC EXAMPLES OF YOUR MISTAKES:
+    ❌ WRONG: "BLACK0425TBU" → Should be: "TBU0425BLACK"
+    ❌ WRONG: "1/4-1/8-4 6045" → Should be: "6045 1/4-1/8-4"
+    ❌ WRONG: "SI VSA11" → Should be: "VSA11 SI"
 
-    CORRECTION: If you detect reversed text in an RTL document:
-    - "14NS15GVP" → Fix to: "GVP15NS14"
-    - "14NS20GVP" → Fix to: "GVP20NS14"
-    - "A11MI" → Fix to: "IM11A"
-    - "IS 52MBSV" → Fix to: "VSBM25 SI"
+    THE FIX - READ CHARACTER BY CHARACTER FROM VISUAL LEFT TO RIGHT:
+    When you see a part number cell in the פריט column, imagine drawing a line from the LEFT edge to the RIGHT edge.
+    The first character touching the LEFT edge is your FIRST character.
 
-    HOW TO FIX: Split into letter/number groups, reverse group order:
-    "14NS15GVP" → ["14","NS","15","GVP"] → ["GVP","15","NS","14"] → "GVP15NS14"
+    VISUAL EXAMPLE:
+    In the cell you see: |6045 1/4-1/8-4|
+                         ↑              ↑
+                       LEFT           RIGHT
+                       START          END
 
-    STEP 3: FOR LTR DOCUMENTS - EXTRACT AS-IS
-    English documents don't have this issue. Extract part numbers exactly as shown.
+    Extract as: "6045 1/4-1/8-4" (starting from LEFT)
+    NOT as: "1/4-1/8-4 6045" (which would be reading from RIGHT)
 
-    COMMON MANUFACTURER PREFIXES (should be at START of part number):
-    GVP, VSA, VSB, VSBM, DVP, SAC, PS, IM, UK, PLC, HMI, VFD
+    CORRECT EXTRACTIONS:
+    ✓ "TBU0425BLACK" - model code first, color last
+    ✓ "6045 1/4-1/8-4" - model number first, size specs last
+    ✓ "VML-10-08" - letters first, numbers last
+    ✓ "VSA11 SI" - model first, variant last
+    ✓ "F263" - simple alphanumeric
+
+    SELF-CHECK BEFORE RETURNING:
+    - Does the part number START with letters/numbers that look like a model code? ✓
+    - Does the part number END with size specs, colors, or variants? ✓
+    - If fractions (1/4, 1/8) appear BEFORE model numbers, you reversed it! ✗
+
+    DOCUMENT DIRECTION DETECTION:
+    - Set isRTLDocument: true if document contains Hebrew (עברית) or Arabic (عربي)
+    - Set isRTLDocument: false for English/European documents
   </constraint_0>
 
   <constraint_1>
@@ -632,7 +664,8 @@ ${categoryList}
     "quoteDate": "YYYY-MM-DD or null",
     "currency": "primary currency",
     "totalItems": number,
-    "columnHeaders": ["array of ALL column names found in document"]
+    "columnHeaders": ["array of ALL column names found in document"],
+    "isRTLDocument": true | false
   },
   "components": [
     {
@@ -672,10 +705,261 @@ ${categoryList}
 8. Extract ALL items, even if some fields are missing
 9. Handle merged cells, multi-line descriptions, and complex layouts
 10. NO quantity field needed - focus on unit price only
-11. ⚠️ RTL DOCS ONLY: If part number ends with letters (like "14NS15GVP"), it's reversed → fix to "GVP15NS14"
+11. ⚠️ PART NUMBERS: Extract EXACTLY as visually shown - do NOT reorder, reverse, or modify characters
 </critical_reminders>
 
 Respond ONLY with valid JSON. No markdown, no explanations.`;
+}
+
+// Color words that typically appear at the END of part numbers (for cables, wires, etc.)
+const COLOR_SUFFIXES = [
+  'BLACK',
+  'BLUE',
+  'RED',
+  'WHITE',
+  'YELLOW',
+  'GREEN',
+  'ORANGE',
+  'BROWN',
+  'GRAY',
+  'GREY',
+  'BK',
+  'BL',
+  'RD',
+  'WH',
+  'YE',
+  'GN',
+  'OR',
+  'BR',
+  'GY',
+];
+
+/**
+ * RTL Safeguard: Detect potentially suspicious part number patterns using GENERAL heuristics
+ * Returns null if no issues detected, or a reason string if suspicious
+ * NOTE: This is for flagging only - auto-correction is handled by autoCorrectRTLPartNumber()
+ */
+function detectPotentialRTLIssue(
+  partNumber: string | undefined
+): string | null {
+  if (!partNumber || partNumber.length < 3) return null;
+
+  const pn = partNumber.trim().toUpperCase();
+  const pnOriginal = partNumber.trim();
+
+  // Pattern 1: Color word at START (should typically be at END)
+  for (const color of COLOR_SUFFIXES) {
+    if (pn.startsWith(color) && pn.length > color.length) {
+      const afterColor = pn.slice(color.length);
+      if (/^\d/.test(afterColor)) {
+        return `Color "${color}" at start - usually appears at end`;
+      }
+    }
+  }
+
+  // Pattern 2: Two parts where SHORT part comes FIRST
+  // e.g., "SI 25VSBM" - short "SI" before longer model code suggests reversal
+  if (pnOriginal.includes(' ')) {
+    const parts = pnOriginal.split(/\s+/);
+    if (parts.length === 2) {
+      const [first, second] = parts;
+      if (first.length <= 3 && second.length > first.length) {
+        // Check if second part has numbers before letters (also reversed internally)
+        if (/^\d+[A-Z]+$/i.test(second)) {
+          return `Short code "${first}" before model "${second}" - likely reversed`;
+        }
+      }
+    }
+  }
+
+  // Pattern 3: Starts with fraction (fractions usually come after model number)
+  if (/^[\d]\/[\d]/.test(pnOriginal)) {
+    return `Starts with fraction - usually comes after model number`;
+  }
+
+  // Pattern 4: Fraction specs before model number
+  const fractionThenNumberPattern = /^[\d/\s-]+\s+(\d{3,})$/;
+  const fractionMatch = pnOriginal.match(fractionThenNumberPattern);
+  if (fractionMatch) {
+    return `Model "${fractionMatch[1]}" at end - should likely be at start`;
+  }
+
+  // Pattern 5: Pure NUMBERS+LETTERS (no space) - might be reversed
+  // e.g., "25VSBM" should be "VSBM25"
+  if (/^\d{2,4}[A-Z]{2,5}$/i.test(pnOriginal)) {
+    return `Numbers before letters - might be reversed`;
+  }
+
+  return null;
+}
+
+/**
+ * RTL Auto-Correction: Fix reversed part numbers using GENERAL heuristics (no hardcoded prefix lists)
+ *
+ * Core principle: In reversed RTL extraction, short suffixes end up at the START,
+ * and the main model code ends up at the END or has its letter/number order swapped.
+ */
+function autoCorrectRTLPartNumber(
+  partNumber: string | undefined
+): { corrected: string; change: string } | null {
+  if (!partNumber || partNumber.length < 3) return null;
+
+  const pn = partNumber.trim();
+
+  // === PATTERN 1: Two space-separated parts, SHORT first + LONG second ===
+  // e.g., "SI 25VSBM" → "VSBM25 SI" (short variant first, model code second)
+  // e.g., "SIF VSBM25" → "VSBM25 SIF"
+  if (pn.includes(' ')) {
+    const parts = pn.split(/\s+/);
+    if (parts.length === 2) {
+      const [first, second] = parts;
+
+      // Heuristic: If first part is SHORT (1-3 chars, typically variant suffix)
+      // and second part is LONGER (model code), they're likely reversed
+      if (first.length <= 3 && second.length > first.length) {
+        // Check if second part is NUMBERS+LETTERS (e.g., "25VSBM")
+        // This pattern suggests the letters/numbers within are also reversed
+        const numThenLetters = second.match(/^(\d+)([A-Z]+)$/i);
+        if (numThenLetters) {
+          const [, nums, letters] = numThenLetters;
+          // Reconstruct: LETTERS+NUMBERS + VARIANT
+          const corrected = `${letters}${nums} ${first}`;
+          return {
+            corrected,
+            change: `Reversed: "${first} ${nums}${letters}" → "${letters}${nums} ${first}"`,
+          };
+        }
+
+        // Check if second part is LETTERS+NUMBERS (e.g., "VSBM25") - might just need word swap
+        const lettersThenNum = second.match(/^([A-Z]+)(\d+)$/i);
+        if (lettersThenNum) {
+          // Just swap the word order
+          const corrected = `${second} ${first}`;
+          return {
+            corrected,
+            change: `Swapped word order: "${first} ${second}" → "${second} ${first}"`,
+          };
+        }
+      }
+    }
+  }
+
+  // === PATTERN 2: Fractions/specs at START, model number at END ===
+  // e.g., "1/4-1/8-4 6045" → "6045 1/4-1/8-4"
+  const fractionFirstPattern = /^([\d/-]+(?:[-\s][\d/-]+)*)\s+(\d{3,})$/;
+  const fractionMatch = pn.match(fractionFirstPattern);
+  if (fractionMatch) {
+    const [, fractionPart, modelNumber] = fractionMatch;
+    const corrected = `${modelNumber} ${fractionPart}`;
+    return { corrected, change: `Moved model "${modelNumber}" to start` };
+  }
+
+  // === PATTERN 3: Color word at START (colors usually go at END) ===
+  // e.g., "BLACK0425XYZ" → "XYZ0425BLACK"
+  for (const color of COLOR_SUFFIXES) {
+    const upperPN = pn.toUpperCase();
+    if (upperPN.startsWith(color) && pn.length > color.length + 3) {
+      const afterColor = pn.slice(color.length);
+      // Check for pattern: COLOR + NUMBERS + LETTERS
+      const numLetters = afterColor.match(/^(\d+)([A-Z]+)$/i);
+      if (numLetters) {
+        const [, nums, letters] = numLetters;
+        const corrected = `${letters}${nums}${color}`;
+        return {
+          corrected,
+          change: `Moved color "${color}" to end, fixed model to "${letters}${nums}"`,
+        };
+      }
+    }
+  }
+
+  // === PATTERN 4: Pure NUMBERS+LETTERS (no space) where numbers come first ===
+  // e.g., "25VSBM" → "VSBM25"
+  // Only apply if numbers are 2-4 digits and letters are 2-5 chars (typical model pattern)
+  const numLetterPattern = /^(\d{2,4})([A-Z]{2,5})$/i;
+  const numLetterMatch = pn.match(numLetterPattern);
+  if (numLetterMatch) {
+    const [, nums, letters] = numLetterMatch;
+    const corrected = `${letters}${nums}`;
+    return {
+      corrected,
+      change: `Reversed "${nums}${letters}" → "${letters}${nums}"`,
+    };
+  }
+
+  return null;
+}
+
+/**
+ * RTL Safeguard: Process components, auto-correct where possible, and add warnings
+ */
+function addRTLWarnings(
+  components: AIExtractedComponent[],
+  isRTLDocument: boolean
+): { components: AIExtractedComponent[]; warnings: ExtractionWarning[] } {
+  const warnings: ExtractionWarning[] = [];
+
+  // Add general RTL document warning
+  if (isRTLDocument) {
+    warnings.push({
+      type: 'rtl_document',
+      message:
+        'RTL document detected. Part numbers have been auto-corrected where patterns were recognized.',
+      severity: 'info',
+    });
+  }
+
+  // Process each component: auto-correct if possible, otherwise flag
+  const processedComponents = components.map((component, index) => {
+    if (!isRTLDocument) return component;
+
+    // Try auto-correction first
+    const correction = autoCorrectRTLPartNumber(component.manufacturerPN);
+
+    if (correction) {
+      // Auto-correction succeeded
+      logger.info(
+        `RTL Auto-correct [${index + 1}]: "${component.manufacturerPN}" → "${correction.corrected}" (${correction.change})`
+      );
+
+      warnings.push({
+        type: 'potential_reversal',
+        message: `Component ${index + 1}: Auto-corrected "${component.manufacturerPN}" → "${correction.corrected}"`,
+        componentIndex: index,
+        severity: 'info', // Info because it was fixed
+      });
+
+      return {
+        ...component,
+        manufacturerPN: correction.corrected,
+        potentialRTLIssue: false, // Corrected, no longer an issue
+        rtlIssueReason: `Auto-corrected: ${correction.change}`,
+      };
+    }
+
+    // No auto-correction, check if there's a potential issue to flag
+    const issue = detectPotentialRTLIssue(component.manufacturerPN);
+
+    if (issue) {
+      // Flag as potential issue (couldn't auto-correct)
+      warnings.push({
+        type: 'potential_reversal',
+        message: `Component ${index + 1} "${component.manufacturerPN}": ${issue}`,
+        componentIndex: index,
+        severity: 'warning',
+      });
+
+      return {
+        ...component,
+        potentialRTLIssue: true,
+        rtlIssueReason: issue,
+      };
+    }
+
+    return component;
+  });
+
+  return { components: processedComponents, warnings };
 }
 
 /**
@@ -710,19 +994,58 @@ function parseClaudeResponse(responseText: string): AIExtractionResult {
           ) / parsed.components.length
         : 0.5;
 
+    // Log RTL document detection and extracted part numbers for debugging
+    const isRTL = parsed.metadata?.isRTLDocument ?? false;
+    if (isRTL) {
+      logger.info('RTL document detected. Extracted part numbers:');
+      parsed.components.forEach((c: AIExtractedComponent, i: number) => {
+        if (c.manufacturerPN) {
+          logger.info(
+            `  [${i + 1}] "${c.manufacturerPN}" - ${c.name || 'unnamed'}`
+          );
+        }
+      });
+    }
+
+    // Apply RTL safeguards - check for potential reversal issues
+    const { components: processedComponents, warnings } = addRTLWarnings(
+      parsed.components,
+      isRTL
+    );
+
+    // Log warnings if any
+    if (warnings.length > 0) {
+      logger.warn(`RTL Safeguard: ${warnings.length} warning(s) detected:`);
+      warnings.forEach(w => logger.warn(`  - [${w.severity}] ${w.message}`));
+    }
+
+    // Adjust confidence if RTL document with warnings
+    let adjustedConfidence = avgConfidence;
+    const rtlWarnings = warnings.filter(w => w.type === 'potential_reversal');
+    if (isRTL && rtlWarnings.length > 0) {
+      // Reduce confidence by 10% for each potential reversal issue (max 30% reduction)
+      const reduction = Math.min(0.3, rtlWarnings.length * 0.1);
+      adjustedConfidence = Math.max(0.3, avgConfidence - reduction);
+      logger.info(
+        `Confidence adjusted from ${avgConfidence.toFixed(2)} to ${adjustedConfidence.toFixed(2)} due to ${rtlWarnings.length} potential RTL issue(s)`
+      );
+    }
+
     return {
       success: true,
-      components: parsed.components,
+      components: processedComponents,
       metadata: {
         documentType: parsed.documentType || 'unknown',
         supplier: parsed.metadata?.supplier,
         quoteDate: parsed.metadata?.quoteDate,
         currency: parsed.metadata?.currency,
-        totalItems: parsed.components.length,
+        totalItems: processedComponents.length,
         columnHeaders: parsed.metadata?.columnHeaders || [],
+        isRTLDocument: isRTL,
       },
-      confidence: avgConfidence,
+      confidence: adjustedConfidence,
       rawResponse: responseText,
+      warnings: warnings.length > 0 ? warnings : undefined,
     };
   } catch (error) {
     logger.error('Failed to parse Claude response:', error);

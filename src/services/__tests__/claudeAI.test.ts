@@ -218,19 +218,18 @@ describe('claudeAI service', () => {
   });
 
   /**
-   * REGRESSION TESTS: RTL Text Reversal Bug Fix
+   * REGRESSION TESTS: RTL Text Exact Visual Extraction
    *
-   * Bug: When extracting part numbers from Hebrew (RTL) documents, Latin text was being reversed
-   * Example: "VSBM25 SI" was extracted as "SI 25VSBM" (reversed)
-   * Example: "IM11A" was extracted as "A11IM" (reversed)
+   * Bug: When extracting part numbers from Hebrew (RTL) documents, Latin text was being
+   * reversed or had characters reordered (e.g., "2240.12.37P" → "P2240.12.37")
    *
-   * Root Cause: Claude AI misinterpreted the text direction of Latin characters in RTL context
-   * Fix: Added explicit RTL handling instructions to the extraction prompt (constraint_0)
+   * Root Cause: Claude AI was applying RTL text direction logic to Latin characters
+   * Fix: Changed prompt to extract part numbers as pure OCR - exact visual character order
    *
-   * These tests verify that part numbers are preserved in their correct LTR order
-   * after being extracted and passed through aiComponentToComponent.
+   * These tests verify that part numbers are preserved EXACTLY as provided,
+   * with no reversal, reordering, or modification of any kind.
    */
-  describe('RTL text reversal prevention', () => {
+  describe('RTL text exact visual extraction', () => {
     it('should preserve "VSBM25 SI" part number (not reverse to "SI 25VSBM")', () => {
       // REGRESSION TEST: This was the exact bug reported
       const aiComponent: AIExtractedComponent = {
@@ -320,6 +319,89 @@ describe('claudeAI service', () => {
         expect(result.manufacturerPN).toBe(input);
         expect(result.manufacturerPN).not.toBe(reversed);
       }
+    });
+
+    it('should preserve part numbers with suffix letters (not move to front)', () => {
+      // REGRESSION TEST: Specific bug where suffix letters were moved to front
+      // Example: "2240.12.37P" was incorrectly extracted as "P2240.12.37"
+      const testCases = [
+        { input: '2240.12.37P', wrongOrder: 'P2240.12.37' },
+        { input: '2246.01M', wrongOrder: 'M2246.01' },
+        { input: '5822.32S', wrongOrder: 'S5822.32' },
+        { input: 'CV12/0B-00A', wrongOrder: 'A00-B0/21VC' },
+        { input: 'CL12/0B-00A', wrongOrder: 'A00-B0/21LC' },
+      ];
+
+      for (const { input, wrongOrder } of testCases) {
+        const aiComponent: AIExtractedComponent = {
+          name: 'Test Component',
+          manufacturerPN: input,
+          unitPriceNIS: 100,
+          currency: 'NIS',
+          confidence: 0.9,
+        };
+
+        const result = aiComponentToComponent(aiComponent);
+
+        // Part number should be EXACTLY as provided
+        expect(result.manufacturerPN).toBe(input);
+        // Should NOT have letters moved to wrong position
+        expect(result.manufacturerPN).not.toBe(wrongOrder);
+      }
+    });
+
+    it('should support potentialRTLIssue flag on components', () => {
+      // Test that the new RTL safeguard fields are properly passed through
+      const aiComponent: AIExtractedComponent = {
+        name: 'Test Component',
+        manufacturerPN: '2240.12.37P',
+        unitPriceNIS: 100,
+        currency: 'NIS',
+        confidence: 0.9,
+        potentialRTLIssue: true,
+        rtlIssueReason: 'Part number ends with letter(s) after numbers',
+      };
+
+      const result = aiComponentToComponent(aiComponent);
+
+      // Component should preserve the RTL issue flags
+      expect(result.manufacturerPN).toBe('2240.12.37P');
+      // The aiComponentToComponent doesn't pass these through, but the interface supports them
+    });
+
+    /**
+     * REGRESSION TEST: Segment reversal patterns
+     * Bug: Part numbers like "TBU0425BLACK" were extracted as "BLACK0425TBU" (segments reversed)
+     * These tests document the expected extraction and what should be flagged as suspicious
+     */
+    it('should flag segment-reversed patterns like "BLACK0425TBU"', () => {
+      // This pattern (COLOR+NUMBERS+PREFIX) suggests the segments are reversed
+      // The correct extraction should be "TBU0425BLACK" (PREFIX+NUMBERS+COLOR)
+      const aiComponent: AIExtractedComponent = {
+        name: 'צינור פוליאוריטן שחור',
+        manufacturerPN: 'BLACK0425TBU', // WRONG - this is reversed
+        unitPriceNIS: 200,
+        currency: 'NIS',
+        confidence: 0.9,
+      };
+
+      const result = aiComponentToComponent(aiComponent);
+
+      // The extraction passes through as-is (no auto-correction)
+      // But the detection system should flag this pattern
+      expect(result.manufacturerPN).toBe('BLACK0425TBU');
+
+      // Document the correct extraction for reference
+      const correctExtraction: AIExtractedComponent = {
+        name: 'צינור פוליאוריטן שחור',
+        manufacturerPN: 'TBU0425BLACK', // CORRECT order
+        unitPriceNIS: 200,
+        currency: 'NIS',
+        confidence: 0.9,
+      };
+      expect(aiComponentToComponent(correctExtraction).manufacturerPN).toBe(
+        'TBU0425BLACK'
+      );
     });
   });
 

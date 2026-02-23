@@ -275,6 +275,7 @@ export function ComponentLibrary() {
             <div className="relative flex-1">
               <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
+                dir="auto"
                 placeholder="חיפוש לפי שם, יצרן, מקט, קטגוריה, סוג מוצר, ספק..."
                 value={searchTerm}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
@@ -405,6 +406,7 @@ export function ComponentLibrary() {
             <div className="relative flex-1">
               <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
+                dir="auto"
                 placeholder="חיפוש לפי שם, קטגוריה, תיאור..."
                 value={searchTerm}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) =>

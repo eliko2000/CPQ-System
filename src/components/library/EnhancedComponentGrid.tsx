@@ -655,6 +655,12 @@ export function EnhancedComponentGrid({
           uniqueValues: getUniqueValues('manufacturerPN'),
         }),
         cellClass: 'font-mono text-sm',
+        cellStyle: {
+          direction: 'ltr',
+          unicodeBidi: 'isolate',
+          textAlign: 'left',
+        },
+        cellEditorParams: { inputStyle: { direction: 'ltr' } },
         filterParams: {
           values: (_params: any) => getUniqueValues('manufacturerPN'),
         },

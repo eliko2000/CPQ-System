@@ -1,208 +1,224 @@
-import { useMemo, useRef } from 'react'
-import { AgGridReact } from 'ag-grid-react'
-import { ColDef } from 'ag-grid-community'
-import 'ag-grid-community/styles/ag-grid.css'
-import 'ag-grid-community/styles/ag-theme-alpine.css'
-import { Button } from '../ui/button'
-import { Badge } from '../ui/badge'
-import { Edit, Trash2, Eye } from 'lucide-react'
-import { Component } from '../../types'
+import { useMemo, useRef } from 'react';
+import { AgGridReact } from 'ag-grid-react';
+import { ColDef } from 'ag-grid-community';
+import 'ag-grid-community/styles/ag-grid.css';
+import 'ag-grid-community/styles/ag-theme-alpine.css';
+import { Button } from '../ui/button';
+import { Badge } from '../ui/badge';
+import { Edit, Trash2, Eye } from 'lucide-react';
+import { Component } from '../../types';
 
 interface ComponentGridProps {
-  components: Component[]
-  onEdit: (component: Component) => void
-  onDelete: (componentId: string, componentName: string) => void
-  onView?: (component: Component) => void
+  components: Component[];
+  onEdit: (component: Component) => void;
+  onDelete: (componentId: string, componentName: string) => void;
+  onView?: (component: Component) => void;
 }
 
-export function ComponentGrid({ components, onEdit, onDelete, onView }: ComponentGridProps) {
-  const gridRef = useRef<AgGridReact>(null)
+export function ComponentGrid({
+  components,
+  onEdit,
+  onDelete,
+  onView,
+}: ComponentGridProps) {
+  const gridRef = useRef<AgGridReact>(null);
 
-  const columnDefs: ColDef[] = useMemo(() => [
-    {
-      headerName: 'שם רכיב',
-      field: 'name',
-      sortable: true,
-      filter: true,
-      resizable: true,
-      minWidth: 200,
-      cellRenderer: (params: any) => (
-        <div className="py-1">
-          <div className="font-medium">{params.value}</div>
-          {params.data.description && (
-            <div className="text-sm text-muted-foreground">
-              {params.data.description}
-            </div>
-          )}
-        </div>
-      )
-    },
-    {
-      headerName: 'יצרן',
-      field: 'manufacturer',
-      sortable: true,
-      filter: true,
-      resizable: true,
-      minWidth: 120
-    },
-    {
-      headerName: 'מק"ט יצרן',
-      field: 'manufacturerPN',
-      sortable: true,
-      filter: true,
-      resizable: true,
-      minWidth: 140,
-      cellClass: 'font-mono text-sm'
-    },
-    {
-      headerName: 'קטגוריה',
-      field: 'category',
-      sortable: true,
-      filter: true,
-      resizable: true,
-      minWidth: 120,
-      cellRenderer: (params: any) => (
-        <Badge variant="secondary" className="text-xs">
-          {params.value}
-        </Badge>
-      )
-    },
-    {
-      headerName: 'סוג מוצר',
-      field: 'productType',
-      sortable: true,
-      filter: true,
-      resizable: true,
-      minWidth: 120,
-      valueGetter: (params: any) => params.data.productType || '-'
-    },
-    {
-      headerName: 'ספק',
-      field: 'supplier',
-      sortable: true,
-      filter: true,
-      resizable: true,
-      minWidth: 120
-    },
-    {
-      headerName: 'מחיר בש"ח',
-      field: 'unitCostNIS',
-      sortable: true,
-      filter: 'agNumberColumnFilter',
-      resizable: true,
-      minWidth: 120,
-      type: 'numericColumn',
-      valueFormatter: (params: any) => {
-        return new Intl.NumberFormat('he-IL', {
-          style: 'currency',
-          currency: 'ILS',
-          minimumFractionDigits: 2
-        }).format(params.value || 0)
+  const columnDefs: ColDef[] = useMemo(
+    () => [
+      {
+        headerName: 'שם רכיב',
+        field: 'name',
+        sortable: true,
+        filter: true,
+        resizable: true,
+        minWidth: 200,
+        cellRenderer: (params: any) => (
+          <div className="py-1">
+            <div className="font-medium">{params.value}</div>
+            {params.data.description && (
+              <div className="text-sm text-muted-foreground">
+                {params.data.description}
+              </div>
+            )}
+          </div>
+        ),
       },
-      cellClass: 'font-semibold text-green-600'
-    },
-    {
-      headerName: 'מחיר בדולר',
-      field: 'unitCostUSD',
-      sortable: true,
-      filter: 'agNumberColumnFilter',
-      resizable: true,
-      minWidth: 120,
-      type: 'numericColumn',
-      valueFormatter: (params: any) => {
-        return new Intl.NumberFormat('en-US', {
-          style: 'currency',
-          currency: 'USD',
-          minimumFractionDigits: 2
-        }).format(params.value || 0)
+      {
+        headerName: 'יצרן',
+        field: 'manufacturer',
+        sortable: true,
+        filter: true,
+        resizable: true,
+        minWidth: 120,
       },
-      cellClass: 'font-semibold text-blue-600'
-    },
-    {
-      headerName: 'מטבע',
-      field: 'currency',
-      sortable: true,
-      filter: true,
-      resizable: true,
-      minWidth: 80,
-      cellRenderer: (params: any) => (
-        <Badge variant="outline" className="text-xs">
-          {params.value}
-        </Badge>
-      )
-    },
-    {
-      headerName: 'תאריך הצעה',
-      field: 'quoteDate',
-      sortable: true,
-      filter: true,
-      resizable: true,
-      minWidth: 120,
-      valueFormatter: (params: any) => {
-        if (!params.value) return '-'
-        return new Date(params.value).toLocaleDateString('he-IL')
-      }
-    },
-    {
-      headerName: 'פעולות',
-      field: 'actions',
-      sortable: false,
-      filter: false,
-      resizable: false,
-      minWidth: 150,
-      cellRenderer: (params: any) => (
-        <div className="flex gap-1">
-          {onView && (
+      {
+        headerName: 'מק"ט יצרן',
+        field: 'manufacturerPN',
+        sortable: true,
+        filter: true,
+        resizable: true,
+        minWidth: 140,
+        cellClass: 'font-mono text-sm',
+        cellStyle: {
+          direction: 'ltr',
+          unicodeBidi: 'isolate',
+          textAlign: 'left',
+        },
+      },
+      {
+        headerName: 'קטגוריה',
+        field: 'category',
+        sortable: true,
+        filter: true,
+        resizable: true,
+        minWidth: 120,
+        cellRenderer: (params: any) => (
+          <Badge variant="secondary" className="text-xs">
+            {params.value}
+          </Badge>
+        ),
+      },
+      {
+        headerName: 'סוג מוצר',
+        field: 'productType',
+        sortable: true,
+        filter: true,
+        resizable: true,
+        minWidth: 120,
+        valueGetter: (params: any) => params.data.productType || '-',
+      },
+      {
+        headerName: 'ספק',
+        field: 'supplier',
+        sortable: true,
+        filter: true,
+        resizable: true,
+        minWidth: 120,
+      },
+      {
+        headerName: 'מחיר בש"ח',
+        field: 'unitCostNIS',
+        sortable: true,
+        filter: 'agNumberColumnFilter',
+        resizable: true,
+        minWidth: 120,
+        type: 'numericColumn',
+        valueFormatter: (params: any) => {
+          return new Intl.NumberFormat('he-IL', {
+            style: 'currency',
+            currency: 'ILS',
+            minimumFractionDigits: 2,
+          }).format(params.value || 0);
+        },
+        cellClass: 'font-semibold text-green-600',
+      },
+      {
+        headerName: 'מחיר בדולר',
+        field: 'unitCostUSD',
+        sortable: true,
+        filter: 'agNumberColumnFilter',
+        resizable: true,
+        minWidth: 120,
+        type: 'numericColumn',
+        valueFormatter: (params: any) => {
+          return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'USD',
+            minimumFractionDigits: 2,
+          }).format(params.value || 0);
+        },
+        cellClass: 'font-semibold text-blue-600',
+      },
+      {
+        headerName: 'מטבע',
+        field: 'currency',
+        sortable: true,
+        filter: true,
+        resizable: true,
+        minWidth: 80,
+        cellRenderer: (params: any) => (
+          <Badge variant="outline" className="text-xs">
+            {params.value}
+          </Badge>
+        ),
+      },
+      {
+        headerName: 'תאריך הצעה',
+        field: 'quoteDate',
+        sortable: true,
+        filter: true,
+        resizable: true,
+        minWidth: 120,
+        valueFormatter: (params: any) => {
+          if (!params.value) return '-';
+          return new Date(params.value).toLocaleDateString('he-IL');
+        },
+      },
+      {
+        headerName: 'פעולות',
+        field: 'actions',
+        sortable: false,
+        filter: false,
+        resizable: false,
+        minWidth: 150,
+        cellRenderer: (params: any) => (
+          <div className="flex gap-1">
+            {onView && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onView(params.data)}
+                className="h-8 w-8 p-0"
+                title="צפה"
+              >
+                <Eye className="h-3 w-3" />
+              </Button>
+            )}
             <Button
               variant="outline"
               size="sm"
-              onClick={() => onView(params.data)}
+              onClick={() => onEdit(params.data)}
               className="h-8 w-8 p-0"
-              title="צפה"
+              title="ערוך"
             >
-              <Eye className="h-3 w-3" />
+              <Edit className="h-3 w-3" />
             </Button>
-          )}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onEdit(params.data)}
-            className="h-8 w-8 p-0"
-            title="ערוך"
-          >
-            <Edit className="h-3 w-3" />
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onDelete(params.data.id, params.data.name)}
-            className="h-8 w-8 p-0 text-red-600 hover:text-red-800"
-            title="מחק"
-          >
-            <Trash2 className="h-3 w-3" />
-          </Button>
-        </div>
-      )
-    }
-  ], [])
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onDelete(params.data.id, params.data.name)}
+              className="h-8 w-8 p-0 text-red-600 hover:text-red-800"
+              title="מחק"
+            >
+              <Trash2 className="h-3 w-3" />
+            </Button>
+          </div>
+        ),
+      },
+    ],
+    []
+  );
 
-  const defaultColDef = useMemo(() => ({
-    sortable: true,
-    filter: true,
-    resizable: true,
-    wrapText: true,
-    autoHeight: true
-  }), [])
+  const defaultColDef = useMemo(
+    () => ({
+      sortable: true,
+      filter: true,
+      resizable: true,
+      wrapText: true,
+      autoHeight: true,
+    }),
+    []
+  );
 
   const onGridReady = (params: any) => {
     // Auto-size columns to fit content
-    params.api.sizeColumnsToFit()
-  }
+    params.api.sizeColumnsToFit();
+  };
 
   const onFirstDataRendered = (params: any) => {
     // Auto-size columns after data is rendered
-    params.api.sizeColumnsToFit()
-  }
+    params.api.sizeColumnsToFit();
+  };
 
   return (
     <div className="ag-theme-alpine" style={{ height: '600px', width: '100%' }}>
@@ -232,8 +248,8 @@ export function ComponentGrid({ components, onEdit, onDelete, onView }: Componen
               labelKey: 'filters',
               iconKey: 'filter',
               toolPanel: 'agFiltersToolPanel',
-            }
-          ]
+            },
+          ],
         }}
         localeText={{
           page: 'עמוד',
@@ -270,9 +286,9 @@ export function ComponentGrid({ components, onEdit, onDelete, onView }: Componen
           rowGroupColumns: 'עמודות קיבוץ שורות',
           pivotColumns: 'עמודות פיבוט',
           valueColumns: 'עמודות ערך',
-          pivotPanel: 'פאנל פיבוט'
+          pivotPanel: 'פאנל פיבוט',
         }}
       />
     </div>
-  )
+  );
 }

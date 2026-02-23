@@ -275,14 +275,22 @@ export function ComponentLibrary() {
             <div className="relative flex-1">
               <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                dir="auto"
-                placeholder="חיפוש לפי שם, יצרן, מקט, קטגוריה, סוג מוצר, ספק..."
+                dir="ltr"
+                style={{ direction: 'ltr', textAlign: 'right' }}
                 value={searchTerm}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                   setSearchTerm(e.target.value)
                 }
                 className="pr-10"
               />
+              {!searchTerm && (
+                <span
+                  dir="rtl"
+                  className="absolute inset-y-0 right-10 left-0 flex items-center text-sm text-muted-foreground pointer-events-none overflow-hidden"
+                >
+                  חיפוש לפי שם, יצרן, מקט, קטגוריה, סוג מוצר, ספק...
+                </span>
+              )}
             </div>
           </div>
 
@@ -406,14 +414,22 @@ export function ComponentLibrary() {
             <div className="relative flex-1">
               <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                dir="auto"
-                placeholder="חיפוש לפי שם, קטגוריה, תיאור..."
+                dir="ltr"
+                style={{ direction: 'ltr', textAlign: 'right' }}
                 value={searchTerm}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                   setSearchTerm(e.target.value)
                 }
                 className="pr-10"
               />
+              {!searchTerm && (
+                <span
+                  dir="rtl"
+                  className="absolute inset-y-0 right-10 left-0 flex items-center text-sm text-muted-foreground pointer-events-none overflow-hidden"
+                >
+                  חיפוש לפי שם, קטגוריה, תיאור...
+                </span>
+              )}
             </div>
           </div>
 

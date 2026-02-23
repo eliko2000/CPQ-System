@@ -655,12 +655,22 @@ export function EnhancedComponentGrid({
           uniqueValues: getUniqueValues('manufacturerPN'),
         }),
         cellClass: 'font-mono text-sm',
-        cellStyle: {
-          direction: 'ltr',
-          unicodeBidi: 'isolate',
-          textAlign: 'left',
+        cellRenderer: (params: any) => (
+          <span
+            dir="ltr"
+            style={{
+              direction: 'ltr',
+              unicodeBidi: 'bidi-override',
+              display: 'block',
+              textAlign: 'right',
+            }}
+          >
+            {params.value || ''}
+          </span>
+        ),
+        cellEditorParams: {
+          inputStyle: { direction: 'ltr', textAlign: 'left' },
         },
-        cellEditorParams: { inputStyle: { direction: 'ltr' } },
         filterParams: {
           values: (_params: any) => getUniqueValues('manufacturerPN'),
         },

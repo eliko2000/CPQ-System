@@ -556,11 +556,13 @@ export function ComponentForm({
                       מק"ט יצרן
                     </label>
                     <Input
+                      dir="ltr"
+                      style={{ direction: 'ltr', unicodeBidi: 'isolate' }}
                       value={formData.manufacturerPN}
                       onChange={e =>
                         handleInputChange('manufacturerPN', e.target.value)
                       }
-                      placeholder="לדוגמה: 6ES7214-1AG40-0XB0"
+                      placeholder="6ES7214-1AG40-0XB0"
                     />
                   </div>
                 </div>

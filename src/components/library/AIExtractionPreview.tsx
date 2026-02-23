@@ -118,33 +118,47 @@ const LABOR_SUBTYPES = [
 
 /**
  * Reverse a part number to fix RTL extraction issues.
- * Reverses the ORDER of letter/number SEGMENTS (not characters).
+ *
+ * Two character types:
+ *   Type 1 (non-letter): digits, dots, dashes, slashes — stay together as one group
+ *   Type 2 (letter):     A-Z, a-z — stay together as one group
+ *
+ * Split into alternating type-1 and type-2 groups, then REVERSE their order.
+ * Applying twice restores the original (involutory).
+ *
+ * Strings with NO letters are returned unchanged — pure type-1 strings have
+ * no inherent direction to fix.
  *
  * Examples:
- * - "A11IM" → segments ['A','11','IM'] → reversed ['IM','11','A'] → "IM11A"
- * - "SI 25VSBM" → words reversed + segments: "VSBM25 SI"
- * - "25VSBM" → segments ['25','VSBM'] → reversed ['VSBM','25'] → "VSBM25"
+ *   "2240.KD.00"        ↔ ".00KD2240."     (groups: "2240." + "KD" + ".00")
+ *   "CL12/0B-OOA"       ↔ "OOA-B12/0CL"   (groups: "CL" + "12/0" + "B" + "-" + "OOA")
+ *   "2246.01M"          ↔ "M2246.01"       (groups: "2246.01" + "M")
+ *   "P2240.12.37"       ↔ "2240.12.37P"
+ *   "5822.32S"          ↔ "S32.5822"        — wait, S is type-2, 5822.32 is type-1
+ *   "BLACK0425TBU"      ↔ "TBU0425BLACK"
+ *   "2241.52.00.39.02"  → unchanged (no letters)
+ *
+ * Space-separated: reverse word order, then apply within each word.
  */
 function reversePartNumber(pn: string): string {
   if (!pn) return pn;
+  // No letters → no directional information → leave unchanged
+  if (!/[A-Za-z]/.test(pn)) return pn;
 
-  // Helper to reverse segments (letter/number groups) within a token
-  const reverseSegments = (token: string): string => {
-    // Split into alternating letter/number groups
-    const segments = token.match(/[A-Za-z]+|\d+|[^A-Za-z\d]+/g);
+  const reverseToken = (token: string): string => {
+    if (!/[A-Za-z]/.test(token)) return token;
+    // Type 1 = non-letter chars (digits, dots, dashes, etc. — all grouped together)
+    // Type 2 = letter chars (A-Za-z — grouped together)
+    const segments = token.match(/[A-Za-z]+|[^A-Za-z]+/g);
     if (!segments || segments.length <= 1) return token;
-    return segments.reverse().join('');
+    return [...segments].reverse().join('');
   };
 
-  // If has spaces, reverse word order AND reverse segments within each word
   if (pn.includes(' ')) {
-    const words = pn.trim().split(/\s+/);
-    const reversed = words.reverse().map(reverseSegments);
-    return reversed.join(' ');
+    return pn.trim().split(/\s+/).reverse().map(reverseToken).join(' ');
   }
 
-  // No spaces - just reverse segments
-  return reverseSegments(pn);
+  return reverseToken(pn);
 }
 
 export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
@@ -1411,6 +1425,7 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
                     <div className="flex gap-1">
                       <Input
                         dir="ltr"
+                        style={{ direction: 'ltr', unicodeBidi: 'isolate' }}
                         className="text-left flex-1"
                         value={component.manufacturerPN || ''}
                         onChange={e =>
@@ -1594,6 +1609,7 @@ export const AIExtractionPreview: React.FC<AIExtractionPreviewProps> = ({
                   <div className="flex items-center gap-1">
                     <p
                       dir="ltr"
+                      style={{ direction: 'ltr', unicodeBidi: 'isolate' }}
                       className={`font-medium truncate text-left ${component.potentialRTLIssue ? 'text-amber-600' : ''}`}
                     >
                       {component.manufacturerPN || '—'}

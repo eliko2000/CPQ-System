@@ -373,43 +373,29 @@ The user has specified which price columns to extract:`;
 
 <critical_constraints>
   <constraint_0>
-    ⚠️ CRITICAL: RTL DOCUMENT PART NUMBER EXTRACTION ⚠️
+    ⚠️ PART NUMBERS — COPY EXACTLY, CHARACTER BY CHARACTER:
+    Part numbers (מק"ט) are LTR strings. Copy them EXACTLY as you visually read them
+    in the cell — left to right, every character, in exact order.
 
-    IN HEBREW/RTL DOCUMENTS: Part numbers appear in a dedicated column (usually rightmost, labeled פריט or מק"ט).
-    These part numbers are LATIN TEXT and must be read LEFT-TO-RIGHT within that column.
+    ABSOLUTE RULES — NO EXCEPTIONS:
+    1. NEVER truncate: if you see "2240.KD.00" output "2240.KD.00" — NOT "KD2240"
+    2. NEVER move letters before numbers: if digits come first, keep digits first
+    3. NEVER strip dots: the dots in "2240.KD.00" are part of the value
+    4. NEVER duplicate characters: "5822.32S" stays "5822.32S" — not "S5822.32S"
 
-    ⚠️⚠️⚠️ SEGMENT REVERSAL BUG - YOU MUST AVOID THIS ⚠️⚠️⚠️
-    In RTL documents, you have been reversing the ORDER OF SEGMENTS. This is WRONG.
+    WRONG → CORRECT examples:
+    "KD2240"    → "2240.KD.00"  (truncated AND reordered — both errors)
+    "KT2240"    → "2240.KT.10"  (same)
+    "S5822.32S" → "5822.32S"    (duplicated leading character)
 
-    SPECIFIC EXAMPLES OF YOUR MISTAKES:
-    ❌ WRONG: "BLACK0425TBU" → Should be: "TBU0425BLACK"
-    ❌ WRONG: "1/4-1/8-4 6045" → Should be: "6045 1/4-1/8-4"
-    ❌ WRONG: "SI VSA11" → Should be: "VSA11 SI"
+    COLUMN BOUNDARY — DO NOT BLEED FROM ADJACENT COLUMNS:
+    - The PN cell contains ONLY the part number
+    - If adjacent description/model text appears to touch the PN cell, take ONLY the PN value
+    - Example: seeing "OPTYMA32-S5822.32S" where "OPTYMA32-S" is the product model →
+      extract only "5822.32S"
 
-    THE FIX - READ CHARACTER BY CHARACTER FROM VISUAL LEFT TO RIGHT:
-    When you see a part number cell in the פריט column, imagine drawing a line from the LEFT edge to the RIGHT edge.
-    The first character touching the LEFT edge is your FIRST character.
-
-    VISUAL EXAMPLE:
-    In the cell you see: |6045 1/4-1/8-4|
-                         ↑              ↑
-                       LEFT           RIGHT
-                       START          END
-
-    Extract as: "6045 1/4-1/8-4" (starting from LEFT)
-    NOT as: "1/4-1/8-4 6045" (which would be reading from RIGHT)
-
-    CORRECT EXTRACTIONS:
-    ✓ "TBU0425BLACK" - model code first, color last
-    ✓ "6045 1/4-1/8-4" - model number first, size specs last
-    ✓ "VML-10-08" - letters first, numbers last
-    ✓ "VSA11 SI" - model first, variant last
-    ✓ "F263" - simple alphanumeric
-
-    SELF-CHECK BEFORE RETURNING:
-    - Does the part number START with letters/numbers that look like a model code? ✓
-    - Does the part number END with size specs, colors, or variants? ✓
-    - If fractions (1/4, 1/8) appear BEFORE model numbers, you reversed it! ✗
+    ROW ALIGNMENT — CRITICAL FOR RTL TABLES:
+    - Match each cell to its SAME row — do not pick part numbers from adjacent rows
 
     DOCUMENT DIRECTION DETECTION:
     - Set isRTLDocument: true if document contains Hebrew (עברית) or Arabic (عربي)
@@ -428,8 +414,8 @@ The user has specified which price columns to extract:`;
 
     ⚠️ WHAT IS A VALID PART NUMBER:
     - Typically 5-15 characters
-    - Usually starts with letters or numbers
-    - Examples: "1404187", "DVP14SS211R", "750-362", "6ES7214-1AG40-0XB0", "SAC-8P-1,5-PUR/M8FS"
+    - Can start with digits, letters, or dots — all are valid
+    - Examples: "1404187", "DVP14SS211R", "750-362", "6ES7214-1AG40-0XB0", "2240.KD.00", "5822.32S"
 
     ⚠️ WHAT IS NOT A VALID PART NUMBER (use as name instead):
     - Cable specifications like "AI 0,75-8 BU" (wire type + gauge + conductors + color)
@@ -790,103 +776,30 @@ function detectPotentialRTLIssue(
     return `Numbers before letters - might be reversed`;
   }
 
+  // Pattern 6: Starts with short letter group (1-4 letters) followed only by digits and dots
+  // e.g., "KD2240.00", "S5822.32", "P2240.12.37" — letters moved to front by RTL BiDi rendering
+  // Does NOT match complex patterns like "CV12/0B-00A" (has slashes/letters in rest)
+  const lettersStartMatch = pnOriginal.match(/^([A-Za-z]{1,4})(\d[\d.]+)$/);
+  if (lettersStartMatch) {
+    return `Starts with "${lettersStartMatch[1]}" — letter group may have moved from end due to RTL rendering`;
+  }
+
   return null;
 }
 
 /**
- * RTL Auto-Correction: Fix reversed part numbers using GENERAL heuristics (no hardcoded prefix lists)
+ * RTL Auto-Correction: disabled.
  *
- * Core principle: In reversed RTL extraction, short suffixes end up at the START,
- * and the main model code ends up at the END or has its letter/number order swapped.
+ * Heuristic auto-correction was causing incorrect modifications to already-correct part numbers
+ * (e.g. "2240.KD.00" extracted correctly but then "corrected" to "KD2240.00").
+ * The UI reverse button now handles user-controlled correction on a per-item basis.
  */
 function autoCorrectRTLPartNumber(
   partNumber: string | undefined
 ): { corrected: string; change: string } | null {
   if (!partNumber || partNumber.length < 3) return null;
 
-  const pn = partNumber.trim();
-
-  // === PATTERN 1: Two space-separated parts, SHORT first + LONG second ===
-  // e.g., "SI 25VSBM" → "VSBM25 SI" (short variant first, model code second)
-  // e.g., "SIF VSBM25" → "VSBM25 SIF"
-  if (pn.includes(' ')) {
-    const parts = pn.split(/\s+/);
-    if (parts.length === 2) {
-      const [first, second] = parts;
-
-      // Heuristic: If first part is SHORT (1-3 chars, typically variant suffix)
-      // and second part is LONGER (model code), they're likely reversed
-      if (first.length <= 3 && second.length > first.length) {
-        // Check if second part is NUMBERS+LETTERS (e.g., "25VSBM")
-        // This pattern suggests the letters/numbers within are also reversed
-        const numThenLetters = second.match(/^(\d+)([A-Z]+)$/i);
-        if (numThenLetters) {
-          const [, nums, letters] = numThenLetters;
-          // Reconstruct: LETTERS+NUMBERS + VARIANT
-          const corrected = `${letters}${nums} ${first}`;
-          return {
-            corrected,
-            change: `Reversed: "${first} ${nums}${letters}" → "${letters}${nums} ${first}"`,
-          };
-        }
-
-        // Check if second part is LETTERS+NUMBERS (e.g., "VSBM25") - might just need word swap
-        const lettersThenNum = second.match(/^([A-Z]+)(\d+)$/i);
-        if (lettersThenNum) {
-          // Just swap the word order
-          const corrected = `${second} ${first}`;
-          return {
-            corrected,
-            change: `Swapped word order: "${first} ${second}" → "${second} ${first}"`,
-          };
-        }
-      }
-    }
-  }
-
-  // === PATTERN 2: Fractions/specs at START, model number at END ===
-  // e.g., "1/4-1/8-4 6045" → "6045 1/4-1/8-4"
-  const fractionFirstPattern = /^([\d/-]+(?:[-\s][\d/-]+)*)\s+(\d{3,})$/;
-  const fractionMatch = pn.match(fractionFirstPattern);
-  if (fractionMatch) {
-    const [, fractionPart, modelNumber] = fractionMatch;
-    const corrected = `${modelNumber} ${fractionPart}`;
-    return { corrected, change: `Moved model "${modelNumber}" to start` };
-  }
-
-  // === PATTERN 3: Color word at START (colors usually go at END) ===
-  // e.g., "BLACK0425XYZ" → "XYZ0425BLACK"
-  for (const color of COLOR_SUFFIXES) {
-    const upperPN = pn.toUpperCase();
-    if (upperPN.startsWith(color) && pn.length > color.length + 3) {
-      const afterColor = pn.slice(color.length);
-      // Check for pattern: COLOR + NUMBERS + LETTERS
-      const numLetters = afterColor.match(/^(\d+)([A-Z]+)$/i);
-      if (numLetters) {
-        const [, nums, letters] = numLetters;
-        const corrected = `${letters}${nums}${color}`;
-        return {
-          corrected,
-          change: `Moved color "${color}" to end, fixed model to "${letters}${nums}"`,
-        };
-      }
-    }
-  }
-
-  // === PATTERN 4: Pure NUMBERS+LETTERS (no space) where numbers come first ===
-  // e.g., "25VSBM" → "VSBM25"
-  // Only apply if numbers are 2-4 digits and letters are 2-5 chars (typical model pattern)
-  const numLetterPattern = /^(\d{2,4})([A-Z]{2,5})$/i;
-  const numLetterMatch = pn.match(numLetterPattern);
-  if (numLetterMatch) {
-    const [, nums, letters] = numLetterMatch;
-    const corrected = `${letters}${nums}`;
-    return {
-      corrected,
-      change: `Reversed "${nums}${letters}" → "${letters}${nums}"`,
-    };
-  }
-
+  // Disabled: let users apply the reverse button manually
   return null;
 }
 
@@ -904,7 +817,7 @@ function addRTLWarnings(
     warnings.push({
       type: 'rtl_document',
       message:
-        'RTL document detected. Part numbers have been auto-corrected where patterns were recognized.',
+        'RTL document detected. Review part numbers and use the Reverse button if they appear reversed.',
       severity: 'info',
     });
   }

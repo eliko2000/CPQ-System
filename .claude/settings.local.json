@@ -58,7 +58,13 @@
       "Bash(done)",
       "Bash(git merge:*)",
       "Bash(git worktree:*)",
-      "Bash(git fetch:*)"
+      "Bash(git fetch:*)",
+      "Bash(.scriptscreate-worktree.bat bugfix supabase-security)",
+      "Bash(cmd.exe /c \"scripts\\\\create-worktree.bat bugfix supabase-security\")",
+      "Bash(code:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(npx vitest run:*)"
     ],
     "deny": [],
     "ask": []

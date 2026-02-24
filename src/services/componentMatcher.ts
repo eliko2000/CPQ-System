@@ -105,8 +105,15 @@ function dbToComponent(dbComp: DbComponent): Component {
     unitCostUSD: dbComp.unit_cost_usd || 0,
     unitCostEUR: dbComp.unit_cost_eur || 0,
     supplier: dbComp.supplier || '',
-    currency: (dbComp.currency as 'NIS' | 'USD' | 'EUR') || 'USD',
-    originalCost: dbComp.unit_cost_usd || dbComp.unit_cost_ils || 0,
+    currency: (dbComp.currency as 'NIS' | 'USD' | 'EUR') || 'NIS',
+    // Use the currency-specific field to get the correct original cost.
+    // Do NOT use unit_cost_usd as a blanket default — that corrupts NIS/EUR components.
+    originalCost:
+      ((dbComp.currency as string) === 'EUR'
+        ? dbComp.unit_cost_eur
+        : (dbComp.currency as string) === 'USD'
+          ? dbComp.unit_cost_usd
+          : dbComp.unit_cost_ils) || 0,
     quoteDate: new Date().toISOString().split('T')[0],
     quoteFileUrl: '',
     notes: dbComp.notes || '',

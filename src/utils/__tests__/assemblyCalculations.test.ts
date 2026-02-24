@@ -817,3 +817,160 @@ describe('Assembly Integration Scenarios', () => {
     expect(pricing.missingComponentCount).toBe(2);
   });
 });
+
+// ============ Regression Tests: originalCost / currency mismatch bug ============
+// Bug: EUR-priced components had original_cost stored as the USD value in the DB.
+// Assembly was displaying USD prices as EUR prices.
+// Fix: calculateAssemblyPricing now uses unitCostEUR/USD as primary source.
+
+describe('Regression: originalCost mismatch does not corrupt assembly pricing', () => {
+  const rates = { usdToIlsRate: 3.7, eurToIlsRate: 4.0 };
+
+  it('EUR component with originalCost wrongly set to USD value uses unitCostEUR', () => {
+    // Reproduces the exact DB state for Danfoss 134X3077 before the fix:
+    // currency='EUR', original_cost=351.85 (USD value!), unit_cost_eur=325.46
+    const danfossVFD = createMockComponent({
+      name: 'בקר תדר 0.55KW',
+      currency: 'EUR',
+      originalCost: 351.85, // ← was wrongly stored as USD value
+      unitCostEUR: 325.46, // ← correct EUR price
+      unitCostUSD: 351.85,
+      unitCostNIS: 1301.84,
+    });
+
+    const assembly = createMockAssembly([
+      createMockAssemblyComponent(danfossVFD, 1),
+    ]);
+
+    const pricing = calculateAssemblyPricing(assembly, rates);
+
+    // Should use unitCostEUR (325.46), NOT originalCost (351.85)
+    expect(pricing.totalCostEUR).toBe(325.46);
+    expect(pricing.totalCostNIS).toBeCloseTo(325.46 * 4.0, 1); // 1301.84
+    expect(pricing.totalCostUSD).toBeCloseTo((325.46 * 4.0) / 3.7, 1); // ~351.85
+  });
+
+  it('EUR component with originalCost wrongly set to USD value - second component', () => {
+    // Reproduces Danfoss 132B0254: currency='EUR', original_cost=50.26 (USD), unit_cost_eur=46.49
+    const danfossPanel = createMockComponent({
+      name: 'פאנל בקרה דיגיטלי',
+      currency: 'EUR',
+      originalCost: 50.26, // ← wrongly stored as USD value
+      unitCostEUR: 46.49, // ← correct EUR price
+      unitCostUSD: 50.26,
+      unitCostNIS: 185.96,
+    });
+
+    const assembly = createMockAssembly([
+      createMockAssemblyComponent(danfossPanel, 1),
+    ]);
+
+    const pricing = calculateAssemblyPricing(assembly, rates);
+
+    expect(pricing.totalCostEUR).toBe(46.49);
+    expect(pricing.totalCostNIS).toBeCloseTo(46.49 * 4.0, 1); // 185.96
+  });
+
+  it('two EUR components with wrong originalCost produce correct assembly total', () => {
+    // Reproduces the exact scenario from the bug report (images 1+4):
+    // Assembly with 134X3077 + 132B0254 showed EUR 402.11 (should be 371.95)
+    const comp1 = createMockComponent({
+      currency: 'EUR',
+      originalCost: 351.85, // wrong USD value
+      unitCostEUR: 325.46,
+      unitCostUSD: 351.85,
+      unitCostNIS: 1301.84,
+    });
+    const comp2 = createMockComponent({
+      currency: 'EUR',
+      originalCost: 50.26, // wrong USD value
+      unitCostEUR: 46.49,
+      unitCostUSD: 50.26,
+      unitCostNIS: 185.96,
+    });
+
+    const assembly = createMockAssembly([
+      createMockAssemblyComponent(comp1, 1),
+      createMockAssemblyComponent(comp2, 1),
+    ]);
+
+    const pricing = calculateAssemblyPricing(assembly, rates);
+
+    // Correct: 325.46 + 46.49 = 371.95, NOT the buggy 351.85 + 50.26 = 402.11
+    expect(pricing.totalCostEUR).toBeCloseTo(371.95, 2);
+    expect(pricing.totalCostEUR).not.toBeCloseTo(402.11, 1); // old buggy value
+    expect(pricing.breakdown.eurComponents.count).toBe(2);
+  });
+
+  it('USD component with originalCost wrongly set to NIS value uses unitCostUSD', () => {
+    const comp = createMockComponent({
+      currency: 'USD',
+      originalCost: 370, // wrong NIS value
+      unitCostUSD: 100, // correct USD price
+      unitCostNIS: 370,
+      unitCostEUR: 92.5,
+    });
+
+    const assembly = createMockAssembly([createMockAssemblyComponent(comp, 1)]);
+
+    const pricing = calculateAssemblyPricing(assembly, rates);
+
+    // Should use unitCostUSD (100), NOT originalCost (370)
+    expect(pricing.totalCostUSD).toBe(100);
+    expect(pricing.totalCostNIS).toBeCloseTo(100 * 3.7, 1); // 370
+  });
+
+  it('NIS component with originalCost wrongly set to USD value uses unitCostNIS', () => {
+    // Reproduces Pneumax "אום חיבור": currency='NIS', unit_cost_ils=45,
+    // original_cost=12.16 (= unit_cost_usd — wrong value stored by componentMatcher.ts)
+    const pneumaxFitting = createMockComponent({
+      currency: 'NIS',
+      originalCost: 12.16, // ← wrong USD value in DB
+      unitCostNIS: 45, // ← correct NIS price
+      unitCostUSD: 12.16,
+      unitCostEUR: 11.25,
+    });
+
+    const assembly = createMockAssembly([
+      createMockAssemblyComponent(pneumaxFitting, 1),
+    ]);
+
+    const pricing = calculateAssemblyPricing(assembly, rates);
+
+    // Must use unitCostNIS (45), NOT originalCost (12.16)
+    expect(pricing.totalCostNIS).toBe(45);
+    expect(pricing.totalCostNIS).not.toBeCloseTo(12.16, 1);
+    expect(pricing.breakdown.nisComponents.count).toBe(1);
+    expect(pricing.breakdown.nisComponents.total).toBe(45);
+  });
+
+  it('NIS component with correct values calculates correctly', () => {
+    const comp = createMockComponent({
+      currency: 'NIS',
+      originalCost: 100,
+      unitCostNIS: 100,
+    });
+
+    const assembly = createMockAssembly([createMockAssemblyComponent(comp, 2)]);
+
+    const pricing = calculateAssemblyPricing(assembly, rates);
+    expect(pricing.totalCostNIS).toBe(200);
+  });
+
+  it('EUR component with correct originalCost still calculates correctly', () => {
+    // Verify we did not break components where originalCost IS correct
+    const comp = createMockComponent({
+      currency: 'EUR',
+      originalCost: 100, // correct EUR value
+      unitCostEUR: 100,
+      unitCostNIS: 400,
+      unitCostUSD: 108.11,
+    });
+
+    const assembly = createMockAssembly([createMockAssemblyComponent(comp, 1)]);
+
+    const pricing = calculateAssemblyPricing(assembly, rates);
+    expect(pricing.totalCostEUR).toBe(100);
+    expect(pricing.totalCostNIS).toBeCloseTo(400, 0);
+  });
+});

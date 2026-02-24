@@ -176,7 +176,15 @@ function ProductProvider({ children }: { children: React.ReactNode }) {
         unitCostUSD: comp.unit_cost_usd || 0,
         unitCostEUR: comp.unit_cost_eur || 0,
         currency: comp.currency || 'NIS',
-        originalCost: comp.original_cost || comp.unit_cost_ils || 0,
+        // Always derive originalCost from the currency-specific field.
+        // original_cost in the DB is unreliable — it is stored as unit_cost_usd
+        // for all currencies due to a bug in componentMatcher.ts.
+        originalCost:
+          (comp.currency === 'EUR'
+            ? comp.unit_cost_eur
+            : comp.currency === 'USD'
+              ? comp.unit_cost_usd
+              : comp.unit_cost_ils) || 0,
         // MSRP fields (for distributed components)
         msrpPrice: comp.msrp_price,
         msrpCurrency: comp.msrp_currency,

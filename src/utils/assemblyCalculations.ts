@@ -8,7 +8,10 @@
 
 import type { Assembly, AssemblyComponent, AssemblyPricing } from '../types';
 // Component is unused but kept for future use
-import { getGlobalExchangeRates, type ExchangeRates } from './currencyConversion';
+import {
+  getGlobalExchangeRates,
+  type ExchangeRates,
+} from './currencyConversion';
 
 /**
  * Calculate total pricing for an assembly
@@ -49,9 +52,19 @@ export function calculateAssemblyPricing(
     const quantity = assemblyComp.quantity;
     componentCount++;
 
-    // Get the component's original currency and cost
+    // Get the component's original currency and cost.
+    // IMPORTANT: Always use the currency-specific typed field as the authoritative
+    // source. The originalCost field is unreliable — it is systematically stored
+    // as unit_cost_usd in the DB regardless of the component's actual currency
+    // (root cause: componentMatcher.ts hardcodes originalCost = unit_cost_usd
+    // when loading matched components, corrupting data on re-import).
     const currency = component.currency || 'NIS';
-    const originalCost = component.originalCost || component.unitCostNIS;
+    const originalCost =
+      currency === 'EUR'
+        ? component.unitCostEUR || component.unitCostNIS || 0
+        : currency === 'USD'
+          ? component.unitCostUSD || component.unitCostNIS || 0
+          : component.unitCostNIS || 0;
 
     // Calculate line total in original currency
     const lineTotal = originalCost * quantity;
@@ -91,9 +104,18 @@ export function calculateAssemblyPricing(
     componentCount,
     missingComponentCount,
     breakdown: {
-      nisComponents: { count: nisCount, total: Math.round(nisTotal * 100) / 100 },
-      usdComponents: { count: usdCount, total: Math.round(usdTotal * 100) / 100 },
-      eurComponents: { count: eurCount, total: Math.round(eurTotal * 100) / 100 },
+      nisComponents: {
+        count: nisCount,
+        total: Math.round(nisTotal * 100) / 100,
+      },
+      usdComponents: {
+        count: usdCount,
+        total: Math.round(usdTotal * 100) / 100,
+      },
+      eurComponents: {
+        count: eurCount,
+        total: Math.round(eurTotal * 100) / 100,
+      },
     },
   };
 }
@@ -146,13 +168,13 @@ export function getAssemblyPricingBreakdown(pricing: AssemblyPricing): string {
 
   if (pricing.breakdown.usdComponents.count > 0) {
     parts.push(
-      `${pricing.breakdown.usdComponents.count} רכיבים ב-USD ($${pricing.breakdown.usdComponents.total.toFixed(2)})`
+      `${pricing.breakdown.usdComponents.count} רכיבים בדולר ($${pricing.breakdown.usdComponents.total.toFixed(2)})`
     );
   }
 
   if (pricing.breakdown.eurComponents.count > 0) {
     parts.push(
-      `${pricing.breakdown.eurComponents.count} רכיבים ב-EUR (€${pricing.breakdown.eurComponents.total.toFixed(2)})`
+      `${pricing.breakdown.eurComponents.count} רכיבים ביורו (€${pricing.breakdown.eurComponents.total.toFixed(2)})`
     );
   }
 
@@ -184,7 +206,7 @@ export function validateAssembly(
   }
 
   // Check for valid quantities
-  const invalidQuantity = components.find((c) => c.quantity <= 0);
+  const invalidQuantity = components.find(c => c.quantity <= 0);
   if (invalidQuantity) {
     return { valid: false, error: 'כמות הרכיבים חייבת להיות גדולה מאפס' };
   }

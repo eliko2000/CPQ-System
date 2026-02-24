@@ -1,5 +1,9 @@
 import { Assembly, AssemblyWithPricing } from '../../types';
-import { calculateAssemblyPricing, formatAssemblyPricing, getAssemblyPricingBreakdown } from '../../utils/assemblyCalculations';
+import {
+  calculateAssemblyPricing,
+  formatAssemblyPricing,
+  getAssemblyPricingBreakdown,
+} from '../../utils/assemblyCalculations';
 import { Card, CardContent, CardHeader } from '../ui/card';
 import { Button } from '../ui/button';
 import { Edit, Trash2, AlertTriangle, Package } from 'lucide-react';
@@ -11,12 +15,18 @@ interface AssemblyGridProps {
   onDelete: (assemblyId: string, assemblyName: string) => void;
 }
 
-export function AssemblyGrid({ assemblies, onEdit, onDelete }: AssemblyGridProps) {
+export function AssemblyGrid({
+  assemblies,
+  onEdit,
+  onDelete,
+}: AssemblyGridProps) {
   // Calculate pricing for each assembly
-  const assembliesWithPricing: AssemblyWithPricing[] = assemblies.map((assembly) => ({
-    ...assembly,
-    pricing: calculateAssemblyPricing(assembly),
-  }));
+  const assembliesWithPricing: AssemblyWithPricing[] = assemblies.map(
+    assembly => ({
+      ...assembly,
+      pricing: calculateAssemblyPricing(assembly),
+    })
+  );
 
   if (assemblies.length === 0) {
     return (
@@ -34,7 +44,7 @@ export function AssemblyGrid({ assemblies, onEdit, onDelete }: AssemblyGridProps
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      {assembliesWithPricing.map((assembly) => {
+      {assembliesWithPricing.map(assembly => {
         const formatted = formatAssemblyPricing(assembly.pricing);
         const breakdown = getAssemblyPricingBreakdown(assembly.pricing);
 
@@ -53,7 +63,9 @@ export function AssemblyGrid({ assemblies, onEdit, onDelete }: AssemblyGridProps
                     )}
                   </div>
                   {assembly.description && (
-                    <p className="text-sm text-muted-foreground">{assembly.description}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {assembly.description}
+                    </p>
                   )}
                 </div>
               </div>
@@ -94,7 +106,10 @@ export function AssemblyGrid({ assemblies, onEdit, onDelete }: AssemblyGridProps
 
               {/* Breakdown */}
               {breakdown && (
-                <div className="text-xs text-muted-foreground border-t pt-2">
+                <div
+                  className="text-xs text-muted-foreground border-t pt-2 text-right"
+                  dir="rtl"
+                >
                   {breakdown}
                 </div>
               )}

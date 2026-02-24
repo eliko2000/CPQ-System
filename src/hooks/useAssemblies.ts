@@ -123,10 +123,18 @@ export function useAssemblies(): UseAssembliesReturn {
                   unitCostUSD: parseFloat(ac.component.unit_cost_usd || 0),
                   unitCostEUR: parseFloat(ac.component.unit_cost_eur || 0),
                   currency: ac.component.currency || 'NIS',
+                  // Always derive originalCost from the currency-specific field.
+                  // original_cost in DB is stored as unit_cost_usd for all currencies.
                   originalCost: parseFloat(
-                    ac.component.original_cost ||
-                      ac.component.unit_cost_ils ||
-                      0
+                    ac.component.currency === 'EUR'
+                      ? ac.component.unit_cost_eur ||
+                          ac.component.unit_cost_ils ||
+                          0
+                      : ac.component.currency === 'USD'
+                        ? ac.component.unit_cost_usd ||
+                          ac.component.unit_cost_ils ||
+                          0
+                        : ac.component.unit_cost_ils || 0
                   ),
                   quoteDate: ac.component.created_at?.split('T')[0] || '',
                   quoteFileUrl: '',
